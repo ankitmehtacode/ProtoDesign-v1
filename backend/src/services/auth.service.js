@@ -32,8 +32,15 @@ export const authService = {
 
         await db.none('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [user.id, 'user']);
 
-        emailService.sendWelcomeEmail(user.email, user.full_name)
-            .catch(err => console.error("Failed to send welcome email:", err));
+        // Awaited: under Lambda a dangling promise is frozen with the container the
+        // instant the response returns, so this would never actually send.
+        try {
+            await emailService.sendWelcomeEmail(user.email, user.full_name);
+        } catch (err) {
+            console.error(JSON.stringify({
+                event: 'email_failed', type: 'welcome', userId: user.id, error: err.message
+            }));
+        }
 
         const token = this._generateToken(user.id, user.email, 'user');
 
@@ -117,8 +124,13 @@ export const authService = {
             await db.none('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [user.id, 'user']);
 
             // Send Welcome Email
-            emailService.sendWelcomeEmail(email, name)
-                .catch(err => console.error("Failed to send welcome email:", err));
+            try {
+                await emailService.sendWelcomeEmail(email, name);
+            } catch (err) {
+                console.error(JSON.stringify({
+                    event: 'email_failed', type: 'welcome_google', userId: user.id, error: err.message
+                }));
+            }
         } else {
             // Get existing role
             role = await this._getUserRole(user.id);

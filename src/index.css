@@ -7,91 +7,103 @@ All colors MUST be HSL.
 */
 
 @layer base {
+    /* ─────────────────────────────────────────────────────────────────────
+       Palette reference: Škoda's dark pine-green / mint pairing, requested
+       2026-09-18. Re-mapped by ROLE, not copied literally -- Škoda uses the
+       dark green for large surfaces (nav, footer) and mint only for small
+       punchy CTAs. Same split applied here: --accent (grounding, large
+       surfaces) takes the deep pine; --primary (the color that already
+       drives every CTA button/link/focus-ring in this codebase) takes the
+       mint, so the whole existing component tree repaints correctly by
+       changing values in exactly this one file -- no component touched.
+       ───────────────────────────────────────────────────────────────────── */
     :root {
-        --background: 35 30% 98%;
-        --foreground: 25 40% 15%;
+        --background: 150 22% 97%;
+        --foreground: 160 35% 11%;
 
         --card: 0 0% 100%;
-        --card-foreground: 25 40% 15%;
+        --card-foreground: 160 35% 11%;
 
         --popover: 0 0% 100%;
-        --popover-foreground: 25 40% 15%;
+        --popover-foreground: 160 35% 11%;
 
-        /* Warm terracotta primary - main brand color */
-        --primary: 15 65% 55%;
-        --primary-foreground: 0 0% 100%;
-        --primary-glow: 15 75% 65%;
+        /* Mint - the CTA/link/focus color (was terracotta) */
+        --primary: 152 55% 58%;
+        --primary-foreground: 160 45% 10%;
+        --primary-glow: 152 65% 68%;
 
-        /* Sandy beige secondary */
-        --secondary: 40 35% 85%;
-        --secondary-foreground: 25 40% 20%;
+        /* Soft sage secondary (was sandy beige) */
+        --secondary: 150 22% 90%;
+        --secondary-foreground: 160 35% 16%;
 
-        /* Warm muted tones */
-        --muted: 35 25% 92%;
-        --muted-foreground: 25 20% 45%;
+        /* Muted, same cool family */
+        --muted: 150 15% 93%;
+        --muted-foreground: 160 15% 42%;
 
-        /* Accent - deep warm brown */
-        --accent: 25 45% 35%;
-        --accent-foreground: 35 30% 98%;
+        /* Deep pine - grounding accent for surfaces/badges (was warm brown) */
+        --accent: 160 45% 14%;
+        --accent-foreground: 150 25% 97%;
 
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 0 0% 100%;
 
-        --border: 35 20% 88%;
-        --input: 35 20% 88%;
-        --ring: 15 65% 55%;
+        --border: 150 18% 87%;
+        --input: 150 18% 87%;
+        --ring: 152 55% 58%;
 
         --radius: 0.75rem;
 
-        /* Premium gradients */
-        --gradient-warm: linear-gradient(135deg, hsl(15 65% 55%) 0%, hsl(25 55% 45%) 100%);
-        --gradient-subtle: linear-gradient(180deg, hsl(35 30% 98%) 0%, hsl(35 25% 92%) 100%);
-        --gradient-hero: linear-gradient(135deg, hsl(15 65% 55%) 0%, hsl(25 45% 35%) 100%);
+        /* Gradients now run mint -> pine instead of terracotta -> brown */
+        --gradient-warm: linear-gradient(135deg, hsl(152 55% 58%) 0%, hsl(160 40% 20%) 100%);
+        --gradient-subtle: linear-gradient(180deg, hsl(150 22% 97%) 0%, hsl(150 15% 93%) 100%);
+        --gradient-hero: linear-gradient(135deg, hsl(152 55% 58%) 0%, hsl(160 45% 14%) 100%);
 
         /* Shadows */
-        --shadow-soft: 0 4px 20px -2px hsl(15 65% 55% / 0.15);
-        --shadow-glow: 0 0 40px hsl(15 75% 65% / 0.3);
+        --shadow-soft: 0 4px 20px -2px hsl(152 55% 58% / 0.15);
+        --shadow-glow: 0 0 40px hsl(152 65% 68% / 0.3);
 
         /* Transitions */
         --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .dark {
-        --background: 25 30% 8%;
-        --foreground: 35 30% 95%;
+        --background: 160 38% 6%;
+        --foreground: 150 22% 95%;
 
-        --card: 25 25% 12%;
-        --card-foreground: 35 30% 95%;
+        --card: 160 32% 9%;
+        --card-foreground: 150 22% 95%;
 
-        --popover: 25 25% 12%;
-        --popover-foreground: 35 30% 95%;
+        --popover: 160 32% 9%;
+        --popover-foreground: 150 22% 95%;
 
-        --primary: 15 70% 60%;
-        --primary-foreground: 25 30% 8%;
-        --primary-glow: 15 75% 65%;
+        --primary: 152 55% 62%;
+        --primary-foreground: 160 45% 8%;
+        --primary-glow: 152 65% 70%;
 
-        --secondary: 25 20% 18%;
-        --secondary-foreground: 35 30% 95%;
+        --secondary: 160 22% 15%;
+        --secondary-foreground: 150 22% 95%;
 
-        --muted: 25 20% 15%;
-        --muted-foreground: 35 15% 60%;
+        --muted: 160 20% 13%;
+        --muted-foreground: 150 15% 65%;
 
-        --accent: 15 55% 50%;
-        --accent-foreground: 35 30% 98%;
+        /* A lighter pine in dark mode -- the near-black pine from light mode
+           would vanish against this background instead of reading as accent */
+        --accent: 155 40% 40%;
+        --accent-foreground: 150 25% 97%;
 
         --destructive: 0 62.8% 50%;
         --destructive-foreground: 35 30% 95%;
 
-        --border: 25 20% 20%;
-        --input: 25 20% 20%;
-        --ring: 15 70% 60%;
+        --border: 160 20% 18%;
+        --input: 160 20% 18%;
+        --ring: 152 55% 62%;
 
-        --gradient-warm: linear-gradient(135deg, hsl(15 70% 60%) 0%, hsl(25 55% 45%) 100%);
-        --gradient-subtle: linear-gradient(180deg, hsl(25 30% 8%) 0%, hsl(25 25% 12%) 100%);
-        --gradient-hero: linear-gradient(135deg, hsl(15 70% 60%) 0%, hsl(25 45% 35%) 100%);
+        --gradient-warm: linear-gradient(135deg, hsl(152 55% 62%) 0%, hsl(155 40% 40%) 100%);
+        --gradient-subtle: linear-gradient(180deg, hsl(160 38% 6%) 0%, hsl(160 32% 9%) 100%);
+        --gradient-hero: linear-gradient(135deg, hsl(152 55% 62%) 0%, hsl(155 40% 40%) 100%);
 
-        --shadow-soft: 0 4px 20px -2px hsl(15 70% 60% / 0.2);
-        --shadow-glow: 0 0 40px hsl(15 75% 65% / 0.4);
+        --shadow-soft: 0 4px 20px -2px hsl(152 55% 62% / 0.2);
+        --shadow-glow: 0 0 40px hsl(152 65% 70% / 0.4);
     }
 }
 
@@ -140,5 +152,16 @@ All colors MUST be HSL.
 
     .transition-smooth {
         transition: var(--transition-smooth);
+    }
+}
+/* Respects the OS-level reduced-motion preference. Was entirely absent despite
+   the project using tailwindcss-animate, GSAP, and Framer Motion -- someone
+   with motion sensitivity had no way to opt out of any animation on this site. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }

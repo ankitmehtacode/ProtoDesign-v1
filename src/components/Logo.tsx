@@ -9,10 +9,16 @@ export const Logo = ({ className = "w-9 h-9" }: { className?: string }) => {
                 xmlns="http://www.w3.org/2000/svg"
             >
                 <defs>
+                    {/* References the same --primary/--accent tokens as the rest of
+                        the UI (src/index.css) instead of hardcoded hex. Was three
+                        standalone hex stops with no connection to the design system --
+                        the last palette change (terracotta -> mint/pine) left the logo
+                        behind since nothing tied it to the tokens. This way the logo
+                        repaints automatically the next time the palette does too. */}
                     <linearGradient id="logoWarmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: '#FACC15', stopOpacity: 1 }} />
-                        <stop offset="50%" style={{ stopColor: '#EF4444', stopOpacity: 1 }} />
-                        <stop offset="100%" style={{ stopColor: '#D9643A', stopOpacity: 1 }} />
+                        <stop offset="0%" style={{ stopColor: 'hsl(var(--primary-glow))', stopOpacity: 1 }} />
+                        <stop offset="50%" style={{ stopColor: 'hsl(var(--primary))', stopOpacity: 1 }} />
+                        <stop offset="100%" style={{ stopColor: 'hsl(var(--accent))', stopOpacity: 1 }} />
                     </linearGradient>
                 </defs>
 

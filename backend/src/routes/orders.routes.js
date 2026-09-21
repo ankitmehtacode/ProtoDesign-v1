@@ -1,19 +1,25 @@
 import express from 'express';
 import db from '../config/database.js';
 import authMiddleware from '../middleware/auth.js';
+import isAdmin from '../middleware/isAdmin.js';
 import { emailService } from '../services/email.service.js';
 import { phonePeService } from '../services/phonepe.service.js';
+import {
+    PENDING_STATUSES,
+    CANCELLABLE_STATUSES,
+    cancelOrder,
+    createOrder,
+    isUuid,
+    reconcilePendingOrder,
+    reconcilePendingOrders
+} from '../services/order.service.js';
 const router = express.Router();
 
 // ==========================================
 // 🚨 ADMIN ROUTE (MUST BE FIRST)
 // ==========================================
-router.get('/admin/all', authMiddleware, async (req, res, next) => {
+router.get('/admin/all', authMiddleware, isAdmin, async (req, res, next) => {
     try {
-        if (req.userRole !== 'admin') {
-            return res.status(403).json({ error: 'Access denied' });
-        }
-
         const orders = await db.any(`
             SELECT
                 o.id, o.created_at, o.status,
@@ -51,7 +57,9 @@ router.get('/admin/all', authMiddleware, async (req, res, next) => {
 
 /**
  * GET /api/orders
- * Get logged-in user's orders
+ * Get logged-in user's orders. Pending PhonePe orders are re-checked with the
+ * gateway first, so the list reflects a payment made moments ago even if the
+ * webhook has not arrived.
  */
 router.get('/', authMiddleware, async (req, res, next) => {
     try {
@@ -78,55 +86,22 @@ router.get('/', authMiddleware, async (req, res, next) => {
             ORDER BY o.created_at DESC
         `, [req.userId]);
 
-        const updatedOrders = await Promise.all(orders.map(async (order) => {
-            if (order.status === 'pending' && order.payment_gateway === 'phonepe') {
-                try {
-                    const statusData = await phonePeService.verifyPaymentStatus(order.id);
-                    const state = statusData.state || (statusData.data && statusData.data.state);
-                    const code = statusData.code || statusData.responseCode;
+        const pendingIds = orders
+            .filter((o) => PENDING_STATUSES.includes(o.status) && o.payment_gateway?.toLowerCase() === 'phonepe')
+            .map((o) => o.id);
 
-                    if (code === 'PAYMENT_SUCCESS' || state === 'COMPLETED' || state === 'SUCCESS') {
-                        await db.none(
-                            "UPDATE orders SET status = 'processing', payment_status = 'paid', updated_at = NOW() WHERE id = $1",
-                            [order.id]
-                        );
-                        order.status = 'processing';
-                    }
-                    else if (
-                        code === 'PAYMENT_ERROR' || code === 'PAYMENT_DECLINED' ||
-                        code === 'PAYMENT_CANCELLED' || state === 'FAILED' ||
-                        state === 'CANCELLED' || state === 'DECLINED'
-                    ) {
-                        await db.none(
-                            "UPDATE orders SET status = 'cancelled', payment_status = 'failed', updated_at = NOW() WHERE id = $1",
-                            [order.id]
-                        );
-                        order.status = 'cancelled';
-                    }
-                } catch (err) {
-                    console.error(`Auto-verify failed for ${order.id}:`, err.message);
-                    if (err.response) {
-                        const errCode = err.response.status;
-                        if (errCode === 404 || errCode === 400) {
-                            await db.none("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]);
-                            order.status = 'cancelled';
-                        }
-                    } else if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
-                        await db.none("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]);
-                        order.status = 'cancelled';
-                    } else {
-                        const orderAge = Date.now() - new Date(order.created_at).getTime();
-                        if (orderAge > 15 * 60 * 1000) {
-                            await db.none("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]);
-                            order.status = 'cancelled';
-                        }
-                    }
-                }
+        if (pendingIds.length > 0) {
+            await reconcilePendingOrders(pendingIds);
+            // Re-read rather than infer from the outcome: a webhook may have
+            // settled the order while we were talking to the gateway.
+            const fresh = await db.any('SELECT id, status FROM orders WHERE id IN ($1:csv)', [pendingIds]);
+            const statusById = new Map(fresh.map((o) => [o.id, o.status]));
+            for (const order of orders) {
+                if (statusById.has(order.id)) order.status = statusById.get(order.id);
             }
-            return order;
-        }));
+        }
 
-        res.json({ success: true, data: updatedOrders });
+        res.json({ success: true, data: orders });
     } catch (error) {
         next(error);
     }
@@ -138,6 +113,8 @@ router.get('/', authMiddleware, async (req, res, next) => {
 router.get('/:id', authMiddleware, async (req, res, next) => {
     try {
         const { id } = req.params;
+        if (!isUuid(id)) return res.status(404).json({ error: 'Order not found' });
+
         const order = await db.oneOrNone(
             `SELECT * FROM orders WHERE id = $1 AND user_id = $2`,
             [id, req.userId]
@@ -151,185 +128,168 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
 
 /**
  * POST /api/orders
- * CREATION WITH DYNAMIC SHIPPING & PRICING ENFORCEMENT
+ * The client sends product ids, quantities and an address. Prices, GST,
+ * shipping and the total are computed server-side by the order service.
  */
 router.post('/', authMiddleware, async (req, res, next) => {
     try {
-        if (!req.body || Object.keys(req.body).length === 0) {
-            return res.status(400).json({ error: 'Request body is empty.' });
-        }
+        const { items, shippingAddress, paymentGateway } = req.body ?? {};
 
-        const { items, shippingAddress, paymentGateway } = req.body;
         if (!items || !items.length) return res.status(400).json({ error: 'No items in order' });
+        if (!shippingAddress || typeof shippingAddress !== 'object' || Array.isArray(shippingAddress)) {
+            return res.status(400).json({ error: 'Shipping address is required' });
+        }
 
-        // 1. Fetch Product details from DB for security, category check, AND specifications
-        const productIds = items.map(i => i.product_id);
-        // ✅ FETCH SPECIFICATIONS TO CHECK FOR COD OVERRIDE
-        const products = await db.many('SELECT id, price, stock, name, category, specifications FROM products WHERE id IN ($1:csv)', [productIds]);
-        
-        const productMap = {};
-        products.forEach(p => productMap[p.id] = p);
-
-        // 2. ENFORCE BUSINESS RULES (Recalculate logic based on DB verified values)
-        const hasPrinter = products.some(p => p.category === '3d_printer');
-        
-        // ✅ 160 IQ FIX: Check if admin manually forced COD availability via specs
-        const hasCodOverride = products.some(p => {
-            const specs = p.specifications;
-            if (!specs) return false;
-            // Handle Array format
-            if (Array.isArray(specs)) return specs.some(s => s.key === 'allow_cod_override' && String(s.value).toLowerCase() === 'true');
-            // Handle Object format
-            return String(specs.allow_cod_override).toLowerCase() === 'true';
+        const { order, totalPaise, lines } = await createOrder({
+            userId: req.userId,
+            items,
+            shippingAddress,
+            paymentGateway
         });
 
-        let shippingAmount = 0.00;
-        if (!hasPrinter) {
-            shippingAmount = (paymentGateway === 'cod') ? 300.00 : 199.00;
-        }
-
-        let subtotal = 0;
-        const verifiedItems = [];
-
-        for (const item of items) {
-            const product = productMap[item.product_id];
-            if (!product) throw new Error(`Product not found: ${item.product_id}`);
-            if (product.stock < item.quantity) {
-                return res.status(400).json({ error: `Insufficient stock for ${product.name}` });
-            }
-            const quantity = parseInt(item.quantity) || 1;
-            const lineTotal = parseFloat(product.price) * quantity;
-            subtotal += lineTotal;
-            verifiedItems.push({ ...item, price: product.price, quantity, lineTotal });
-        }
-
-        // ✅ SECURITY: Verify COD eligibility on the server side
-        if (paymentGateway === 'cod') {
-            if (hasPrinter) {
-                return res.status(400).json({ error: 'Cash on Delivery is not available for orders containing 3D Printers' });
-            }
-            // ✅ Dynamic check: Only block if NO override exists
-            if (subtotal >= 999 && !hasCodOverride) {
-                return res.status(400).json({ error: 'Cash on Delivery is only available for orders below ₹999' });
-            }
-        }
-
-        const gst = subtotal * 0.18;
-        const totalAmount = subtotal + gst + shippingAmount;
-
-        const newOrder = await db.tx(async t => {
-            const order = await t.one(
-                `INSERT INTO orders
-                 (user_id, subtotal_amount, tax_amount, shipping_amount, total_amount, shipping_address, payment_gateway, status)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-                     RETURNING *`,
-                [req.userId, subtotal, gst, shippingAmount, totalAmount, JSON.stringify(shippingAddress), paymentGateway]
-            );
-
-            const queries = verifiedItems.map(item => {
-                return [
-                    t.none(
-                        `INSERT INTO order_items (order_id, product_id, quantity, price, line_total)
-                         VALUES ($1, $2, $3, $4, $5)`,
-                        [order.id, item.product_id, item.quantity, item.price, item.lineTotal]
-                    ),
-                    t.none(`UPDATE products SET stock = stock - $1 WHERE id = $2`, [item.quantity, item.product_id])
-                ];
-            });
-
-            await t.batch(queries.flat());
-            return order;
-        });
-
-        // 3. Initiate Payment or Confirm COD
-        if (paymentGateway === 'phonepe' || paymentGateway === 'PHONEPE') {
+        if (order.payment_gateway === 'phonepe') {
             try {
                 const redirectUrl = await phonePeService.initiatePayment(
-                    newOrder.id,
-                    totalAmount,
+                    order.id,
+                    totalPaise / 100,
                     req.userId,
                     shippingAddress.phone || '9999999999'
                 );
-                return res.status(201).json({ success: true, orderId: newOrder.id, redirectUrl });
+                return res.status(201).json({ success: true, orderId: order.id, redirectUrl });
             } catch (err) {
-                return res.status(400).json({ success: false, error: "Payment failed: " + err.message });
+                console.error(JSON.stringify({ event: 'payment_initiation_failed', orderId: order.id, error: err.message }));
+                // No payment will ever happen for this order: give the stock back
+                // now. If this also fails the order stays pending, and the stale
+                // hold path releases it once PhonePe reports it unknown.
+                try {
+                    await cancelOrder(order.id, { from: PENDING_STATUSES, paymentStatus: 'failed' });
+                } catch (releaseErr) {
+                    console.error(JSON.stringify({ event: 'stock_release_failed', orderId: order.id, error: releaseErr.message }));
+                }
+                return res.status(400).json({ success: false, error: "Payment Initiation Failed: " + (err.message || "Unknown Error") });
             }
         }
 
-        // Handle COD Email/Confirmation
-        db.oneOrNone('SELECT email, full_name FROM users WHERE id = $1', [req.userId])
-            .then(async (user) => {
-                if (user) {
-                    await emailService.sendOrderConfirmation(user.email, newOrder.id, totalAmount, verifiedItems);
-                }
-            });
+        // Awaited deliberately: Lambda freezes the execution environment as soon as
+        // the response is returned, so a promise left dangling here would never
+        // settle. A failed email must not fail the order, but it must be visible.
+        const buyer = await db.oneOrNone('SELECT email, full_name FROM users WHERE id = $1', [req.userId]);
+        if (buyer) {
+            try {
+                await emailService.sendOrderConfirmation(buyer.email, order.id, (totalPaise / 100).toFixed(2), lines);
+            } catch (emailErr) {
+                console.error(JSON.stringify({
+                    event: 'email_failed',
+                    type: 'order_confirmation',
+                    orderId: order.id,
+                    error: emailErr.message
+                }));
+            }
+        }
 
-        res.status(201).json({ message: 'Order placed successfully', orderId: newOrder.id });
+        res.status(201).json({ message: 'Order placed successfully', orderId: order.id });
     } catch (error) {
-        console.error('Order Error:', error);
         next(error);
     }
 });
 
 /**
- * POST /api/orders/payment/callback
+ * POST /api/orders/payment/callback  (PhonePe webhook)
+ *
+ * The body is treated as a hint about *which* order changed, never as
+ * evidence of *what* happened: state and amount come from PhonePe's status API
+ * (see settlePayment). Forging this request can therefore at worst make us ask
+ * PhonePe about an order, which is harmless.
  */
 router.post('/payment/callback', async (req, res) => {
     try {
-        let notification = req.body;
-        if (req.body.response) {
-            const decoded = Buffer.from(req.body.response, 'base64').toString('utf-8');
-            notification = JSON.parse(decoded);
+        const auth = phonePeService.verifyCallbackAuth(req.headers.authorization);
+        if (auth.configured && !auth.valid) {
+            console.warn(JSON.stringify({ event: 'payment_callback_rejected', reason: 'bad_authorization' }));
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (!auth.configured) {
+            // Still safe (state is re-verified), but the operator should know the
+            // webhook header check is off. See PHONEPE_WEBHOOK_* in .env.example.
+            console.warn(JSON.stringify({ event: 'payment_callback_auth_unconfigured' }));
         }
 
-        const code = notification.code;
-        const data = notification.data || {};
-        const merchantOrderId = data.merchantOrderId || data.merchantTransactionId || notification.orderId;
-        const state = data.state || notification.state;
-
-        if (!merchantOrderId) return res.status(400).json({ error: "Missing Order ID" });
-
-        if (code === 'PAYMENT_SUCCESS' || state === 'COMPLETED' || state === 'SUCCESS') {
-            await db.none(`UPDATE orders SET status = 'processing', payment_status = 'paid', updated_at = NOW() WHERE id = $1`, [merchantOrderId]);
+        let notification = req.body ?? {};
+        if (typeof notification.response === 'string') {
+            try {
+                notification = JSON.parse(Buffer.from(notification.response, 'base64').toString('utf-8'));
+            } catch (e) {
+                console.warn(JSON.stringify({ event: 'payment_callback_rejected', reason: 'undecodable_body' }));
+                return res.status(400).json({ error: 'Invalid callback' });
+            }
         }
-        else if (
-            code === 'PAYMENT_ERROR' || code === 'PAYMENT_DECLINED' ||
-            code === 'PAYMENT_CANCELLED' || state === 'FAILED' ||
-            state === 'CANCELLED' || state === 'DECLINED'
-        ) {
-            await db.none(`UPDATE orders SET status = 'cancelled', payment_status = 'failed', updated_at = NOW() WHERE id = $1`, [merchantOrderId]);
+
+        // PhonePe v2 nests the order under `payload`; older shapes use `data` or the root.
+        const source = notification.payload ?? notification.data ?? notification;
+        const merchantOrderId = source.merchantOrderId ?? source.merchantTransactionId ?? notification.orderId;
+
+        if (!isUuid(merchantOrderId)) {
+            return res.status(400).json({ error: 'Missing or invalid order id' });
+        }
+
+        const outcome = await reconcilePendingOrder(merchantOrderId, { includeCancelled: true });
+        if (outcome === 'unverified') {
+            // Could not reach PhonePe. 5xx makes PhonePe retry the webhook.
+            return res.status(503).json({ error: 'Payment verification unavailable' });
         }
         res.json({ status: 'ok' });
     } catch (error) {
-        console.error('Callback Error:', error.message);
+        console.error(JSON.stringify({ event: 'payment_callback_error', error: error.message }));
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
 /**
- * PUT /api/orders/:id (Admin only)
+ * PUT /api/orders/:id  (admin)
+ * 'cancelled' goes through cancelOrder so reserved stock is returned, and is
+ * terminal: a cancelled order cannot be revived (its stock has been released).
  */
-router.put('/:id', authMiddleware, async (req, res, next) => {
+router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
     try {
-        if (req.userRole !== 'admin') {
-            return res.status(403).json({ error: 'Only admins can update orders' });
-        }
         const { id } = req.params;
-        const { status } = req.body;
+        const { status } = req.body ?? {};
         const validStatuses = ['pending', 'pending_payment', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
 
+        if (!isUuid(id)) return res.status(404).json({ error: 'Order not found' });
         if (!status || !validStatuses.includes(status)) {
             return res.status(400).json({ error: `Invalid status` });
         }
 
-        const order = await db.oneOrNone(`UPDATE orders SET status = $1 WHERE id = $2 RETURNING *`, [status, id]);
-        if (!order) return res.status(404).json({ error: 'Order not found' });
+        const current = await db.oneOrNone('SELECT status FROM orders WHERE id = $1', [id]);
+        if (!current) return res.status(404).json({ error: 'Order not found' });
+        if (current.status === 'cancelled') {
+            return res.status(409).json({ error: 'A cancelled order cannot be changed' });
+        }
+
+        if (status === 'cancelled') {
+            if (!(await cancelOrder(id))) {
+                return res.status(409).json({ error: `An order that is ${current.status} cannot be cancelled` });
+            }
+        } else {
+            await db.none(`UPDATE orders SET status = $1 WHERE id = $2 AND status <> 'cancelled'`, [status, id]);
+        }
+
+        const order = await db.one('SELECT * FROM orders WHERE id = $1', [id]);
 
         if (['shipped', 'delivered', 'cancelled'].includes(status)) {
             const user = await db.oneOrNone('SELECT email, full_name FROM users WHERE id = $1', [order.user_id]);
             if (user) {
-                emailService.sendOrderStatusEmail(user.email, user.full_name, order.id, status)
-                    .catch(err => console.error('Status email failed:', err));
+                try {
+                    await emailService.sendOrderStatusEmail(user.email, user.full_name, order.id, status);
+                } catch (err) {
+                    console.error(JSON.stringify({
+                        event: 'email_failed',
+                        type: 'order_status',
+                        orderId: order.id,
+                        status,
+                        error: err.message
+                    }));
+                }
             }
         }
         res.json({ message: 'Order updated successfully', data: order });
@@ -340,20 +300,52 @@ router.put('/:id', authMiddleware, async (req, res, next) => {
 
 /**
  * POST /api/orders/:id/cancel
+ * Matches on the order id and owner, in a single guarded UPDATE.
  */
 router.post('/:id/cancel', authMiddleware, async (req, res, next) => {
     try {
         const { id } = req.params;
-        const order = await db.oneOrNone('SELECT status, created_at FROM orders WHERE id = $1 AND user_id = $2', [id, req.userId]);
-        if (!order) return res.status(404).json({ error: 'Order not found' });
+        if (!isUuid(id)) return res.status(404).json({ error: 'Order not found' });
 
-        if (!['pending', 'pending_payment', 'processing'].includes(order.status)) {
-            return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
+        if (await cancelOrder(id, { userId: req.userId })) {
+            return res.json({ success: true, message: 'Order cancelled successfully' });
         }
 
-        await db.none(`UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`, [id]);
-        res.json({ success: true, message: 'Order cancelled successfully' });
+        const order = await db.oneOrNone('SELECT status FROM orders WHERE id = $1 AND user_id = $2', [id, req.userId]);
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
     } catch (error) {
+        console.error('Cancel order error:', error);
+        next(error);
+    }
+});
+
+/**
+ * PUT /api/orders/:id/address
+ */
+router.put('/:id/address', authMiddleware, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { address } = req.body ?? {};
+
+        if (!address || typeof address !== 'object' || Array.isArray(address)) {
+            return res.status(400).json({ error: 'Address data required' });
+        }
+        if (!isUuid(id)) return res.status(404).json({ error: 'Order not found' });
+
+        const updated = await db.oneOrNone(
+            `UPDATE orders SET shipping_address = $1, updated_at = NOW()
+              WHERE id = $2 AND user_id = $3 AND status = ANY($4)
+          RETURNING id`,
+            [JSON.stringify(address), id, req.userId, CANCELLABLE_STATUSES]
+        );
+        if (updated) return res.json({ success: true, message: 'Address updated successfully' });
+
+        const order = await db.oneOrNone('SELECT status FROM orders WHERE id = $1 AND user_id = $2', [id, req.userId]);
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        res.status(400).json({ error: 'Cannot update address for shipped orders' });
+    } catch (error) {
+        console.error('Update address error:', error);
         next(error);
     }
 });

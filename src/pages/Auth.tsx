@@ -9,6 +9,7 @@ import { apiService } from '@/services/api.service';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import protodesignWordmark from '@/assets/protodesign-wordmark.webp';
 
 export default function Auth() {
     const navigate = useNavigate();
@@ -104,7 +105,15 @@ export default function Auth() {
             <Card className="w-full max-w-md shadow-lg">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <CardHeader>
-                        <CardTitle className="text-2xl text-center">ProtoDesign</CardTitle>
+                        {/* -mx-6 cancels CardHeader's own p-6 horizontal padding for just this
+                            row. Without it, the card's 448px width minus that padding leaves
+                            only 400px -- not enough for a 2.5x-sized logo at this wordmark's 3:1
+                            aspect ratio (needs 420px+) without either overflowing or falling
+                            short of the requested size. This uses the full card width instead
+                            of quietly settling for a smaller logo to fit inside the padding. */}
+                        <CardTitle className="flex justify-center -mx-6">
+                            <img src={protodesignWordmark} alt="ProtoDesign" className="h-36 w-auto" />
+                        </CardTitle>
                         <CardDescription className="text-center">
                             Login or create an account to manage your orders
                         </CardDescription>

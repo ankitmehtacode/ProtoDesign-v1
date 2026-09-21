@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "https://REPLACE-WITH-LAMBDA-FUNCTION-URL/sitemap.xml"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -67,6 +67,8 @@ export default function CustomPrinting() {
 
     const [contact, setContact] = useState({ email: "", phone: "", notes: "" });
     const [isSending, setIsSending] = useState(false);
+    // null when idle; 0..1 while the model is uploading to storage.
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [isSuccess, setIsSuccess] = useState(false)
 
     const navigate = useNavigate();
@@ -90,11 +92,11 @@ export default function CustomPrinting() {
         }
         setIsSending(true);
 
-        const formData = new FormData();
-        if (file) formData.append("file", file);
-        formData.append("email", contact.email);
-        formData.append("phone", contact.phone);
-        formData.append("notes", contact.notes);
+        if (!file) {
+            toast.error("Please choose a model file first.");
+            setIsSending(false);
+            return;
+        }
 
         const specs = JSON.stringify({
             quality: quality.name,
@@ -109,17 +111,32 @@ export default function CustomPrinting() {
             estimatedPrice: calculatePrice(),
             estimatedTime: calculateTime()
         });
-        formData.append("specifications", specs);
-
         try {
-            await apiService.sendQuoteRequest(formData);
+            // Two steps: the model goes straight to storage, then the quote is
+            // recorded against the returned key. The API never carries the file,
+            // so model size is not bounded by the request limit.
+            setUploadProgress(0);
+            const fileKey = await apiService.uploadModel(file, setUploadProgress);
+
+            await apiService.sendQuoteRequest({
+                fileKey,
+                fileName: file.name,
+                email: contact.email,
+                phone: contact.phone,
+                notes: contact.notes,
+                specifications: specs,
+            });
+
             toast.success("Quote sent successfully!");
             setIsSuccess(true);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast.error("Failed to send quote. Please try again.");
+            // Surface the real reason -- size and file-type rejections are
+            // actionable, and a generic message just makes people retry.
+            toast.error(error?.message || "Failed to send quote. Please try again.");
         } finally {
             setIsSending(false);
+            setUploadProgress(null);
         }
     };
 
@@ -206,9 +223,13 @@ export default function CustomPrinting() {
         <div className="min-h-screen pt-24 pb-12 bg-gray-50">
             <div className="container mx-auto px-4">
 
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold mb-2">Instant 3D Printing Quote</h1>
-                    <p className="text-muted-foreground">Upload your model and customize specifications.</p>
+                <div className="mb-10 flex items-baseline gap-4 border-b border-border pb-6">
+                    <h1 className="font-display text-4xl md:text-5xl font-bold leading-tight">
+                        Instant 3D Printing Quote
+                    </h1>
+                    <span className="hidden md:block text-sm text-muted-foreground whitespace-nowrap">
+                        Upload a model, dial in the specs, get a live price.
+                    </span>
                 </div>
 
                 <div className="grid lg:grid-cols-12 gap-8 items-start">
@@ -342,24 +363,30 @@ export default function CustomPrinting() {
                                     <div className="grid grid-cols-3 gap-2">
                                         <div>
                                             <Input
+                                                type="number"
                                                 value={printDims.x}
                                                 onChange={e => handleDimensionChange('x', e.target.value)}
+                                                onFocus={e => e.target.select()}
                                                 placeholder="L"
                                             />
                                             <span className="text-xs text-muted-foreground text-center block mt-1">Length</span>
                                         </div>
                                         <div>
                                             <Input
+                                                type="number"
                                                 value={printDims.y}
                                                 onChange={e => handleDimensionChange('y', e.target.value)}
+                                                onFocus={e => e.target.select()}
                                                 placeholder="W"
                                             />
                                             <span className="text-xs text-muted-foreground text-center block mt-1">Width</span>
                                         </div>
                                         <div>
                                             <Input
+                                                type="number"
                                                 value={printDims.z}
                                                 onChange={e => handleDimensionChange('z', e.target.value)}
+                                                onFocus={e => e.target.select()}
                                                 placeholder="H"
                                             />
                                             <span className="text-xs text-muted-foreground text-center block mt-1">Height</span>
@@ -383,6 +410,7 @@ export default function CustomPrinting() {
                                                 const val = parseFloat(e.target.value);
                                                 if (val > 0) setScale(val / 100);
                                             }}
+                                            onFocus={e => e.target.select()}
                                             className="w-24"
                                         />
                                         <span className="text-sm font-medium">%</span>
@@ -502,7 +530,13 @@ export default function CustomPrinting() {
                                     disabled={isSending || !file}
                                 >
                                     {isSending ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2" />}
-                                    Send Quote Request
+                                    {/* Large models take real time to upload; showing
+                                        progress keeps the wait from looking like a hang. */}
+                                    {uploadProgress !== null && uploadProgress < 1
+                                        ? `Uploading model... ${Math.round(uploadProgress * 100)}%`
+                                        : isSending
+                                            ? "Sending Quote Request..."
+                                            : "Send Quote Request"}
                                 </Button>
                             </CardContent>
                         </Card>

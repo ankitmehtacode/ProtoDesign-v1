@@ -3,63 +3,19 @@ import multer from 'multer';
 import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
 import authMiddleware from '../middleware/auth.js';
+import isAdmin from '../middleware/isAdmin.js';
 
 const router = express.Router();
 
+// Multer now serves the CSV bulk import only. Product images and video are
+// uploaded by the browser directly to Cloudinary via a signature from
+// POST /upload-signature, so they never occupy a request body -- which is what
+// keeps this route under Lambda's 6MB payload ceiling.
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024 }, // a product CSV is text; 5MB is ample
 });
 
-// ✅ 160 IQ SEO: Clean Semantic Slugs
-const generateUniqueSlug = async (name, ignoreId = null) => {
-    let slug = name.toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-
-    const checkQuery = ignoreId 
-        ? 'SELECT id FROM products WHERE slug = $1 AND id != $2'
-        : 'SELECT id FROM products WHERE slug = $1';
-    
-    const params = ignoreId ? [slug, ignoreId] : [slug];
-    
-    let exists = await db.oneOrNone(checkQuery, params);
-    
-    if (exists) {
-        let counter = 1;
-        let newSlug = `${slug}-${counter}`;
-        while (await db.oneOrNone('SELECT id FROM products WHERE slug = $1', [newSlug])) {
-            counter++;
-            newSlug = `${slug}-${counter}`;
-        }
-        return newSlug;
-    }
-    
-    return slug;
-};
-
-// ✅ FIXED: Robust Admin Middleware (Removed crashing user_roles check)
-const isAdmin = async (req, res, next) => {
-    try {
-        // 1. First check if the token payload already knows they are an admin
-        if (req.userRole === 'admin') {
-            return next();
-        }
-
-        // 2. If not, do a single, safe lookup on the main users table
-        const user = await db.oneOrNone('SELECT role FROM users WHERE id = $1', [req.userId]);
-        
-        if (user && user.role === 'admin') {
-            return next();
-        } else {
-            // Stop crashing the server, just gracefully deny access
-            return res.status(403).json({ error: 'Admin access required' });
-        }
-    } catch (error) {
-        console.error("Admin Verify Error:", error);
-        res.status(500).json({ error: 'Failed to verify admin privileges' });
-    }
-};
 
 // Helper function to parse CSV files
 const parseCSV = (buffer) => {
@@ -204,6 +160,27 @@ router.get('/', async (req, res) => {
         query += ' ORDER BY created_at DESC';
 
         const products = await db.any(query, params);
+
+        // Was one query per product (verified live: 36 sequential round trips for
+        // today's 35 products, growing linearly with the catalog). Replaced with a
+        // single batched query for every product's images, grouped in JS -- 2 total
+        // round trips regardless of how many products match.
+        if (products.length > 0) {
+            const productIds = products.map(p => p.id);
+            const allImages = await db.any(
+                'SELECT * FROM product_images WHERE product_id IN ($1:csv) ORDER BY product_id, display_order ASC',
+                [productIds]
+            );
+            const imagesByProduct = new Map();
+            for (const image of allImages) {
+                if (!imagesByProduct.has(image.product_id)) imagesByProduct.set(image.product_id, []);
+                imagesByProduct.get(image.product_id).push(image);
+            }
+            for (const product of products) {
+                product.product_images = imagesByProduct.get(product.id) || [];
+            }
+        }
+
         res.json(products);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -329,45 +306,76 @@ router.get('/:id/reviews', async (req, res) => {
     }
 });
 
-// ==========================================
-// ADMIN ACTIONS
-// ==========================================
+// ADMIN ROUTES
 
-router.post('/', authMiddleware, isAdmin, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
-    try {
-        const { name, description, short_description, price, category, stock, specifications, is_archived } = req.body;
-        
-        // ✅ FIX: Stringify specifications to prevent pg-promise from formatting arrays as text[]
-        let specsToSave = '{}';
-        try {
-            if (specifications) {
-                const parsed = typeof specifications === 'string' ? JSON.parse(specifications) : specifications;
-                specsToSave = JSON.stringify(parsed);
-            }
-        } catch(e) {}
+// Only Cloudinary URLs are accepted back from the client. Without this an admin
+// could store an arbitrary attacker-controlled URL as a product image.
+const CLOUDINARY_URL = /^https:\/\/res\.cloudinary\.com\/[A-Za-z0-9_-]+\//;
 
-        const slug = await generateUniqueSlug(name);
-
-        const product = await db.one(
-            `INSERT INTO products (name, slug, description, short_description, price, category, stock, specifications, is_archived)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9) RETURNING *`,
-            [name, slug, description, short_description, price, category, stock, specsToSave, is_archived === 'true']
-        );
-
-        if (req.files && req.files['images']) {
-            for (let i = 0; i < req.files['images'].length; i++) {
-                const url = await storageService.uploadFile(req.files['images'][i], 'products');
-                await db.none('INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)', [product.id, url, i]);
-                if (i === 0) await db.none('UPDATE products SET image_url = $1 WHERE id = $2', [url, product.id]);
-            }
+const sanitizeMediaUrls = (value, { max }) => {
+    const list = Array.isArray(value) ? value : (value ? [value] : []);
+    if (list.length > max) {
+        throw Object.assign(new Error(`At most ${max} files allowed`), { status: 400 });
+    }
+    for (const url of list) {
+        if (typeof url !== 'string' || !CLOUDINARY_URL.test(url)) {
+            throw Object.assign(new Error(`Rejected media URL: ${String(url).slice(0, 80)}`), { status: 400 });
         }
-        res.status(201).json(product);
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    }
+    return list;
+};
+
+/**
+ * Mint Cloudinary upload credentials for the browser. Scoped to a folder and
+ * short-lived; admin-only because only admins add product media.
+ */
+router.post('/upload-signature', authMiddleware, isAdmin, async (req, res, next) => {
+    try {
+        const kind = req.body?.kind === 'video' ? 'products/videos' : 'products';
+        res.json(storageService.createMediaUploadSignature({ folder: kind }));
+    } catch (error) {
+        if (error.status) return res.status(error.status).json({ error: error.message });
+        next(error);
+    }
 });
 
-router.put('/:id', authMiddleware, isAdmin, upload.fields([{ name: 'images', maxCount: 10 }, { name: 'video', maxCount: 1 }]), async (req, res) => {
+router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
     try {
-        const { name, description, short_description, price, category, stock, specifications, imagesToDelete, is_archived } = req.body;
+        const { name, description, short_description, price, category, stock,
+                specifications, is_archived, images, videoUrl } = req.body || {};
+
+        const imageUrls = sanitizeMediaUrls(images, { max: 10 });
+        const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
+
+        const product = await db.one(
+            `INSERT INTO products (name, description, short_description, price, category, stock, specifications, video_url, is_archived)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [name, description, short_description, price, category, stock, specifications,
+             video || null, is_archived === true || is_archived === 'true']
+        );
+
+        for (let i = 0; i < imageUrls.length; i++) {
+            await db.none(
+                'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
+                [product.id, imageUrls[i], i]
+            );
+            if (i === 0) await db.none('UPDATE products SET image_url = $1 WHERE id = $2', [imageUrls[i], product.id]);
+        }
+
+        res.status(201).json(product);
+    } catch (error) {
+        if (error.status) return res.status(error.status).json({ error: error.message });
+        next(error);
+    }
+});
+
+router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
+    try {
+        const { name, description, short_description, price, category, stock,
+                specifications, imagesToDelete, is_archived, images, videoUrl } = req.body || {};
+
+        const imageUrls = sanitizeMediaUrls(images, { max: 10 });
+        const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
 
         // ✅ FIX: Stringify specifications to prevent pg-promise from formatting arrays as text[]
         let specsToSave = '{}';
@@ -387,21 +395,25 @@ router.put('/:id', authMiddleware, isAdmin, upload.fields([{ name: 'images', max
 
         await db.none(
             `UPDATE products
-             SET name=$1, slug=$2, description=$3, short_description=$4, price=$5, category=$6, stock=$7, specifications=$8::jsonb, is_archived=$9, updated_at=NOW()
-             WHERE id=$10`,
-            [name, slug, description, short_description, price, category, stock, specsToSave, is_archived === 'true', req.params.id]
+             SET name=$1, description=$2, short_description=$3, price=$4, category=$5, stock=$6, specifications=$7, is_archived=$8, updated_at=NOW()
+             WHERE id=$9`,
+            [name, description, short_description, price, category, stock, specifications,
+             is_archived === true || is_archived === 'true', req.params.id]
         );
+
+        if (video) {
+            await db.none('UPDATE products SET video_url = $1 WHERE id = $2', [video, req.params.id]);
+        }
 
         if (imagesToDelete) {
             const idsToDelete = JSON.parse(imagesToDelete);
             if (idsToDelete.length > 0) await db.none('DELETE FROM product_images WHERE id IN ($1:csv)', [idsToDelete]);
         }
 
-        if (req.files && req.files['images']) {
+        if (imageUrls.length > 0) {
             const maxOrdResult = await db.one('SELECT COALESCE(MAX(display_order), -1) as m FROM product_images WHERE product_id=$1', [req.params.id]);
             let nextOrder = maxOrdResult.m + 1;
-            for (const file of req.files['images']) {
-                const url = await storageService.uploadFile(file, 'products');
+            for (const url of imageUrls) {
                 await db.none('INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)', [req.params.id, url, nextOrder++]);
             }
         }
@@ -410,7 +422,10 @@ router.put('/:id', authMiddleware, isAdmin, upload.fields([{ name: 'images', max
         if (firstImage) await db.none('UPDATE products SET image_url = $1 WHERE id = $2', [firstImage.image_url, req.params.id]);
 
         res.json({ message: "Product updated successfully" });
-    } catch (error) { res.status(500).json({ error: error.message }); }
+    } catch (error) {
+        if (error.status) return res.status(error.status).json({ error: error.message });
+        next(error);
+    }
 });
 
 router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {

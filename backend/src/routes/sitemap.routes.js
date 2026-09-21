@@ -20,10 +20,15 @@ const escapeXml = (unsafe) => {
 
 router.get('/sitemap.xml', async (req, res) => {
     try {
-        // ✅ 160 IQ SEO: Fetch name and image_url for Google Image Indexing
-        const products = await db.any('SELECT id, slug, name, image_url, updated_at FROM products WHERE is_archived = false');
-        
-        const baseUrl = 'https://protodesignstudio.in';
+        // FIX: Use db.any() which is the correct pg-promise method for multiple rows
+        // It returns the array of products directly.
+        const products = await db.any('SELECT id, updated_at FROM products WHERE is_archived = false');
+
+        // Was hardcoded to a domain that was never actually deployed to.
+        // FRONTEND_URL is already a required env var for the PhonePe redirect
+        // (see phonepe.service.js), so it is reused here rather than adding a
+        // second place to configure the same fact.
+        const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '');
 
         // ✅ Inject the Google Image Sitemap XML namespace
         let xml = `<?xml version="1.0" encoding="UTF-8"?>

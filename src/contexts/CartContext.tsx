@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { apiService } from '@/services/api.service';
 import { CartItem, CartContextType } from '@/types/cart';
 
+const AUTH_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
 // Export Context so the hook can use it
 export const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -33,17 +35,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         else setItems([]);
     }, [loadCart]); // Added loadCart dependency for safety
 
-    // Periodic check
+    // Periodic check: drop a stale cart if the session has ended. Registered
+    // once; the functional update reads current items without the effect
+    // depending on (and re-registering for) every cart change.
     useEffect(() => {
         const interval = setInterval(() => {
-            const isAuth = apiService.isAuthenticated();
-            if (!isAuth && items.length > 0) {
-                setItems([]);
+            if (!apiService.isAuthenticated()) {
+                setItems(prev => (prev.length > 0 ? [] : prev));
                 setIsAuthenticated(false);
             }
-        }, 0); // 5 minutes
+        }, AUTH_CHECK_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, [items.length]);
+    }, []);
 
     const addToCart = async (productId: string, quantity: number = 1) => {
         try {
@@ -118,5 +121,5 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         >
             {children}
         </CartContext.Provider>
-    );zz
+    );
 };

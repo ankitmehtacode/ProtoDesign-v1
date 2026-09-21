@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS products (
     image_url TEXT,
     image_data BYTEA,
     video_url TEXT,                      -- Added from 006
+    is_archived BOOLEAN DEFAULT FALSE,   -- Added from 008; products.routes.js filters on it
     category TEXT DEFAULT '3d_printer',
     sub_category TEXT DEFAULT NULL,      -- Added from 003
     stock INTEGER DEFAULT 0,
@@ -112,7 +113,11 @@ CREATE TABLE IF NOT EXISTS orders (
     shipping_amount DECIMAL(10,2) NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
     status VARCHAR(50) DEFAULT 'pending',
-    payment_gateway VARCHAR(50) DEFAULT 'razorpay',
+    -- Folded in from 009_add_payment_status.sql. The PhonePe callback in
+    -- orders.routes.js writes this column on every settlement; a database built
+    -- from this file without it throws on every successful payment.
+    payment_status VARCHAR(50) DEFAULT 'pending',
+    payment_gateway VARCHAR(50) DEFAULT 'phonepe',
     shipping_address JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -185,7 +190,9 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_likes ON products(likes_count);
+CREATE INDEX IF NOT EXISTS idx_products_is_archived ON products(is_archived);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id);
 CREATE INDEX IF NOT EXISTS idx_product_likes_user_product ON product_likes(user_id, product_id);
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);

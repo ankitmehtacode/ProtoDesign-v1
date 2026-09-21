@@ -28,3 +28,13 @@ dist-ssr
 .env
 .env.production
 backend/.env
+# Lambda build artifacts
+backend/dist/
+backend/lambda.zip
+
+# SAM / infra
+infra/.aws-sam/
+infra/parameters.sh
+
+# Local dev overrides (Vite loads this automatically, never commit it)
+.env.local

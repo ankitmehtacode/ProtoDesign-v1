@@ -25,7 +25,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {Logo} from "@/components/Logo.tsx";
+import protodesignWordmark from "@/assets/protodesign-wordmark.webp";
 
 interface UserInfo {
     id: string;
@@ -116,10 +116,17 @@ export const Navigation = () => {
 
                     {/* Logo */}
                     <Link to="/" className="flex items-center gap-2 group">
-                        <Logo className="w-10 h-10" /> {/* Slightly larger to show detail */}
-                        <span className="font-display text-xl font-bold text-foreground">
-                            ProtoDesign
-                        </span>
+                        {/* Icon mark removed from the header per request -- the wordmark now
+                            carries the full brand identity here on its own. Still present in
+                            the footer (Footer.tsx) unless that should go too. */}
+                        {/* Taller than the nav's own h-20 row on purpose -- centered via
+                            items-center, it bleeds slightly above/below the bar rather than
+                            being clipped (confirmed nothing here sets overflow-hidden). Bumping
+                            the row's own height instead would mean auditing every page's
+                            pt-20/pt-24/pt-16 offset for whether it's actually nav-clearing or
+                            unrelated spacing -- this reaches the same size with zero of that
+                            cross-page risk. */}
+                        <img src={protodesignWordmark} alt="ProtoDesign" className="h-24 w-auto" />
                     </Link>
 
                     {/* Desktop Nav */}
