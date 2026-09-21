@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 // Load Config
 const CLIENT_ID = process.env.PHONEPE_CLIENT_ID;
@@ -121,6 +122,38 @@ export const phonePeService = {
                 throw error;
             }
         }
+    },
+
+    /**
+     * Checks the Authorization header PhonePe sends with every webhook:
+     * SHA256("<username>:<password>"), where the credentials are the ones set
+     * in the PhonePe dashboard's webhook configuration.
+     *
+     * This is defense in depth, not the trust boundary: the order service never
+     * acts on the webhook body, it re-queries PhonePe for the real state. The
+     * header check just stops strangers from making us call PhonePe.
+     *
+     * Read at call time (not import time) so a rotated credential needs only a
+     * config change, and so tests can set it.
+     *
+     * @returns {{configured: boolean, valid: boolean}} `configured` is false when
+     *   the credentials are not set; callers must log that, not silently accept.
+     */
+    verifyCallbackAuth(authorizationHeader) {
+        const username = process.env.PHONEPE_WEBHOOK_USERNAME;
+        const password = process.env.PHONEPE_WEBHOOK_PASSWORD;
+        if (!username || !password) return { configured: false, valid: false };
+        if (typeof authorizationHeader !== 'string') return { configured: true, valid: false };
+
+        const expected = createHash('sha256').update(`${username}:${password}`).digest('hex');
+        // Tolerate an optional "SHA256 " scheme prefix; compare hex case-insensitively.
+        const provided = authorizationHeader.trim().replace(/^sha256[\s=:]+/i, '').toLowerCase();
+
+        // Hash both sides so the buffers are equal length for timingSafeEqual
+        // regardless of what the caller sent.
+        const a = createHash('sha256').update(provided).digest();
+        const b = createHash('sha256').update(expected).digest();
+        return { configured: true, valid: timingSafeEqual(a, b) };
     },
 
     /**

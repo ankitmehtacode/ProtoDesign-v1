@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx app.ts",
-    "build": "echo 'No build step required for tsx'",
     "start": "tsx app.ts",
-    "db:setup": "psql -U postgres -f migrations/000_create_database.sql"
+    "build": "node build.mjs",
+    "package": "npm run build && cd dist && zip -qr ../lambda.zip lambda.mjs && echo 'built lambda.zip'",
+    "db:setup": "psql -U postgres -f migrations/000_create_database.sql",
+    "test": "node test/storage.presign.test.mjs && node --test test/orders.lifecycle.test.mjs"
   },
   "dependencies": {
-    "@react-oauth/google": "^0.12.2",
+    "@aws-sdk/client-s3": "^3.1135.0",
+    "@aws-sdk/s3-request-presigner": "^3.1135.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -19,11 +22,9 @@
     "@types/nodemailer": "^6.4.14",
     "@types/pg": "^8.10.9",
     "axios": "^1.13.5",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
-    "cross-env": "^7.0.3",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "google-auth-library": "^10.5.0",
@@ -33,9 +34,12 @@
     "nodemailer": "^6.9.9",
     "pg": "^8.11.0",
     "pg-promise": "^12.3.0",
-    "react-js-phonepe-pg": "^1.1.1",
+    "serverless-http": "^3.2.0",
     "streamifier": "^0.1.1",
     "tsx": "^4.19.1",
     "typescript": "^5.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

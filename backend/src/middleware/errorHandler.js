@@ -24,7 +24,11 @@ const errorHandler = (error, req, res, next) => {
     // The 'error' object from your TS interface is a standard Error object,
     // and custom properties like 'status' are accessed directly.
     const status = error.status || 500;
-    const message = error.message || 'Internal Server Error';
+    // 5xx messages are usually driver/library text (SQL, hostnames). They are
+    // logged above; the client gets a generic one outside development.
+    const message = status >= 500 && process.env.NODE_ENV !== 'development'
+        ? 'Internal Server Error'
+        : (error.message || 'Internal Server Error');
 
     // Conditional inclusion of stack trace for development environment
     const errorResponse = {
