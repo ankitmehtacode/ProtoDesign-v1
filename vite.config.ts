@@ -1,38 +1,43 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
-export default defineConfig(({ mode }) => ({
-    server: {
-        host: true,
-        port: 8080,
-        allowedHosts: [
-            "192.168.29.39.nip.io",
-            "localhost"
-        ],
-        // ✅ FIX: Add these headers to allow Google Login popup communication
-        headers: {
-            "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-            "Cross-Origin-Embedder-Policy": "credentialless"
-        },
-        proxy: {
-            '/api': {
-                target: 'http://localhost:3001',
-                changeOrigin: true,
-                secure: false,
-            },
-            '/sitemap.xml': {
-                target: 'http://localhost:3001',
-                changeOrigin: true,
-                secure: false,
-            }
-        }
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
     },
-    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
-    resolve: {
-        alias: {
-            "@": path.resolve(__dirname, "./src"),
+  },
+  server: {
+    port: 8080,
+      proxy: {
+          '/api': {
+              target: 'http://localhost:3001',
+              changeOrigin: true,
+          }
+      }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes("node_modules")) {
+            // 1. Isolate the massive 3D engine strictly by itself
+            if (id.includes("three")) return "three";
+            
+            // 2. Isolate the animation engines strictly by themselves
+            if (id.includes("framer-motion")) return "framer-motion";
+            if (id.includes("gsap")) return "gsap";
+            
+            // By dropping the "vendor-ui" and "vendor-react" grouping, 
+            // we eliminate the circular loop completely. Vite handles the rest.
+          }
         },
+      },
     },
-}));
+    // 3D apps are naturally large, this safely raises the warning ceiling
+    chunkSizeWarningLimit: 1500, 
+  },
+});

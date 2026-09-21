@@ -3,6 +3,8 @@ import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import path from 'path';
+import sharp from 'sharp'; 
+import axios from 'axios';  
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

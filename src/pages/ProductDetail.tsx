@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom"; // ✅ Imported useSearchParams
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
     Loader2,
     ShoppingCart,
@@ -39,7 +40,7 @@ import { useCart } from "@/hooks/use-cart";
 import { formatINR } from "@/lib/currency";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
-import {Helmet} from "react-helmet-async";
+import { Helmet } from "react-helmet-async";
 
 // --- INTERFACES ---
 interface ProductImage {
@@ -51,6 +52,7 @@ interface ProductImage {
 
 interface Product {
     id: string;
+    slug?: string;
     name: string;
     description: string;
     short_description?: string;
@@ -99,6 +101,7 @@ interface EditableProductState {
     videoFile: File | null;
     videoPreview: string | null;
     deleteVideo: boolean;
+    allowCodOverride: boolean; 
 }
 
 const CATEGORY_ROUTES: Record<string, string> = {
@@ -129,7 +132,7 @@ const StarRating = ({ rating, interactive = false, onRate, size = 16 }: { rating
     );
 };
 
-const ImageMagnifier = ({ src }: { src: string }) => {
+const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
     const [showZoom, setShowZoom] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const imgRef = useRef<HTMLImageElement>(null);
@@ -152,14 +155,14 @@ const ImageMagnifier = ({ src }: { src: string }) => {
             <img
                 ref={imgRef}
                 src={src}
-                alt="Product"
+                alt={alt}
                 className={`w-full h-full object-contain p-4 transition-opacity duration-200 ${showZoom ? 'opacity-0' : 'opacity-100'}`}
             />
             {showZoom && (
                 <div className="absolute inset-0 overflow-hidden bg-white pointer-events-none">
                     <img
                         src={src}
-                        alt="Zoomed"
+                        alt={`${alt} zoomed`}
                         className="absolute max-w-none"
                         style={{
                             width: '250%',
@@ -179,30 +182,25 @@ const ImageMagnifier = ({ src }: { src: string }) => {
 const ProductDetail = () => {
     const { productId } = useParams<{ productId: string }>();
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams(); // ✅ Get Search Params
+    const [searchParams, setSearchParams] = useSearchParams();
     const { addToCart } = useCart();
 
-    // Data State
     const [product, setProduct] = useState<Product | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const [reviews, setReviews] = useState<Review[]>([]);
 
-    // UI State
     const [loading, setLoading] = useState(true);
     const [quantity, setQuantity] = useState(1);
     const [activeImage, setActiveImage] = useState<string>("");
 
-    // Admin & Editing State
     const [isAdmin, setIsAdmin] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
 
-    // Undo/Redo History State
     const [editState, setEditState] = useState<EditableProductState | null>(null);
     const [history, setHistory] = useState<EditableProductState[]>([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Review Logic
     const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
     const [newReview, setNewReview] = useState({ rating: 0, comment: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,7 +217,6 @@ const ProductDetail = () => {
         return Object.entries(specs).map(([key, value]) => ({ key, value: String(value) }));
     }, []);
 
-    // --- INITIAL DATA FETCH & ADMIN CHECK ---
     useEffect(() => {
         const checkAdmin = async () => {
             try {
@@ -241,28 +238,24 @@ const ProductDetail = () => {
                 if (!productId) { navigate("/shop"); return; }
                 setLoading(true);
 
-                const adminStatus = await checkAdmin();
+                await checkAdmin();
 
-                // 1. Get Product
                 const productRes = await apiService.getProduct(productId);
                 const fetchedProduct = productRes.data || productRes;
                 setProduct(fetchedProduct);
 
-                // Set active image immediately
                 const firstImg = fetchedProduct.product_images?.[0]?.image_url
                     || fetchedProduct.product_images?.[0]?.image_data
                     || fetchedProduct.image_url
                     || "/placeholder.svg";
                 setActiveImage(firstImg);
 
-                // 2. Get Reviews
                 try {
-                    const reviewRes = await apiService.getProductReviews(productId);
+                    const reviewRes = await apiService.getProductReviews(fetchedProduct.id);
                     const reviewsData = Array.isArray(reviewRes) ? reviewRes : (reviewRes.data || []);
                     setReviews(reviewsData);
                 } catch (e) { console.error("Failed to load reviews"); }
 
-                // 3. Get Related Products
                 if (fetchedProduct.category) {
                     const categoryRes = await apiService.getProducts(fetchedProduct.category);
                     const catProducts = (categoryRes.data || []).filter((p: Product) => p.id !== fetchedProduct.id);
@@ -273,6 +266,7 @@ const ProductDetail = () => {
 
             } catch (error) {
                 console.error("Error loading product", error);
+                navigate("/shop");
             } finally {
                 setLoading(false);
             }
@@ -280,25 +274,19 @@ const ProductDetail = () => {
         loadData();
     }, [productId, navigate]);
 
-    // ✅ Auto Edit Trigger
     useEffect(() => {
         if (product && isAdmin && searchParams.get('edit') === 'true' && !isEditing) {
             startEditing();
-            // Don't clear params immediately so we know if it is 'new'
         }
     }, [product, isAdmin, searchParams]);
 
-
-    // --- EDITING LOGIC ---
-
     const startEditing = () => {
-        // Since startEditing is called inside useEffect depending on 'product',
-        // we can safely access product here, but we need to guard it or use the ref from state
-        // To be safe in a closure, we use the functional update or check state.
-        // But since this function is recreated on render, `product` variable is fresh.
         if (!product) return;
 
-        const specsArray: EditableSpec[] = normalizeSpecs(product.specifications).map((item) => ({
+        // ✅ Parse specifications and extract the COD override flag
+        const rawSpecs = normalizeSpecs(product.specifications);
+        const hasOverride = rawSpecs.some(s => s.key === 'allow_cod_override' && String(s.value).toLowerCase() === 'true');
+        const cleanSpecs = rawSpecs.filter(s => s.key !== 'allow_cod_override').map((item) => ({
             id: Math.random().toString(36).substr(2, 9),
             key: item.key,
             value: item.value
@@ -312,14 +300,15 @@ const ProductDetail = () => {
             stock: product.stock,
             category: product.category,
             sub_category: product.sub_category || '',
-            specificationsArray: specsArray,
+            specificationsArray: cleanSpecs,
             currentImages: product.product_images || [],
             deletedImageIds: [],
             newImageFiles: [],
             newImagePreviews: [],
             videoFile: null,
             videoPreview: null,
-            deleteVideo: false
+            deleteVideo: false,
+            allowCodOverride: hasOverride // ✅ Initialize State
         };
 
         setEditState(initialState);
@@ -332,12 +321,10 @@ const ProductDetail = () => {
         setEditState((prev) => {
             if (!prev) return null;
             const updated = { ...prev, ...newState };
-
             const newHistory = history.slice(0, historyIndex + 1);
             newHistory.push(updated);
             setHistory(newHistory);
             setHistoryIndex(newHistory.length - 1);
-
             return updated;
         });
     }, [history, historyIndex]);
@@ -362,12 +349,11 @@ const ProductDetail = () => {
             if (editState.videoPreview) URL.revokeObjectURL(editState.videoPreview);
         }
 
-        // If it was a NEW draft, delete it permanently
         if (searchParams.get('new') === 'true' && product) {
             try {
-                await apiService.deleteProduct(product.id, true); // True = permanent
+                await apiService.deleteProduct(product.id, true);
                 toast.info("Draft discarded");
-                navigate(-1); // Go back to previous page
+                navigate(-1);
                 return;
             } catch (e) {
                 console.error("Failed to delete draft", e);
@@ -377,16 +363,19 @@ const ProductDetail = () => {
         setIsEditing(false);
         setEditState(null);
         setHistory([]);
-        // Clear params on simple cancel
         setSearchParams({}, { replace: true });
     };
 
-    // ✅ UPDATED SAVE LOGIC
     const saveChanges = async () => {
         if (!product || !editState) return;
         setIsSaving(true);
         try {
             const specsToSave = editState.specificationsArray.map(({ key, value }) => ({ key, value }));
+            
+            // ✅ Inject COD Override back into specifications before saving
+            if (editState.allowCodOverride) {
+                specsToSave.push({ key: 'allow_cod_override', value: 'true' });
+            }
 
             const formData = new FormData();
             formData.append('name', editState.name);
@@ -397,8 +386,6 @@ const ProductDetail = () => {
             formData.append('category', editState.category);
             formData.append('sub_category', editState.sub_category);
             formData.append('specifications', JSON.stringify(specsToSave));
-
-            // ✅ Mark as Published (Visible)
             formData.append('is_archived', 'false');
 
             if (editState.deletedImageIds.length > 0) formData.append('imagesToDelete', JSON.stringify(editState.deletedImageIds));
@@ -408,8 +395,6 @@ const ProductDetail = () => {
 
             await apiService.updateProduct(product.id, formData);
             toast.success("Product published successfully!");
-
-            // Clear 'new' param so refreshing doesn't cause weird state
             setSearchParams({});
             window.location.reload();
         } catch (error: any) {
@@ -445,9 +430,7 @@ const ProductDetail = () => {
 
     const handleImageUpload = (files: File[]) => {
         if (!files || !files.length || !editState) return;
-
         const previews = files.map(f => URL.createObjectURL(f));
-
         updateEditState({
             newImageFiles: [...editState.newImageFiles, ...files],
             newImagePreviews: [...editState.newImagePreviews, ...previews]
@@ -498,7 +481,6 @@ const ProductDetail = () => {
         if (!e.target.files?.[0] || !editState) return;
         const file = e.target.files[0];
         const previewUrl = URL.createObjectURL(file);
-
         updateEditState({
             videoFile: file,
             videoPreview: previewUrl,
@@ -529,12 +511,9 @@ const ProductDetail = () => {
             const existing = editState.currentImages.map(img => img.image_url || img.image_data || '').filter(Boolean);
             return [...existing, ...editState.newImagePreviews];
         }
-
         if (!product) return [];
         const images: string[] = [];
-
         if (product.video_url) images.push(product.video_url);
-
         if (product.product_images?.length) {
             product.product_images.forEach(img => {
                 const url = img.image_url || img.image_data;
@@ -542,7 +521,6 @@ const ProductDetail = () => {
             });
         }
         if (images.length === 0 && product.image_url) images.push(product.image_url);
-
         return images;
     };
 
@@ -594,19 +572,30 @@ const ProductDetail = () => {
 
     // --- SEO & SCHEMA GENERATION ---
     const siteUrl = window.location.origin;
-    const currentUrl = `${siteUrl}/product/${productId}`;
-    // Get the first valid image
+    
+    const currentUrl = product?.slug 
+        ? `${siteUrl}/product/${product.slug}` 
+        : `${siteUrl}/product/${productId}`;
+        
     const productImage = activeImage || product?.image_url || '/placeholder.svg';
     const fullImageUrl = productImage.startsWith('http') ? productImage : `${siteUrl}${productImage}`;
 
-    // Create Google Structured Data (JSON-LD)
+    const allImages = getProductImages();
+    const schemaImages = allImages.length > 0 
+        ? allImages.map(img => img.startsWith('http') ? img : `${siteUrl}${img}`) 
+        : [fullImageUrl];
+
+    const priceValidUntil = new Date();
+    priceValidUntil.setFullYear(priceValidUntil.getFullYear() + 1);
+
     const productSchema = product ? {
         "@context": "https://schema.org/",
         "@type": "Product",
         "name": product.name,
-        "image": [fullImageUrl],
-        "description": product.short_description || product.description,
+        "image": schemaImages,
+        "description": product.short_description || product.description.substring(0, 160),
         "sku": product.id,
+        "mpn": product.id,
         "brand": {
             "@type": "Brand",
             "name": "ProtoDesign"
@@ -616,37 +605,61 @@ const ProductDetail = () => {
             "url": currentUrl,
             "priceCurrency": "INR",
             "price": product.price,
+            "priceValidUntil": priceValidUntil.toISOString().split('T')[0],
+            "itemCondition": "https://schema.org/NewCondition",
             "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-            "itemCondition": "https://schema.org/NewCondition"
+            "shippingDetails": {
+                "@type": "OfferShippingDetails",
+                "shippingRate": {
+                    "@type": "MonetaryAmount",
+                    "value": product.category === '3d_printer' ? 0 : 199,
+                    "currency": "INR"
+                },
+                "shippingDestination": {
+                    "@type": "DefinedRegion",
+                    "addressCountry": "IN"
+                }
+            },
+            "hasMerchantReturnPolicy": {
+                "@type": "MerchantReturnPolicy",
+                "applicableCountry": "IN",
+                "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+                "merchantReturnDays": 7,
+                "returnMethod": "https://schema.org/ReturnByMail"
+            }
         },
         ...(reviews.length > 0 && {
             "aggregateRating": {
                 "@type": "AggregateRating",
-                "ratingValue": product.average_rating || 0,
+                "ratingValue": product.average_rating || 5,
                 "reviewCount": product.review_count || reviews.length
-            }
+            },
+            "review": reviews.slice(0, 5).map(r => ({
+                "@type": "Review",
+                "reviewRating": { "@type": "Rating", "ratingValue": r.rating },
+                "author": { "@type": "Person", "name": r.user },
+                "datePublished": r.created_at ? new Date(r.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                "reviewBody": r.comment
+            }))
         })
     } : null;
 
     if (loading) return <div className="min-h-screen pt-32 flex justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
     if (!product) return null;
 
-    const productImages = getProductImages();
     const inStock = isEditing ? (editState?.stock ?? 0) > 0 : product.stock > 0;
     const averageRating = product.average_rating ? Number(product.average_rating) : 0;
-    const displaySpecs = normalizeSpecs(product.specifications);
+    const displaySpecs = normalizeSpecs(product.specifications).filter(s => s.key !== 'allow_cod_override');
 
     return (
         <>
             {product && (
                 <Helmet>
-                    {/* 1. Browser Tab & Search Results */}
-                    <title>{`${product.name} | ProtoDesign`}</title>
-                    <meta name="description" content={product.short_description || product.description.substring(0, 160)} />
+                    <title>{`${product.name} - Buy Online | ProtoDesign`}</title>
+                    <meta name="description" content={`Buy ${product.name} at ProtoDesign. ${product.short_description || product.description.substring(0, 120)}`} />
                     <link rel="canonical" href={currentUrl} />
 
-                    {/* 2. Social Media Previews (WhatsApp/Facebook) */}
-                    <meta property="og:title" content={product.name} />
+                    <meta property="og:title" content={`${product.name} | ProtoDesign`} />
                     <meta property="og:description" content={product.short_description || product.description.substring(0, 160)} />
                     <meta property="og:image" content={fullImageUrl} />
                     <meta property="og:url" content={currentUrl} />
@@ -654,7 +667,6 @@ const ProductDetail = () => {
                     <meta property="product:price:amount" content={product.price.toString()} />
                     <meta property="product:price:currency" content="INR" />
 
-                    {/* 3. Google Structured Data (The "Secret Sauce") */}
                     <script type="application/ld+json">
                         {JSON.stringify(productSchema)}
                     </script>
@@ -662,7 +674,6 @@ const ProductDetail = () => {
             )}
         <div className="min-h-screen bg-background pt-24 pb-16 font-sans relative">
 
-            {/* --- ADMIN EDIT BAR --- */}
             {isAdmin && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground/90 text-background backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-white/20 flex items-center gap-4 transition-all">
                     {!isEditing ? (
@@ -690,8 +701,6 @@ const ProductDetail = () => {
             )}
 
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-
-                {/* 1. BREADCRUMBS */}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
                     <Link to="/" className="hover:text-primary transition-colors">Home</Link>
                     <ChevronRight size={14} />
@@ -702,24 +711,19 @@ const ProductDetail = () => {
                     </span>
                 </div>
 
-                {/* 2. MAIN PRODUCT GRID */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24">
-
-                    {/* LEFT: GALLERY */}
                     <div className="space-y-6 top-24 h-fit">
                         <div className="w-[85%] mx-auto aspect-[4/5] bg-white rounded-2xl shadow-sm border border-border/50 relative z-10 flex items-center justify-center overflow-hidden">
                             {activeImage && isVideo(activeImage) ? (
                                 <video src={activeImage} controls autoPlay muted loop className="w-full h-full object-contain" />
                             ) : (
-                                <ImageMagnifier src={activeImage || productImages[0]} />
+                                <ImageMagnifier src={activeImage || allImages[0]} alt={product.name} />
                             )}
                         </div>
 
-                        {/* Thumbnails */}
                         <div className="flex gap-3 justify-center flex-wrap">
                             {isEditing && editState ? (
                                 <>
-                                    {/* --- VIDEO EDITING SECTION --- */}
                                     <div className="w-full mb-2 p-3 bg-muted/30 rounded-lg border border-dashed flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
@@ -757,19 +761,17 @@ const ProductDetail = () => {
                                         </div>
                                     </div>
 
-                                    {/* Existing Images */}
                                     {editState.currentImages.map((img) => (
                                         <div key={img.id} className="relative group w-16 h-16 rounded-lg border overflow-hidden">
-                                            <img src={img.image_url || img.image_data} className="w-full h-full object-contain" />
+                                            <img src={img.image_url || img.image_data} alt={product.name} className="w-full h-full object-contain" />
                                             <button onClick={() => handleDeleteExistingImage(img.id)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                                                 <Trash2 size={20} />
                                             </button>
                                         </div>
                                     ))}
-                                    {/* New Images */}
                                     {editState.newImagePreviews.map((url, idx) => (
                                         <div key={`new-${idx}`} className="relative group w-16 h-16 rounded-lg border overflow-hidden border-green-500">
-                                            <img src={url} className="w-full h-full object-contain" />
+                                            <img src={url} alt={`${product.name} new view ${idx}`} className="w-full h-full object-contain" />
                                             <button onClick={() => handleDeleteNewImage(idx)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                                                 <Trash2 size={20} />
                                             </button>
@@ -778,7 +780,7 @@ const ProductDetail = () => {
                                     <DetailImageDropzone />
                                 </>
                             ) : (
-                                productImages.map((img, idx) => (
+                                allImages.map((img, idx) => (
                                     <button
                                         key={idx}
                                         onClick={() => setActiveImage(img)}
@@ -790,7 +792,7 @@ const ProductDetail = () => {
                                                 <Play size={20} className="text-gray-800" />
                                             </div>
                                         ) : (
-                                            <img src={img} className="w-full h-full object-contain" alt="Thumbnail" />
+                                            <img src={img} className="w-full h-full object-contain" alt={`${product.name} gallery image ${idx}`} />
                                         )}
                                     </button>
                                 ))
@@ -798,14 +800,12 @@ const ProductDetail = () => {
                         </div>
                     </div>
 
-                    {/* RIGHT: INFO */}
                     <div className="flex flex-col pt-4">
-                        {/* Category & Subcategory */}
-                        <div className="mb-4 flex flex-wrap items-center gap-2">
+                        <div className="mb-4 flex flex-wrap items-center gap-3">
                             {isEditing && editState ? (
                                 <>
                                     <Select value={editState.category} onValueChange={(val) => updateEditState({ category: val })}>
-                                        <SelectTrigger className="w-[140px] h-8 text-xs font-bold uppercase"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="w-[140px] h-9 text-xs font-bold uppercase"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="3d_printer">3D Printer</SelectItem>
                                             <SelectItem value="filament">Filament</SelectItem>
@@ -817,9 +817,26 @@ const ProductDetail = () => {
                                     <Input
                                         value={editState.sub_category}
                                         onChange={(e) => updateEditState({ sub_category: e.target.value })}
-                                        className="w-[140px] h-8 text-xs font-semibold uppercase"
+                                        className="w-[140px] h-9 text-xs font-semibold uppercase"
                                         placeholder="Sub Category"
                                     />
+                                    
+                                    {/* ✅ MASTER COD OVERRIDE EXPLICIT DROPDOWN */}
+                                    <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-md border border-dashed ml-auto">
+                                        <Label className="text-xs font-bold whitespace-nowrap pl-2">COD Override:</Label>
+                                        <Select 
+                                            value={editState.allowCodOverride ? "true" : "false"} 
+                                            onValueChange={val => updateEditState({ allowCodOverride: val === "true" })}
+                                        >
+                                            <SelectTrigger className={`w-[150px] h-8 text-xs font-bold ${editState.allowCodOverride ? "border-green-500 bg-green-100 text-green-800" : ""}`}>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="false">Standard Rules</SelectItem>
+                                                <SelectItem value="true" className="text-green-700 font-bold">Force Enable COD</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </>
                             ) : (
                                 <>
@@ -835,7 +852,6 @@ const ProductDetail = () => {
                             )}
                         </div>
 
-                        {/* Title */}
                         {isEditing && editState ? (
                             <Input
                                 value={editState.name}
@@ -846,7 +862,6 @@ const ProductDetail = () => {
                             <h1 className="text-4xl font-extrabold text-foreground mb-4 leading-tight">{product.name}</h1>
                         )}
 
-                        {/* Short Description */}
                         {isEditing && editState && (
                             <Textarea
                                 value={editState.short_description}
@@ -856,7 +871,6 @@ const ProductDetail = () => {
                             />
                         )}
 
-                        {/* Rating Row */}
                         <div className="flex items-center gap-4 mb-8 pb-8 border-b">
                             <div className="flex items-center gap-2">
                                 <StarRating rating={averageRating} size={20} />
@@ -865,7 +879,6 @@ const ProductDetail = () => {
                             <span className="text-sm text-muted-foreground">{reviews.length} Reviews</span>
                         </div>
 
-                        {/* Price & Stock */}
                         <div className="mb-8">
                             {isEditing && editState ? (
                                 <div className="flex gap-4 items-center">
@@ -899,7 +912,6 @@ const ProductDetail = () => {
                             )}
                         </div>
 
-                        {/* SPECIFICATIONS (DRAG & DROP ENABLED) */}
                         <div className="mb-8">
                             <div className="flex justify-between items-center mb-3">
                                 <h3 className="font-semibold">Key Specs</h3>
@@ -964,7 +976,6 @@ const ProductDetail = () => {
                             </div>
                         </div>
 
-                        {/* Cart Actions */}
                         <div className={`flex flex-col sm:flex-row gap-4 mb-8 mt-auto ${isEditing ? 'opacity-50 pointer-events-none' : ''}`}>
                             <div className="flex items-center border rounded-lg h-12 w-32 bg-background shadow-sm">
                                 <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-3 h-full hover:bg-accent rounded-l-lg"><Minus size={16}/></button>
@@ -978,7 +989,6 @@ const ProductDetail = () => {
                             <Button variant="outline" className="h-12 w-12 p-0"><Share2 className="w-5 h-5"/></Button>
                         </div>
 
-                        {/* Badges */}
                         <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground p-4 bg-secondary/10 rounded-xl border border-border/50">
                             <div className="flex items-center gap-2"><Truck className="w-5 h-5 text-primary"/> Free Shipping</div>
                             <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary"/> 1 Year Warranty</div>
@@ -988,9 +998,7 @@ const ProductDetail = () => {
                     </div>
                 </div>
 
-                {/* 3. SPLIT SECTION: REVIEWS & DESCRIPTION */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24 items-start">
-                    {/* LEFT COLUMN: REVIEWS */}
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold font-display">Customer Reviews</h2>
@@ -1040,31 +1048,31 @@ const ProductDetail = () => {
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN: DESCRIPTION */}
                     <div className="h-fit">
-                        <h2 className="text-2xl font-bold font-display mb-6">Product Description</h2>
-                        {isEditing && editState ? (
-                            <Textarea
-                                value={editState.description}
-                                onChange={(e) => updateEditState({ description: e.target.value })}
-                                className="min-h-[400px] font-sans text-muted-foreground leading-relaxed border-dashed border-primary/30"
-                            />
-                        ) : (
-                            <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
-                                <ul className="space-y-3 list-none pl-0 ">
-                                    {product.description.split('\n').filter(line => line.trim() !== '').map((line, i) => (
-                                        <li key={i} className="flex gap-3 items-start">
-                                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0 block" />
-                                            <span>{line}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
+                        <article className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
+                            <h2 className="text-2xl font-bold font-display mb-6">About {product.name}</h2>
+                            {isEditing && editState ? (
+                                <Textarea
+                                    value={editState.description}
+                                    onChange={(e) => updateEditState({ description: e.target.value })}
+                                    className="min-h-[400px] font-sans text-muted-foreground leading-relaxed border-dashed border-primary/30"
+                                />
+                            ) : (
+                                <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
+                                    <ul className="space-y-3 list-none pl-0 ">
+                                        {product.description.split('\n').filter(line => line.trim() !== '').map((line, i) => (
+                                            <li key={i} className="flex gap-3 items-start">
+                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0 block" />
+                                                <span>{line}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </article>
                     </div>
                 </div>
 
-                {/* 4. RELATED PRODUCTS */}
                 {relatedProducts.length > 0 && (
                     <div className="border-t pt-16">
                         <div className="flex justify-between items-center mb-8">
@@ -1078,7 +1086,7 @@ const ProductDetail = () => {
                                 const rating = related.average_rating ? Number(related.average_rating) : 0;
                                 return (
                                     <motion.div key={related.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="min-w-[280px] w-[280px] snap-start">
-                                        <Card onClick={() => navigate(`/product/${related.id}`)} className="cursor-pointer hover:shadow-xl transition-all h-full flex flex-col group border-border/60 overflow-hidden rounded-xl">
+                                        <Card onClick={() => navigate(`/product/${related.slug || related.id}`)} className="cursor-pointer hover:shadow-xl transition-all h-full flex flex-col group border-border/60 overflow-hidden rounded-xl">
                                             <div className="aspect-square bg-black flex items-center justify-center relative overflow-hidden">
                                                 <img src={related.image_url || '/placeholder.svg'} alt={related.name} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105" />
                                             </div>

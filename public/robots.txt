@@ -1,17 +1,12 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
 
-# ✅ ADD THIS LINE (Use your real domain)
-Sitemap: https://www.protodesignstudio.com/sitemap.xml
+# Sitemaps
+Sitemap: https://protodesignstudio.in/sitemap.xml
+
+# Prevent indexing of sensitive/utility pages
+Disallow: /admin/
+Disallow: /profile/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /reset-password/

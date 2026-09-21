@@ -34,7 +34,7 @@ router.get('/admin/all', authMiddleware, isAdmin, async (req, res, next) => {
                                          'product', json_build_object(
                                                  'name', p.name,
                                                  'image_url', p.image_url
-                                                    )
+                                            )
                                  )
                          ) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
             FROM orders o
@@ -119,7 +119,6 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
             `SELECT * FROM orders WHERE id = $1 AND user_id = $2`,
             [id, req.userId]
         );
-
         if (!order) return res.status(404).json({ error: 'Order not found' });
         res.json({ success: true, data: order });
     } catch (error) {
@@ -238,7 +237,6 @@ router.post('/payment/callback', async (req, res) => {
             // Could not reach PhonePe. 5xx makes PhonePe retry the webhook.
             return res.status(503).json({ error: 'Payment verification unavailable' });
         }
-
         res.json({ status: 'ok' });
     } catch (error) {
         console.error(JSON.stringify({ event: 'payment_callback_error', error: error.message }));
@@ -259,7 +257,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
 
         if (!isUuid(id)) return res.status(404).json({ error: 'Order not found' });
         if (!status || !validStatuses.includes(status)) {
-            return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+            return res.status(400).json({ error: `Invalid status` });
         }
 
         const current = await db.oneOrNone('SELECT status FROM orders WHERE id = $1', [id]);
