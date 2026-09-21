@@ -344,7 +344,22 @@ export default function Profile() {
                                                 const fname = quote.file_name || quote.fileName || "Unknown File";
 
                                                 return (
-                                                    <div key={quote.id} className="border rounded-lg p-4 flex justify-between items-center hover:bg-accent/50 cursor-pointer" onClick={() => setSelectedQuote({...quote, specifications: specs})}>
+                                                    <div
+                                                        key={quote.id}
+                                                        className="border rounded-lg p-4 flex justify-between items-center hover:bg-accent/50 cursor-pointer"
+                                                        onClick={() => setSelectedQuote({...quote, specifications: specs})}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        onKeyDown={(e) => {
+                                                            // A real <button> can't nest the "View Specs" Button below
+                                                            // (invalid HTML), so this row is made keyboard-accessible
+                                                            // directly instead -- it was mouse-only before.
+                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                e.preventDefault();
+                                                                setSelectedQuote({...quote, specifications: specs});
+                                                            }
+                                                        }}
+                                                    >
                                                         <div>
                                                             <h4 className="font-medium">{fname}</h4>
                                                             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
@@ -439,9 +454,16 @@ export default function Profile() {
                                             {/* Action Buttons */}
                                             <div className="flex justify-end gap-3 pt-2">
                                                 <Button variant="outline" asChild>
-                                                    <a href={selectedQuote.file_url || selectedQuote.fileUrl} target="_blank" rel="noopener noreferrer">
+                                                    <button type="button" onClick={async () => {
+                                                        try {
+                                                            const url = await apiService.getQuoteDownloadUrl(selectedQuote.id);
+                                                            window.open(url, "_blank", "noopener,noreferrer");
+                                                        } catch (err: any) {
+                                                            toast.error(err?.message || "Could not open that file.");
+                                                        }
+                                                    }}>
                                                         <Download className="w-4 h-4 mr-2" /> Download STL
-                                                    </a>
+                                                    </button>
                                                 </Button>
                                             </div>
                                         </div>

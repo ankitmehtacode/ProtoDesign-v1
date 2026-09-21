@@ -166,6 +166,19 @@ interface EditingProductImageState {
     isNew: boolean;
 }
 
+/**
+ * Quote models are stored privately, so a download is a short-lived signed URL
+ * fetched on demand rather than a public link held in the row.
+ */
+const openQuoteFile = async (quoteId: string) => {
+    try {
+        const url = await apiService.getQuoteDownloadUrl(quoteId);
+        window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+        toast.error(err?.message || 'Could not open that file.');
+    }
+};
+
 export default function AdminDashboard() {
     const navigate = useNavigate();
 
@@ -348,19 +361,27 @@ export default function AdminDashboard() {
                 return acc;
             }, {} as Record<string, string>);
 
-            const formData = new FormData();
-            formData.append('name', newProduct.name);
-            formData.append('description', newProduct.description);
-            formData.append('short_description', newProduct.short_description);
-            formData.append('price', newProduct.price);
-            formData.append('stock', newProduct.stock);
-            formData.append('category', newProduct.category);
-            formData.append('sub_category', newProduct.sub_category);
-            formData.append('specifications', JSON.stringify(specsObject));
-            if (newProduct.videoFile) formData.append('video', newProduct.videoFile);
-            newProduct.imageFiles.forEach(f => formData.append('images', f));
+            // Media goes straight to Cloudinary; only the resulting URLs are
+            // sent to the API, which cannot carry files (6MB Lambda limit).
+            const images = await Promise.all(
+                newProduct.imageFiles.map((f: File) => apiService.uploadProductMedia(f, 'image'))
+            );
+            const videoUrl = newProduct.videoFile
+                ? await apiService.uploadProductMedia(newProduct.videoFile, 'video')
+                : null;
 
-            await apiService.createProduct(formData);
+            await apiService.createProduct({
+                name: newProduct.name,
+                description: newProduct.description,
+                short_description: newProduct.short_description,
+                price: newProduct.price,
+                stock: newProduct.stock,
+                category: newProduct.category,
+                sub_category: newProduct.sub_category,
+                specifications: JSON.stringify(specsObject),
+                images,
+                videoUrl,
+            });
             toast.success('Product created');
             setShowAddProduct(false);
             setNewProductImagePreviews([]);
@@ -420,25 +441,33 @@ export default function AdminDashboard() {
                 return acc;
             }, {} as Record<string, string>);
 
-            const formData = new FormData();
-            formData.append('name', editingProductData.name);
-            formData.append('description', editingProductData.description);
-            formData.append('short_description', editingProductData.short_description);
-            formData.append('price', editingProductData.price);
-            formData.append('stock', editingProductData.stock);
-            formData.append('category', editingProductData.category);
-            formData.append('sub_category', editingProductData.sub_category);
-            formData.append('specifications', JSON.stringify(specsObject));
-            if (editingProductData.videoFile) formData.append('video', editingProductData.videoFile);
+            const images = await Promise.all(
+                editingProductData.imageFiles.map((f: File) => apiService.uploadProductMedia(f, 'image'))
+            );
+            const videoUrl = editingProductData.videoFile
+                ? await apiService.uploadProductMedia(editingProductData.videoFile, 'video')
+                : null;
+
+            const payload: Record<string, unknown> = {
+                name: editingProductData.name,
+                description: editingProductData.description,
+                short_description: editingProductData.short_description,
+                price: editingProductData.price,
+                stock: editingProductData.stock,
+                category: editingProductData.category,
+                sub_category: editingProductData.sub_category,
+                specifications: JSON.stringify(specsObject),
+                images,
+                videoUrl,
+            };
 
             const imagesToDelete = products.find(p => p.id === editingProductId)?.product_images
                 ?.filter(img => !editingProductImages.some(ei => ei.id === img.id))
                 .map(img => img.id) || [];
 
-            if (imagesToDelete.length) formData.append('imagesToDelete', JSON.stringify(imagesToDelete));
-            editingProductData.imageFiles.forEach(f => formData.append('images', f));
+            if (imagesToDelete.length) payload.imagesToDelete = imagesToDelete;
 
-            await apiService.updateProduct(editingProductId, formData);
+            await apiService.updateProduct(editingProductId, payload);
             toast.success('Product updated');
             setEditingProductId(null);
             cancelEditProduct();
@@ -619,7 +648,7 @@ export default function AdminDashboard() {
                         <div><h4 className="font-semibold border-b pb-2 mb-3 flex items-center gap-2"><Layers size={16} /> Print Settings</h4><div className="grid grid-cols-2 gap-4 text-sm"><div className="space-y-1"><span className="text-muted-foreground text-xs uppercase">Material</span><p className="font-medium">{specs.material || 'N/A'}</p></div><div className="space-y-1"><span className="text-muted-foreground text-xs uppercase">Quality</span><p className="font-medium">{specs.quality || 'Standard'}</p></div><div className="space-y-1"><span className="text-muted-foreground text-xs uppercase">Infill</span><p className="font-medium">{specs.infill || '20%'}</p></div><div className="space-y-1"><span className="text-muted-foreground text-xs uppercase">Scale</span><p className="font-medium">{specs.scale || '100%'}</p></div></div></div>
                         <div><h4 className="font-semibold border-b pb-2 mb-3 flex items-center gap-2"><Maximize size={16} /> Geometry & Dimensions</h4><div className="bg-muted/30 p-4 rounded-lg space-y-4 text-sm"><div className="grid grid-cols-2 gap-x-8 gap-y-2"><div className="text-muted-foreground">Print Dimensions</div><div className="font-mono font-medium text-right">{printDims.x ? `${printDims.x} x ${printDims.y} x ${printDims.z} mm` : 'N/A'}</div><div className="text-muted-foreground">Original Dimensions</div><div className="font-mono text-right text-muted-foreground">{stats.dimensions ? `${stats.dimensions.x?.toFixed(2)} x ${stats.dimensions.y?.toFixed(2)} x ${stats.dimensions.z?.toFixed(2)} mm` : 'N/A'}</div><div className="text-muted-foreground">Rotation</div><div className="font-mono text-right">{specs.rotation || 'None'}</div><div className="text-muted-foreground">Triangle Count</div><div className="font-mono text-right">{stats.triangles?.toLocaleString() || 'N/A'}</div></div></div></div>
                         {quote.admin_notes && (<div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-md border border-yellow-100 dark:border-yellow-900"><span className="text-xs font-bold uppercase text-yellow-700 dark:text-yellow-500 mb-1 block">User Notes</span><p className="text-sm">{quote.admin_notes}</p></div>)}
-                        <div className="flex gap-3"><Button className="flex-1" asChild><a href={quote.file_url} target="_blank" rel="noreferrer">Download STL File</a></Button><Button variant="outline" onClick={onClose}>Close</Button></div>
+                        <div className="flex gap-3"><Button className="flex-1" onClick={() => openQuoteFile(quote.id)}>Download STL File</Button><Button variant="outline" onClick={onClose}>Close</Button></div>
                     </div>
                 </div>
             </div>
@@ -951,7 +980,7 @@ export default function AdminDashboard() {
                                         <tr key={quote.id} className="border-b hover:bg-muted/5">
                                             <td className="px-4 py-3">{new Date(quote.created_at).toLocaleDateString()}</td>
                                             <td className="px-4 py-3"><div className="font-medium">{quote.email}</div><div className="text-xs text-muted-foreground">{quote.phone}</div></td>
-                                            <td className="px-4 py-3"><a href={quote.file_url} target="_blank" className="text-blue-600 hover:underline flex items-center gap-1"><FileText size={14} /> {quote.file_name.substring(0, 15)}...</a></td>
+                                            <td className="px-4 py-3"><button type="button" onClick={() => openQuoteFile(quote.id)} className="text-blue-600 hover:underline flex items-center gap-1"><FileText size={14} /> {quote.file_name.substring(0, 15)}...</button></td>
                                             <td className="px-4 py-3 font-bold">₹{quote.estimated_price}</td>
                                             <td className="px-4 py-3">
                                                 <select value={quote.status} onChange={(e) => handleQuoteStatusUpdate(quote.id, e.target.value)} className={`px-2 py-1 rounded text-xs border ${quote.status==='pending'?'bg-yellow-100':quote.status==='contacted'?'bg-blue-100':quote.status==='completed'?'bg-green-100':''}`}><option value="pending">Pending</option><option value="contacted">Contacted</option><option value="paid">Paid</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select>

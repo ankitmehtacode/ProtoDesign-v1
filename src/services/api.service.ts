@@ -352,10 +352,100 @@ class ApiService {
         return this.request(`/products/${productId}/like`, { method: 'DELETE' });
     }
 
-    async sendQuoteRequest(formData: FormData) {
+    // ─────────────────────────────────────────────────────────────────────
+    // Direct uploads
+    //
+    // The API runs on Lambda, which caps a request body at 6MB. Models and
+    // product media therefore never pass through it: the browser asks for a
+    // short-lived credential, uploads straight to S3 or Cloudinary, and sends
+    // back only the resulting key or URL.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Upload a 3D model straight to S3. Returns the object key to attach to a
+     * quote. `onProgress` receives 0..1.
+     */
+    async uploadModel(file: File, onProgress?: (fraction: number) => void): Promise<string> {
+        const { uploadUrl, key, contentType } = await this.request("/quotes/upload-url", {
+            method: "POST",
+            body: JSON.stringify({
+                filename: file.name,
+                contentType: file.type || "application/octet-stream",
+                contentLength: file.size,
+            }),
+        });
+
+        // XHR rather than fetch: fetch cannot report upload progress, and these
+        // files are large enough that a silent wait looks like a hang.
+        await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("PUT", uploadUrl, true);
+            xhr.setRequestHeader("Content-Type", contentType);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+            };
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve();
+                else reject(new Error(`Upload failed (${xhr.status}). Please try again.`));
+            };
+            xhr.onerror = () => reject(new Error("Upload failed. Check your connection and try again."));
+            xhr.ontimeout = () => reject(new Error("Upload timed out. Please try again."));
+            xhr.send(file);
+        });
+
+        return key;
+    }
+
+    /**
+     * Upload product media straight to Cloudinary. Admin only -- the signature
+     * endpoint enforces that. Returns the secure URL to store.
+     */
+    async uploadProductMedia(file: File, kind: "image" | "video" = "image"): Promise<string> {
+        const sig = await this.request("/products/upload-signature", {
+            method: "POST",
+            body: JSON.stringify({ kind }),
+        });
+
+        const form = new FormData();
+        form.append("file", file);
+        form.append("api_key", sig.apiKey);
+        form.append("timestamp", String(sig.timestamp));
+        form.append("signature", sig.signature);
+        form.append("folder", sig.folder);
+
+        const endpoint = `https://api.cloudinary.com/v1_1/${sig.cloudName}/${kind === "video" ? "video" : "image"}/upload`;
+        const res = await fetch(endpoint, { method: "POST", body: form });
+
+        if (!res.ok) {
+            const detail = await res.json().catch(() => ({}));
+            throw new Error(detail?.error?.message || `Media upload failed (${res.status})`);
+        }
+
+        const data = await res.json();
+        return data.secure_url;
+    }
+
+    /**
+     * Quote models live in a private bucket, so a download is a short-lived
+     * signed URL fetched on demand rather than a stored public link.
+     */
+    async getQuoteDownloadUrl(quoteId: string): Promise<string> {
+        const { url } = await this.request(`/quotes/${quoteId}/download`);
+        return url;
+    }
+
+    async sendQuoteRequest(payload: {
+        fileKey: string;
+        fileName: string;
+        email: string;
+        phone: string;
+        notes?: string;
+        specifications: string;
+    }) {
         return this.request("/quotes/request", {
             method: "POST",
-            body: formData,
+            body: JSON.stringify(payload),
         });
     }
 

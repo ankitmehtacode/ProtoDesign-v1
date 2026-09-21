@@ -15,13 +15,17 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-transporter.verify(function (error, success) {
-    if (error) {
-        console.error('❌ Email Server Connection Error:', error);
-    } else {
-        console.log('✅ Email Server is ready to take our messages');
-    }
-});
+// The eager transporter.verify() that used to live here has been removed. It
+// opened a real SMTP handshake to Gmail on every module load -- meaning every
+// Lambda cold start -- while gating nothing: its result was logged and discarded,
+// and a failure did not stop the app from starting. Send failures are reported at
+// the call sites, which is where they can actually be acted on.
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn(JSON.stringify({
+        event: 'email_not_configured',
+        detail: 'EMAIL_USER/EMAIL_PASS unset; outbound mail will fail'
+    }));
+}
 
 export const emailService = {
     /**

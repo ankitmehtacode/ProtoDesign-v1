@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Mail, Phone, MapPin, Facebook, Instagram, Youtube } from "lucide-react";
 import {Logo} from "@/components/Logo.tsx";
+import protodesignWordmark from "@/assets/protodesign-wordmark.webp";
 
 function LinkedIn(props: { className: string }) {
     return null;
@@ -19,9 +20,7 @@ export const Footer = () => {
                             {/* Logo */}
                             <Link to="/" className="flex items-center gap-2 group">
                                 <Logo className="w-10 h-10" /> {/* Slightly larger to show detail */}
-                                <span className="font-display text-xl font-bold text-foreground">
-                                    ProtoDesign
-                                </span>
+                                <img src={protodesignWordmark} alt="ProtoDesign" className="h-24 w-auto" />
                             </Link>
 
                         </div>

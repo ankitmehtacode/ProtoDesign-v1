@@ -3,8 +3,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import serverless from 'serverless-http';
 
 // Import routes
 import authRoutes from './src/routes/auth.routes.js';
@@ -18,8 +17,11 @@ import sitemapRoutes from './src/routes/sitemap.routes.js';
 
 const app = express();
 
+// Lambda sets this automatically; it is never present locally or in a container.
+const IS_LAMBDA = Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+
 // ============================================
-// 1. SECURITY MIDDLEWARE (Updated)
+// 1. SECURITY MIDDLEWARE
 // ============================================
 
 // Allow Google Login Popups and Cross-Origin Images
@@ -28,31 +30,46 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
+// Origins come from the environment so that a deploy target change is a config
+// change, not a code change. FRONTEND_URLS is a comma-separated list.
+const configuredOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:8080',
     'http://localhost:3000',
-    process.env.FRONTEND_URL,                    // Matches the variable in App Runner
-    'https://master.d1nvmqnm9trfi1.amplifyapp.com' // ✅ Your specific Frontend URL
+    ...configuredOrigins
 ];
+
+// Optional, off by default: Vercel preview deployments get a unique URL per
+// branch/PR (e.g. protodesign-git-feature-x-team.vercel.app), so an exact list
+// cannot cover them. Rather than wildcard-allowing all of *.vercel.app --
+// which is shared hosting, so that would trust every app anyone else deploys
+// there too -- this accepts one project-scoped regex opted into explicitly.
+const previewOriginPattern = process.env.FRONTEND_ORIGIN_PATTERN
+    ? new RegExp(process.env.FRONTEND_ORIGIN_PATTERN)
+    : null;
 
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
-        // Check if origin is allowed
-        if (allowedOrigins.includes(origin) || 
+
+        if (allowedOrigins.includes(origin) ||
+            (previewOriginPattern && previewOriginPattern.test(origin)) ||
             process.env.NODE_ENV === 'development' && (
-                origin.startsWith('http://192.168.') || 
-                origin.startsWith('http://10.') || 
+                origin.startsWith('http://192.168.') ||
+                origin.startsWith('http://10.') ||
                 origin.startsWith('http://localhost')
             )
         ) {
             return callback(null, true);
         }
-        
-        console.log('❌ CORS Blocked Origin:', origin); // Log blocked origins for debugging
+
+        console.warn(JSON.stringify({ event: 'cors_blocked', origin }));
         callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -63,28 +80,21 @@ app.use(cors({
 // ============================================
 // 2. BODY PARSING
 // ============================================
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// NOTE: Lambda caps the synchronous invoke payload at 6MB. Large files must go
+// browser -> S3/Cloudinary directly via presigned upload, never through here.
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // ============================================
-// 3. DEBUG LOGGING
+// 3. REQUEST LOGGING
 // ============================================
 app.use((req, res, next) => {
-    // Only log in production if it's an error or critical path, 
-    // but for now, logging everything helps debug the deployment.
-    console.log(`📝 ${req.method} ${req.path} from ${req.ip}`);
+    console.log(JSON.stringify({ event: 'request', method: req.method, path: req.path }));
     next();
 });
 
 // ============================================
-// 4. STATIC FILES
-// ============================================
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
-
-// ============================================
-// 5. API ROUTES
+// 4. API ROUTES
 // ============================================
 app.use('/', sitemapRoutes);
 
@@ -93,7 +103,7 @@ app.get('/api/health', (req, res) => {
         status: 'OK',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV,
-        allowedOrigins: allowedOrigins // Helpful to see what is allowed in production logs
+        runtime: IS_LAMBDA ? 'lambda' : 'server'
     });
 });
 
@@ -105,7 +115,7 @@ app.use('/api/quotes', quotesRoutes);
 app.use('/api/user', userRoutes);
 
 // ============================================
-// 6. ERROR HANDLING
+// 5. ERROR HANDLING
 // ============================================
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found', path: req.path });
@@ -114,18 +124,27 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // ============================================
-// 7. SERVER START
+// 6. ENTRYPOINTS
 // ============================================
-const PORT = Number(process.env.PORT || 3001);
-const HOST = '0.0.0.0'; // Must be 0.0.0.0 for AWS/Render
 
-const server = app.listen(PORT, HOST, () => {
-    console.log(`✅ Server running on http://${HOST}:${PORT}`);
-});
+// Lambda entrypoint. serverless-http translates the Function URL event into the
+// req/res pair Express expects, so routing above is unchanged.
+export const handler = serverless(app);
 
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received. Closing server...');
-    server.close(() => process.exit(0));
-});
+// Local / container entrypoint. Skipped under Lambda, where listening on a port
+// would do nothing.
+if (!IS_LAMBDA) {
+    const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
+    const HOST = '0.0.0.0';
+
+    const server = app.listen(PORT, HOST, () => {
+        console.log(`✅ Server running on http://${HOST}:${PORT}`);
+    });
+
+    process.on('SIGTERM', () => {
+        console.log('SIGTERM received. Closing server...');
+        server.close(() => process.exit(0));
+    });
+}
 
 export default app;

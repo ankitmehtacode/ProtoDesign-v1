@@ -1,17 +1,16 @@
 import express from 'express';
-import multer from 'multer';
 import nodemailer from 'nodemailer';
 import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
-import authMiddleware from '../middleware/auth.js'; // Import Auth
+import authMiddleware from '../middleware/auth.js';
+import isAdmin from '../middleware/isAdmin.js';
 
 const router = express.Router();
 
-// 1. Upload Configuration (Memory Storage to access buffer for Cloudinary)
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
-});
+// No multer here any more. Models are uploaded by the browser straight to S3
+// using a presigned URL minted by POST /upload-url; this route only ever sees
+// the resulting object key, which keeps every request well under Lambda's 6MB
+// payload ceiling.
 
 // 2. Email Configuration
 const transporter = nodemailer.createTransport({
@@ -30,16 +29,54 @@ router.get('/my', authMiddleware, async (req, res) => {
     }
 });
 
-// ✅ POST REQUEST (Protected: Requires Login)
-router.post('/request', authMiddleware, upload.single('file'), async (req, res) => {
+/**
+ * Step 1 of the upload flow: mint a presigned PUT so the browser can send the
+ * model directly to S3. Validation of type and size happens here, at signing
+ * time, so an oversized or unsupported file is rejected before any bytes move.
+ */
+router.post('/upload-url', authMiddleware, async (req, res, next) => {
     try {
-        const { email, phone, notes, specifications } = req.body;
-        const file = req.file;
+        const { filename, contentType, contentLength } = req.body || {};
+        const result = await storageService.createModelUploadUrl({
+            userId: req.userId,
+            filename,
+            contentType,
+            contentLength
+        });
+        res.json(result);
+    } catch (error) {
+        if (error.status) return res.status(error.status).json({ error: error.message });
+        next(error);
+    }
+});
 
-        if (!file) return res.status(400).json({ error: 'No file uploaded' });
+/**
+ * Step 2: record the quote. The client sends the key it was given, never a URL
+ * and never file bytes.
+ */
+router.post('/request', authMiddleware, async (req, res, next) => {
+    try {
+        const { email, phone, notes, specifications, fileKey, fileName } = req.body || {};
 
-        // 1. Upload File
-        const fileUrl = await storageService.uploadFile(file, 'quotes/stls');
+        if (!fileKey || !fileName) {
+            return res.status(400).json({ error: 'fileKey and fileName are required' });
+        }
+
+        // The key is namespaced by user at signing time; re-check it here so a
+        // caller cannot attach someone else's model to their own quote.
+        if (!String(fileKey).startsWith(`quotes/models/${req.userId}/`)) {
+            return res.status(403).json({ error: 'That file does not belong to you' });
+        }
+
+        // Confirm the object exists rather than trusting the client's word that
+        // the upload succeeded -- otherwise a quote can reference nothing.
+        const stat = await storageService.statModel(fileKey);
+        if (!stat) {
+            return res.status(400).json({ error: 'Upload not found. Please upload the file again.' });
+        }
+
+        const file = { originalname: fileName, size: stat.contentLength };
+        const fileUrl = fileKey;
 
         // 2. Parse Specifications
         let specs = {};
@@ -127,23 +164,23 @@ router.post('/request', authMiddleware, upload.single('file'), async (req, res) 
         `;
 
         // ----------------------------------------------------
-        // 5. Send Admin Email (BACKGROUND - NO AWAIT)
+        // 5. Send Admin Email
         // ----------------------------------------------------
-        // ✅ Removed 'await' so UI doesn't freeze
-        transporter.sendMail({
+        const adminMail = transporter.sendMail({
             from: `"ProtoDesign System" <${process.env.EMAIL_USER}>`,
             to: process.env.EMAIL_USER, // Send to Admin
             subject: `New Request: ${file.originalname} - ₹${specs.estimatedPrice}`,
-            html: adminHtml,
-            attachments: file.size < 10 * 1024 * 1024 ? [{
-                filename: file.originalname,
-                content: file.buffer
-            }] : []
-        }).catch(err => console.error('Admin Email Failed:', err));
+            html: adminHtml
+            // The model is no longer attached: the server never receives the
+            // bytes. It is retrieved on demand from the admin dashboard via
+            // GET /api/quotes/:id/download, which issues a short-lived URL.
+        }).catch(err => console.error(JSON.stringify({
+            event: 'email_failed', type: 'quote_admin', file: file.originalname, error: err.message
+        })));
 
 
         // ----------------------------------------------------
-        // 6. Send Customer Confirmation Email (BACKGROUND - NO AWAIT)
+        // 6. Send Customer Confirmation Email
         // ----------------------------------------------------
         const customerHtml = `
             <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
@@ -161,13 +198,20 @@ router.post('/request', authMiddleware, upload.single('file'), async (req, res) 
         `;
 
         // ✅ Removed 'await' so UI doesn't freeze
-        transporter.sendMail({
+        const customerMail = transporter.sendMail({
             from: `"ProtoDesign" <${process.env.EMAIL_USER}>`,
             to: email, 
             subject: `Order Received: ${file.originalname}`,
             html: customerHtml
-        }).catch(err => console.error('Customer Email Failed:', err));
+        }).catch(err => console.error(JSON.stringify({
+            event: 'email_failed', type: 'quote_customer', to: email, error: err.message
+        })));
 
+        // Both sends are awaited together rather than left dangling. Lambda freezes
+        // the environment the moment the response returns, so a background promise
+        // here simply never completes. allSettled keeps a mail failure from failing
+        // the quote itself, while the .catch handlers above keep it observable.
+        await Promise.allSettled([adminMail, customerMail]);
 
         res.json({ success: true, message: "Quote requested successfully" });
 
@@ -177,15 +221,49 @@ router.post('/request', authMiddleware, upload.single('file'), async (req, res) 
     }
 });
 
+/**
+ * Issue a short-lived download URL for a stored model.
+ *
+ * The bucket is private -- customer models are proprietary designs -- so access
+ * is granted per request to the quote's owner or an admin, rather than by making
+ * objects publicly readable.
+ */
+router.get('/:id/download', authMiddleware, async (req, res, next) => {
+    try {
+        const quote = await db.oneOrNone(
+            'SELECT id, user_id, file_url, file_name FROM quotes WHERE id = $1',
+            [req.params.id]
+        );
+        if (!quote) return res.status(404).json({ error: 'Quote not found' });
+
+        const owns = quote.user_id === req.userId;
+        if (!owns) {
+            const adminRow = await db.oneOrNone(
+                'SELECT role FROM user_roles WHERE user_id = $1 AND role = $2',
+                [req.userId, 'admin']
+            );
+            if (!adminRow) return res.status(403).json({ error: 'Not permitted' });
+        }
+
+        const url = await storageService.createModelDownloadUrl(quote.file_url, quote.file_name);
+        res.json({ url, expiresIn: 300 });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // ADMIN ROUTES
-router.get('/admin/all', async (req, res) => {
+// These previously had NO authentication: any unauthenticated caller could list
+// every customer's email, phone, model and specifications, and change any
+// quote's status. Both now require an admin.
+router.get('/admin/all', authMiddleware, isAdmin, async (req, res) => {
     try {
         const quotes = await db.any('SELECT * FROM quotes ORDER BY created_at DESC');
         res.json(quotes);
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.put('/:id/status', async (req, res) => {
+router.put('/:id/status', authMiddleware, isAdmin, async (req, res) => {
     try {
         const { status } = req.body;
         await db.none('UPDATE quotes SET status = $1 WHERE id = $2', [status, req.params.id]);

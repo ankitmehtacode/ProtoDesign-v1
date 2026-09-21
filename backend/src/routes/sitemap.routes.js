@@ -9,8 +9,11 @@ router.get('/sitemap.xml', async (req, res) => {
         // It returns the array of products directly.
         const products = await db.any('SELECT id, updated_at FROM products WHERE is_archived = false');
 
-        // CHANGE THIS TO YOUR REAL DOMAIN
-        const baseUrl = 'https://www.protodesignstudio.com';
+        // Was hardcoded to a domain that was never actually deployed to.
+        // FRONTEND_URL is already a required env var for the PhonePe redirect
+        // (see phonepe.service.js), so it is reused here rather than adding a
+        // second place to configure the same fact.
+        const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '');
 
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
