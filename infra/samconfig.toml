@@ -1,0 +1,17 @@
+version = 0.1
+
+# Non-secret deploy defaults only. Real parameter values (DB URL, JWT secret,
+# API keys) live in the gitignored parameters.sh and are passed on the command
+# line with --parameter-overrides -- never in this file, since this file is
+# checked in.
+[default.deploy.parameters]
+stack_name = "protodesign-api"
+region = "ap-southeast-1"  # matches the Neon project region (AWS Asia Pacific, Singapore) -- keeping Lambda and DB in the same region avoids a cross-region hop on every query
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+# Function URLs need no API Gateway resource, so no extra IAM capability for
+# that is required beyond CAPABILITY_IAM for the execution role.
+
+[default.build.parameters]
+build_image = false
