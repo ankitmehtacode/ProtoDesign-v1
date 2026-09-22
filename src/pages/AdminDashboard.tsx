@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch'; // ✅ Import Switch
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
     Loader2,
@@ -41,12 +41,13 @@ import {
     Layers,
     Maximize,
     ChevronLeft,
-    Archive, // ✅ Import Archive Icon
-    RefreshCw // ✅ Import Restore Icon
+    Archive,
+    RefreshCw,
+    Star
 } from 'lucide-react';
 import { formatINR } from '@/lib/currency';
 import { apiService } from '@/services/api.service';
-import {useDropzone} from "react-dropzone";
+import { useDropzone } from "react-dropzone";
 
 // --- CONFIGURATION ---
 const MAIN_CATEGORIES = [
@@ -82,7 +83,7 @@ interface Product {
     sub_category?: string;
     video_url?: string | null;
     product_images?: Array<{ id: string; image_url?: string; image_data?: string; display_order: number; }>;
-    is_archived?: boolean; // ✅ Added field
+    is_archived?: boolean;
 }
 
 interface Quote {
@@ -158,6 +159,7 @@ interface ProductFormState {
     imageFiles: File[];
     videoFile: File | null;
     specs: SpecItem[];
+    allow_cod_override: boolean; 
 }
 
 interface EditingProductImageState {
@@ -193,7 +195,8 @@ export default function AdminDashboard() {
 
     // -- UI State --
     const [showAddProduct, setShowAddProduct] = useState(false);
-    const [showArchived, setShowArchived] = useState(false); // ✅ Toggle state for archives
+    const [showArchived, setShowArchived] = useState(false);
+    const [isSeedingReviews, setIsSeedingReviews] = useState(false);
 
     // -- Pagination State --
     const [ordersPage, setOrdersPage] = useState(1);
@@ -222,13 +225,13 @@ export default function AdminDashboard() {
 
     // -- Form State (Add/Edit Product) --
     const [newProduct, setNewProduct] = useState<ProductFormState>({
-        name: '', description: '', short_description: '', price: '', stock: '', category: '3d_printer', sub_category:'', imageFiles: [], videoFile: null, specs: []
+        name: '', description: '', short_description: '', price: '', stock: '', category: '3d_printer', sub_category:'', imageFiles: [], videoFile: null, specs: [], allow_cod_override: false
     });
     const [newProductImagePreviews, setNewProductImagePreviews] = useState<string[]>([]);
 
     const [editingProductId, setEditingProductId] = useState<string | null>(null);
     const [editingProductData, setEditingProductData] = useState<ProductFormState>({
-        name: '', description: '', short_description: '', price: '', stock: '', category: '3d_printer', sub_category: '', imageFiles: [], videoFile: null, specs:[]
+        name: '', description: '', short_description: '', price: '', stock: '', category: '3d_printer', sub_category: '', imageFiles: [], videoFile: null, specs:[], allow_cod_override: false
     });
     const [editingProductImages, setEditingProductImages] = useState<EditingProductImageState[]>([]);
     const [editingVideoPreview, setEditingVideoPreview] = useState<string | null>(null);
@@ -239,7 +242,7 @@ export default function AdminDashboard() {
     // Re-fetch when Archive toggle changes
     useEffect(() => {
         if (isAdmin) fetchDashboardData();
-    }, [showArchived]);
+    }, [showArchived, isAdmin]);
 
     // Cleanup blobs
     useEffect(() => { return () => newProductImagePreviews.forEach(url => URL.revokeObjectURL(url)); }, []);
@@ -268,19 +271,37 @@ export default function AdminDashboard() {
         setFilterSubCategory('all');
     }, [filterCategory]);
 
+    // ✅ FIXED ADMIN VERIFICATION
     const checkAdminAccess = async () => {
         try {
             const token = localStorage.getItem('auth_token');
-            if (!token) { navigate('/auth'); return; }
+            if (!token) {
+                navigate('/auth');
+                return;
+            }
+
             const res = await apiService.getCurrentUser();
-            if ((res.role || res.user?.role) !== 'admin') {
-                toast.error('Access denied.');
+
+            // Check if the API returned an error object instead of blowing up silently
+            if (res.error) {
+                throw new Error(res.error);
+            }
+
+            // Safely extract the role
+            const userRole = res.role || res.user?.role;
+
+            if (userRole !== 'admin') {
+                console.error("Access check failed. Received role:", userRole);
+                toast.error('Access denied. Admin privileges required.');
                 navigate('/');
                 return;
             }
+
             setIsAdmin(true);
             await fetchDashboardData();
-        } catch (e) {
+        } catch (e: any) {
+            console.error("Admin verification error:", e);
+            toast.error('Failed to verify admin status: ' + (e.message || 'Unknown error'));
             navigate('/auth');
         } finally {
             setIsLoading(false);
@@ -289,8 +310,6 @@ export default function AdminDashboard() {
 
     const fetchDashboardData = async () => {
         try {
-            // ✅ Fetch with archive flag if toggle is on
-            // Note: We use request() directly to append the query param if getProducts doesn't support it yet
             const productsRes = await apiService.request(
                 showArchived ? '/products?show_archived=true' : '/products'
             );
@@ -385,7 +404,7 @@ export default function AdminDashboard() {
             toast.success('Product created');
             setShowAddProduct(false);
             setNewProductImagePreviews([]);
-            setNewProduct({ name: '', description: '', short_description: '', price: '', stock: '', category: '3d_printer', sub_category:'', imageFiles: [], videoFile: null, specs: [] });
+            setNewProduct({ name: '', description: '', short_description: '', price: '', stock: '', category: '3d_printer', sub_category:'', imageFiles: [], videoFile: null, specs: [], allow_cod_override: false });
             fetchDashboardData();
         } catch (e: any) { toast.error(e.message || 'Failed to create'); }
     };
@@ -393,11 +412,24 @@ export default function AdminDashboard() {
     // --- EDIT PRODUCT HANDLERS ---
     const startEditProduct = (p: Product) => {
         setEditingProductId(p.id);
-        const specsArray = p.specifications ? Object.entries(p.specifications).map(([key, value]) => ({ key, value })) : [];
+        
+        let specsArray: SpecItem[] = [];
+        let hasOverride = false;
+        
+        if (p.specifications) {
+            if (Array.isArray(p.specifications)) {
+                hasOverride = p.specifications.some((s: any) => s.key === 'allow_cod_override' && String(s.value).toLowerCase() === 'true');
+                specsArray = p.specifications.filter((s: any) => s.key !== 'allow_cod_override').map((s: any) => ({ key: s.key, value: String(s.value) }));
+            } else {
+                hasOverride = String((p.specifications as any).allow_cod_override).toLowerCase() === 'true';
+                specsArray = Object.entries(p.specifications).filter(([k]) => k !== 'allow_cod_override').map(([key, value]) => ({ key, value: String(value) }));
+            }
+        }
+
         setEditingProductData({
             name: p.name, description: p.description || '', short_description: p.short_description || '',
             price: String(p.price), stock: String(p.stock), category: p.category, sub_category: p.sub_category || '',
-            imageFiles: [], videoFile: null, specs: specsArray
+            imageFiles: [], videoFile: null, specs: specsArray, allow_cod_override: hasOverride
         });
         setEditingVideoPreview(p.video_url || null);
         const imgs = (p.product_images || []).sort((a,b) => a.display_order - b.display_order)
@@ -500,7 +532,6 @@ export default function AdminDashboard() {
         );
     };
 
-    // ✅ Renamed to handleArchiveProduct
     const handleArchiveProduct = async (id: string) => {
         const isRestoring = showArchived;
         const confirmMsg = isRestoring
@@ -520,6 +551,20 @@ export default function AdminDashboard() {
             fetchDashboardData();
         } catch (e) {
             toast.error("Action failed");
+        }
+    };
+
+    const handleSeedReviews = async () => {
+        if (!window.confirm("This will inject authentic 4 and 5 star reviews into ALL products. Proceed?")) return;
+        setIsSeedingReviews(true);
+        try {
+            const res = await apiService.request('/products/seed-reviews', { method: 'POST' });
+            toast.success((res as any).message || "Reviews generated successfully!");
+            fetchDashboardData(); // Refresh UI to show new star ratings
+        } catch (e: any) {
+            toast.error(e.message || "Failed to generate reviews");
+        } finally {
+            setIsSeedingReviews(false);
         }
     };
 
@@ -623,7 +668,6 @@ export default function AdminDashboard() {
         </div>
     );
 
-    // ... (QuoteSpecsModal remains unchanged) ...
     const QuoteSpecsModal = ({ quote, onClose }: { quote: any, onClose: () => void }) => {
         if (!quote) return null;
         let specs = quote.specifications || {};
@@ -698,7 +742,20 @@ export default function AdminDashboard() {
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <div><CardTitle>Inventory</CardTitle><CardDescription>Manage catalog</CardDescription></div>
-                            <Button onClick={() => setShowAddProduct(!showAddProduct)} size="sm"><Plus className="mr-2 h-4 w-4" /> Add Product</Button>
+                            <div className="flex items-center gap-2">
+                                {/* ✅ THE NEW SEEDER BUTTON */}
+                                <Button 
+                                    onClick={handleSeedReviews} 
+                                    disabled={isSeedingReviews}
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="hidden md:flex border-yellow-400 text-yellow-600 hover:bg-yellow-50"
+                                >
+                                    {isSeedingReviews ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" fill="currentColor" />}
+                                    {isSeedingReviews ? 'Generating...' : 'Generate Reviews'}
+                                </Button>
+                                <Button onClick={() => setShowAddProduct(!showAddProduct)} size="sm"><Plus className="mr-2 h-4 w-4" /> Add Product</Button>
+                            </div>
                         </div>
                     </CardHeader>
 
@@ -724,7 +781,6 @@ export default function AdminDashboard() {
 
                     <CardContent className="pt-6">
                         {showAddProduct && (
-                            // ... (Keep existing Add Product form logic same) ...
                             <div className="mb-8 p-6 border rounded-xl bg-secondary/10">
                                 <h3 className="font-bold mb-4 text-lg">Add New Product</h3>
                                 <form onSubmit={handleAddProduct} className="space-y-4">
@@ -732,9 +788,23 @@ export default function AdminDashboard() {
                                         <div><Label>Name</Label><Input value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} required /></div>
                                         <div><Label>Price</Label><Input type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} required /></div>
                                         <div><Label>Stock</Label><Input type="number" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} required /></div>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        
+                                        {/* ✅ MASTER COD OVERRIDE EXPLICIT DROPDOWN (ADD MODE) */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 col-span-1 md:col-span-2">
                                             <div><Label>Category</Label><Select value={newProduct.category} onValueChange={val => setNewProduct({...newProduct, category: val, sub_category: ''})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
                                             <div><Label>Sub</Label><Select value={newProduct.sub_category} onValueChange={val => setNewProduct({...newProduct, sub_category: val})} disabled={!SUB_CATEGORIES[newProduct.category]}><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger><SelectContent>{SUB_CATEGORIES[newProduct.category]?.map(sc => <SelectItem key={sc} value={sc}>{sc}</SelectItem>)}</SelectContent></Select></div>
+                                            <div>
+                                                <Label>COD Override (&gt;₹999)</Label>
+                                                <Select value={newProduct.allow_cod_override ? "true" : "false"} onValueChange={val => setNewProduct({...newProduct, allow_cod_override: val === "true"})}>
+                                                    <SelectTrigger className={newProduct.allow_cod_override ? "border-green-500 bg-green-50 text-green-700 font-bold" : ""}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="false">Standard Rules</SelectItem>
+                                                        <SelectItem value="true" className="text-green-700 font-bold">Force Enable COD</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         </div>
                                     </div>
                                     <div><Label>Short Desc</Label><Textarea value={newProduct.short_description} onChange={e => setNewProduct({...newProduct, short_description: e.target.value})} maxLength={150} /></div>
@@ -769,15 +839,28 @@ export default function AdminDashboard() {
                             {displayedProducts.map(product => (
                                 <div key={product.id} className="p-4 border rounded-lg hover:bg-muted/5 transition-colors">
                                     {editingProductId === product.id ? (
-                                        // ... (Keep existing Edit Form) ...
                                         <div className="space-y-4">
                                             <div className="grid md:grid-cols-2 gap-4">
                                                 <div><Label>Name</Label><Input value={editingProductData.name} onChange={e => setEditingProductData({...editingProductData, name: e.target.value})} /></div>
                                                 <div><Label>Price</Label><Input type="number" value={editingProductData.price} onChange={e => setEditingProductData({...editingProductData, price: e.target.value})} /></div>
                                                 <div><Label>Stock</Label><Input type="number" value={editingProductData.stock} onChange={e => setEditingProductData({...editingProductData, stock: e.target.value})} /></div>
-                                                <div className="grid grid-cols-2 gap-2">
+                                                
+                                                {/* ✅ MASTER COD OVERRIDE EXPLICIT DROPDOWN (EDIT MODE) */}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 col-span-1 md:col-span-2">
                                                     <div><Label>Category</Label><Select value={editingProductData.category} onValueChange={v => setEditingProductData({...editingProductData, category: v, sub_category: ''})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent></Select></div>
                                                     <div><Label>Sub</Label><Select value={editingProductData.sub_category} onValueChange={v => setEditingProductData({...editingProductData, sub_category: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SUB_CATEGORIES[editingProductData.category]?.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                                                    <div>
+                                                        <Label>COD Override (&gt;₹999)</Label>
+                                                        <Select value={editingProductData.allow_cod_override ? "true" : "false"} onValueChange={val => setEditingProductData({...editingProductData, allow_cod_override: val === "true"})}>
+                                                            <SelectTrigger className={editingProductData.allow_cod_override ? "border-green-500 bg-green-50 text-green-700 font-bold" : ""}>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="false">Standard Rules</SelectItem>
+                                                                <SelectItem value="true" className="text-green-700 font-bold">Force Enable COD</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div><Label>Short Desc</Label><Textarea value={editingProductData.short_description} onChange={e => setEditingProductData({...editingProductData, short_description: e.target.value})} /></div>
@@ -853,7 +936,7 @@ export default function AdminDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* ORDERS SECTION ... (Rest of file remains unchanged) ... */}
+                {/* ORDERS SECTION */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
                         <div><CardTitle>Recent Orders</CardTitle><CardDescription>View and manage orders</CardDescription></div>
@@ -936,7 +1019,7 @@ export default function AdminDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* QUOTE MANAGEMENT ... (Rest of file remains unchanged) ... */}
+                {/* QUOTE MANAGEMENT */}
                 <Card className="mt-8">
                     <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
                         <div><CardTitle>Custom Print Requests</CardTitle><CardDescription>Manage incoming quotes</CardDescription></div>

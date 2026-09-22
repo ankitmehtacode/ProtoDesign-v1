@@ -31,10 +31,13 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
-    "nodemailer": "^6.9.9",
+    "nodemailer": "^8.0.1",
     "pg": "^8.11.0",
     "pg-promise": "^12.3.0",
+
     "serverless-http": "^3.2.0",
+    "react-js-phonepe-pg": "^1.1.1",
+    "sharp": "^0.34.5",
     "streamifier": "^0.1.1",
     "tsx": "^4.19.1",
     "typescript": "^5.2.0"

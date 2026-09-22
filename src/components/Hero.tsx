@@ -6,6 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import DriftWall from "@/components/DriftWall/DriftWall";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { BlurText } from "./animations/BlurText"; // ✅ SILICON VALLEY INJECTION
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -28,7 +29,7 @@ export const Hero = () => {
   useEffect(() => {
     if (!heroRef.current || !imageRef.current || !contentRef.current) return;
 
-    // Parallax effect for the image
+    // Parallax effect for the image (Kept strictly intact)
     gsap.to(imageRef.current, {
       y: 100,
       ease: "none",
@@ -75,17 +76,12 @@ export const Hero = () => {
       {/* Content */}
       <div ref={contentRef} className="container mx-auto px-4 relative z-20 pt-20">
         <div className="max-w-3xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <h1 className="font-display text-6xl md:text-7xl lg:text-8xl mb-6 leading-tight">
-              High-Fidelity
-              <br />
-              in Every Shade
-            </h1>
-          </motion.div>
+          
+          {/* ✅ DYNAMIC TYPOGRAPHY INJECTION */}
+          <div className="font-display text-6xl md:text-7xl lg:text-8xl mb-6 leading-tight">
+            <BlurText text="High-Fidelity" />
+            <BlurText text="in Every Shade" />
+          </div>
 
           <motion.p
             initial={{ opacity: 0, y: 30 }}
@@ -103,18 +99,25 @@ export const Hero = () => {
             transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
             className="flex flex-col sm:flex-row gap-4"
           >
-            <Link to="/custom">
-              <Button variant="hero" size="lg" className="group">
-                Get Custom Quote
-                <ArrowRight className="transition-transform group-hover:translate-x-1" />
-              </Button>
-            </Link>
-            <Link to="/shop">
-              <Button variant="outline" size="lg" className="shadow-soft">
-                Shop Printers
-              </Button>
-            </Link>
+            {/* ✅ MAGNETIC BUTTON PHYSICS INJECTION */}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Link to="/custom">
+                <Button variant="hero" size="lg" className="group w-full sm:w-auto">
+                  Get Custom Quote
+                  <ArrowRight className="transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Link to="/shop">
+                <Button variant="outline" size="lg" className="shadow-soft w-full sm:w-auto">
+                  Shop Printers
+                </Button>
+              </Link>
+            </motion.div>
           </motion.div>
+
         </div>
       </div>
 

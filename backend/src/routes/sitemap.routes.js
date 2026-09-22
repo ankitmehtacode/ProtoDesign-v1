@@ -1,7 +1,22 @@
 import express from 'express';
-import db from '../config/database.js'; // Importing the pg-promise instance
+import db from '../config/database.js';
 
 const router = express.Router();
+
+// Helper to escape XML special characters like &
+const escapeXml = (unsafe) => {
+    if (!unsafe) return '';
+    return unsafe.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+            default: return c;
+        }
+    });
+};
 
 router.get('/sitemap.xml', async (req, res) => {
     try {
@@ -15,8 +30,10 @@ router.get('/sitemap.xml', async (req, res) => {
         // second place to configure the same fact.
         const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '');
 
+        // ✅ Inject the Google Image Sitemap XML namespace
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
-        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+                xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
             <url>
                 <loc>${baseUrl}/</loc>
                 <changefreq>daily</changefreq>
@@ -25,20 +42,50 @@ router.get('/sitemap.xml', async (req, res) => {
             <url>
                 <loc>${baseUrl}/shop</loc>
                 <changefreq>daily</changefreq>
-                <priority>0.8</priority>
-            </url>`;
+                <priority>0.9</priority>
+            </url>
+            <url>
+                <loc>${baseUrl}/custom</loc>
+                <changefreq>weekly</changefreq>
+                <priority>0.9</priority>
+            </url>
+            <url><loc>${baseUrl}/printers</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+            <url><loc>${baseUrl}/printables</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+            <url><loc>${baseUrl}/filaments</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+            <url><loc>${baseUrl}/resins</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+            <url><loc>${baseUrl}/accessories</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+            <url><loc>${baseUrl}/spare-parts</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>`;
 
-        // Add dynamic product URLs
+        // Dynamic Product Pages with Image Data
         products.forEach(product => {
-            // Handle null updated_at by falling back to current date or a default
             const date = product.updated_at ? new Date(product.updated_at).toISOString() : new Date().toISOString();
+            const productIdentifier = product.slug || product.id;
+            const productUrl = `${baseUrl}/product/${escapeXml(productIdentifier)}`;
+
+            // Ensure image URL is absolute
+            let imgUrl = product.image_url;
+            if (imgUrl && !imgUrl.startsWith('http')) {
+                imgUrl = `${baseUrl}${imgUrl}`;
+            }
 
             xml += `
             <url>
-                <loc>${baseUrl}/product/${product.id}</loc>
+                <loc>${productUrl}</loc>
                 <lastmod>${date}</lastmod>
                 <changefreq>weekly</changefreq>
-                <priority>0.7</priority>
+                <priority>0.7</priority>`;
+            
+            // ✅ Feed images to Google Images crawler
+            if (imgUrl) {
+                xml += `
+                <image:image>
+                    <image:loc>${escapeXml(imgUrl)}</image:loc>
+                    <image:title>${escapeXml(product.name)}</image:title>
+                    <image:caption>Buy ${escapeXml(product.name)} at ProtoDesign</image:caption>
+                </image:image>`;
+            }
+
+            xml += `
             </url>`;
         });
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ interface ProductImage {
 
 interface Product {
     id: string;
+    slug?: string; // ✅ Added slug to interface
     name: string;
     description: string;
     short_description?: string;
@@ -178,12 +179,10 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
         }
     };
 
-    // ✅ UPDATED HANDLER
     const handleCreateProduct = async () => {
         if (!isAdmin) return;
         setIsCreating(true);
         try {
-            // ✅ Send as FormData to satisfy backend Multer expectations
             const formData = new FormData();
             formData.append('name', "New Draft Product");
             formData.append('description', "Description goes here...");
@@ -215,27 +214,15 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
 
     return (
         <div className="min-h-screen pt-20 pb-10 font-sans relative">
-
-            {/* ✅ ADMIN ADD BUTTON */}
             {isAdmin && (
-                <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="fixed bottom-8 right-8 z-50"
-                >
-                    <Button
-                        size="lg"
-                        onClick={handleCreateProduct}
-                        disabled={isCreating}
-                        className="h-16 w-16 rounded-full shadow-2xl bg-primary hover:bg-primary/90 text-white flex items-center justify-center border-4 border-white/20 backdrop-blur-sm"
-                    >
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="fixed bottom-8 right-8 z-50">
+                    <Button size="lg" onClick={handleCreateProduct} disabled={isCreating} className="h-16 w-16 rounded-full shadow-2xl bg-primary hover:bg-primary/90 text-white flex items-center justify-center border-4 border-white/20 backdrop-blur-sm">
                         {isCreating ? <Loader2 className="animate-spin w-8 h-8" /> : <Plus className="w-8 h-8" />}
                     </Button>
                 </motion.div>
             )}
 
             <div className="container mx-auto px-4">
-
                 <section className="py-12 mb-8 rounded-2xl bg-secondary/10 text-center border border-border/50">
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                         <h1 className="text-4xl md:text-5xl font-extrabold mb-3 tracking-tight">{title}</h1>
@@ -247,20 +234,13 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
                     <div className="flex flex-col lg:flex-row items-center gap-3">
                         <div className="relative flex-1 w-full">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by name, specs..."
-                                className="pl-9 h-10 bg-white"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                            <Input placeholder="Search by name, specs..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
 
                         {subCategories.length > 0 && (
                             <div className="w-full lg:w-[200px] shrink-0">
                                 <Select value={activeSubCategory} onValueChange={setActiveSubCategory}>
-                                    <SelectTrigger className="h-10 bg-white">
-                                        <SelectValue placeholder="Category" />
-                                    </SelectTrigger>
+                                    <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Category" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Types</SelectItem>
                                         {subCategories.map(cat => (
@@ -273,9 +253,7 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
 
                         <div className="w-full lg:w-[180px] shrink-0">
                             <Select value={sortOption} onValueChange={setSortOption}>
-                                <SelectTrigger className="h-10 bg-white">
-                                    <SelectValue placeholder="Sort By" />
-                                </SelectTrigger>
+                                <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Sort By" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="newest">Newest Arrivals</SelectItem>
                                     <SelectItem value="price-low">Price: Low to High</SelectItem>
@@ -284,11 +262,7 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
                             </Select>
                         </div>
 
-                        <Button
-                            variant="ghost"
-                            onClick={clearAll}
-                            className="h-10 px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/10 whitespace-nowrap shrink-0"
-                        >
+                        <Button variant="ghost" onClick={clearAll} className="h-10 px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/10 whitespace-nowrap shrink-0">
                             <X className="w-4 h-4 mr-2" /> Clear
                         </Button>
                     </div>
@@ -307,28 +281,15 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
                             const images = (product.product_images || product.images || []).sort((a,b) => a.display_order - b.display_order);
 
                             return (
-                                <motion.div
-                                    key={product.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                >
+                                <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+                                    {/* ✅ THE FIX: Route to slug instead of ID */}
                                     <Card
-                                        onClick={() => navigate(`/product/${product.id}`)}
+                                        onClick={() => navigate(`/product/${product.slug || product.id}`)}
                                         className="group h-full flex flex-col overflow-hidden hover:shadow-xl transition-all cursor-pointer border-border/60"
                                     >
                                         <div className="aspect-[4/3] p-4 bg-white relative">
-                                            <ProductImageCarousel
-                                                images={images.length > 0 ? images : [{id:'0', image_url: product.image_url||'', display_order:0}]}
-                                                productName={product.name}
-                                            />
-                                            {/* 🔥 Like Button with Count */}
-                                            <button
-                                                onClick={(e) => handleLike(product.id, e)}
-                                                className={`absolute top-3 right-3 py-1 px-2 rounded-full bg-white/90 backdrop-blur-sm shadow-sm transition-all z-10 flex items-center gap-1 text-xs font-medium ${
-                                                    isLiked[product.id] ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                                                }`}
-                                            >
+                                            <ProductImageCarousel images={images.length > 0 ? images : [{id:'0', image_url: product.image_url||'', display_order:0}]} productName={product.name} />
+                                            <button onClick={(e) => handleLike(product.id, e)} className={`absolute top-3 right-3 py-1 px-2 rounded-full bg-white/90 backdrop-blur-sm shadow-sm transition-all z-10 flex items-center gap-1 text-xs font-medium ${isLiked[product.id] ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}>
                                                 <Heart className={`w-3.5 h-3.5 ${isLiked[product.id] ? 'fill-current' : ''}`} />
                                                 {product.likes_count > 0 && <span>{product.likes_count}</span>}
                                             </button>
@@ -337,34 +298,19 @@ const CategoryPage = ({ category, title, subtitle, subCategories = [] }: Categor
                                         <CardContent className="p-4 flex-1 flex flex-col">
                                             <div className="mb-2">
                                                 <h3 className="font-semibold text-foreground line-clamp-1" title={product.name}>{product.name}</h3>
-                                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1 min-h-[2.5em]">
-                                                    {product.short_description || product.description}
-                                                </p>
+                                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1 min-h-[2.5em]">{product.short_description || product.description}</p>
                                             </div>
 
                                             <div className="mt-auto pt-4 flex items-center justify-between border-t border-border/50">
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-lg text-primary">{formatINR(product.price)}</span>
-                                                </div>
-
-                                                {/* 🔥 Rating Opposite Price */}
+                                                <div className="flex flex-col"><span className="font-bold text-lg text-primary">{formatINR(product.price)}</span></div>
                                                 <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-md border border-yellow-100">
                                                     <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                                    <span className="text-xs font-semibold text-yellow-700">
-                                                        {product.average_rating ? Number(product.average_rating).toFixed(1) : "0.0"}
-                                                    </span>
-                                                    <span className="text-[10px] text-muted-foreground/70">
-                                                        ({product.review_count || 0})
-                                                    </span>
+                                                    <span className="text-xs font-semibold text-yellow-700">{product.average_rating ? Number(product.average_rating).toFixed(1) : "0.0"}</span>
+                                                    <span className="text-[10px] text-muted-foreground/70">({product.review_count || 0})</span>
                                                 </div>
                                             </div>
 
-                                            <Button
-                                                size="sm"
-                                                onClick={(e) => handleAddToCart(product, e)}
-                                                className="w-full mt-3 rounded-md text-xs font-semibold h-9"
-                                                disabled={product.stock === 0}
-                                            >
+                                            <Button size="sm" onClick={(e) => handleAddToCart(product, e)} className="w-full mt-3 rounded-md text-xs font-semibold h-9" disabled={product.stock === 0}>
                                                 {product.stock > 0 ? <><ShoppingCart className="w-3 h-3 mr-2" /> Add to Cart</> : "Out of Stock"}
                                             </Button>
                                         </CardContent>
