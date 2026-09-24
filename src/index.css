@@ -117,10 +117,13 @@ All colors MUST be HSL.
         font-feature-settings: 'kern' 1, 'liga' 1;
     }
 
-    /* 90% Scale for Laptops/Desktops */
+    /* 90% scale for laptops/desktops. Done through the root font size, which
+       every rem-based Tailwind size follows, rather than `zoom`: zoom skews
+       getBoundingClientRect against layout, so GSAP pins rendered at 90% width
+       and 100vh sections came out 90% tall. */
     @media (min-width: 1024px) {
-        body {
-            zoom: 0.9;
+        html {
+            font-size: 90%;
         }
     }
 

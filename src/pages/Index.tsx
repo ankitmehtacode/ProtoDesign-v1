@@ -1,12 +1,15 @@
 import { Hero } from "@/components/Hero";
-import { Features } from "@/components/Features";
+import { PrintStory } from "@/components/story/PrintStory";
+import { ThreePaths } from "@/components/story/ThreePaths";
 
-
+// The home page reads as one story: the promise (Hero), how an idea becomes an
+// object and the ask (PrintStory), then the ways in (ThreePaths).
 const Index = () => {
   return (
     <div>
       <Hero />
-      <Features />
+      <PrintStory />
+      <ThreePaths />
     </div>
   );
 };

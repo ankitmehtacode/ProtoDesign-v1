@@ -11,8 +11,9 @@ const CATEGORIES: CategoryOption[] = [
 
 const Shop = () => (
     <ProductCatalog
-        title="Shop"
-        subtitle="Printers, materials and parts. Filter fast, add in one tap."
+        eyebrow="Shop"
+        title="Everything we print with."
+        subtitle="Printers, filament, resin and the parts that keep them running."
         categories={CATEGORIES}
     />
 );

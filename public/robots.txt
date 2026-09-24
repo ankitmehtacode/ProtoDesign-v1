@@ -1,12 +1,12 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /bulk-upload
+Disallow: /profile
+Disallow: /orders
+Disallow: /cart
+Disallow: /checkout
+Disallow: /reset-password
+Disallow: /forgot-password
 
-# Sitemaps
-Sitemap: https://protodesignstudio.in/sitemap.xml
-
-# Prevent indexing of sensitive/utility pages
-Disallow: /admin/
-Disallow: /profile/
-Disallow: /cart/
-Disallow: /checkout/
-Disallow: /reset-password/
+Sitemap: https://www.protodesignstudio.com/sitemap.xml

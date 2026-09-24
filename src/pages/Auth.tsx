@@ -9,7 +9,7 @@ import { apiService } from '@/services/api.service';
 import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import protodesignWordmark from '@/assets/protodesign-wordmark.webp';
+import logoLockup from '@/assets/logo-lockup-light.webp';
 
 export default function Auth() {
     const navigate = useNavigate();
@@ -116,14 +116,12 @@ export default function Auth() {
             <Card className="w-full max-w-md shadow-lg">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <CardHeader className="p-5 sm:p-6">
-                        {/* The nav already shows the wordmark, and on a phone a second copy at
-                            h-36 pushed the form below the fold. Phones get a text heading; the
-                            large wordmark returns from sm up, where there is room for both.
-                            -mx-6 there cancels CardHeader's padding: the 448px card minus
-                            padding leaves 400px, short of the 420px+ this 3:1 wordmark needs. */}
+                        {/* The nav already shows the logo, and on a phone a second copy pushed the
+                            form below the fold. Phones get a text heading; the full lockup
+                            returns from sm up, where there is room for both. */}
                         <CardTitle className="text-center text-2xl sm:hidden">Welcome</CardTitle>
-                        <div className="hidden sm:flex justify-center -mx-6">
-                            <img src={protodesignWordmark} alt="ProtoDesign" className="h-36 w-auto" />
+                        <div className="hidden sm:flex justify-center">
+                            <img src={logoLockup} alt="ProtoDesign Technologies" width={767} height={640} className="h-36 w-auto" />
                         </div>
                         <CardDescription className="text-center">
                             Login or create an account to manage your orders

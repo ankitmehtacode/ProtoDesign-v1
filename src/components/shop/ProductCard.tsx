@@ -3,22 +3,12 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, Heart, Loader2, Plus, Star } from 'lucide-react';
 import { formatINR } from '@/lib/currency';
-import { CATEGORY_LABELS, Product } from './product';
+import { CATEGORY_LABELS, Product, productImageUrls as imageUrls } from './product';
 
 // Only genuinely scarce stock earns the badge; flagging most of the catalog would make it noise.
 const LOW_STOCK_THRESHOLD = 3;
 const NEW_FOR_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Ordered image URLs for a product, falling back to its legacy single image_url. */
-function imageUrls(product: Product): string[] {
-    const images = [...(product.product_images || product.images || [])]
-        .sort((a, b) => a.display_order - b.display_order)
-        .map((img) => img.image_url || img.image_data)
-        .filter((url): url is string => Boolean(url));
-    if (images.length === 0 && product.image_url) images.push(product.image_url);
-    return images;
-}
 
 /**
  * The single most useful status for a shopper, or null. One badge at most:

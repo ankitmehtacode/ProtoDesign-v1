@@ -40,7 +40,8 @@ import { useCart } from "@/hooks/use-cart";
 import { formatINR } from "@/lib/currency";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
-import { Helmet } from "react-helmet-async";
+import { Seo } from "@/seo/Seo";
+import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, productUrl } from "@/seo/site.js";
 import { CATEGORY_LABELS } from '@/components/shop/product';
 
 // --- INTERFACES ---
@@ -578,79 +579,11 @@ const ProductDetail = () => {
         navigate(route);
     };
 
-    // --- SEO & SCHEMA GENERATION ---
-    const siteUrl = window.location.origin;
-    
-    const currentUrl = product?.slug 
-        ? `${siteUrl}/product/${product.slug}` 
-        : `${siteUrl}/product/${productId}`;
-        
-    const productImage = activeImage || product?.image_url || '/placeholder.svg';
-    const fullImageUrl = productImage.startsWith('http') ? productImage : `${siteUrl}${productImage}`;
-
+    // --- SEO: shared with scripts/prerender.mjs so crawler and browser see the same tags ---
     const allImages = getProductImages();
-    const schemaImages = allImages.length > 0 
-        ? allImages.map(img => img.startsWith('http') ? img : `${siteUrl}${img}`) 
-        : [fullImageUrl];
-
-    const priceValidUntil = new Date();
-    priceValidUntil.setFullYear(priceValidUntil.getFullYear() + 1);
-
-    const productSchema = product ? {
-        "@context": "https://schema.org/",
-        "@type": "Product",
-        "name": product.name,
-        "image": schemaImages,
-        "description": product.short_description || product.description.substring(0, 160),
-        "sku": product.id,
-        "mpn": product.id,
-        "brand": {
-            "@type": "Brand",
-            "name": "ProtoDesign"
-        },
-        "offers": {
-            "@type": "Offer",
-            "url": currentUrl,
-            "priceCurrency": "INR",
-            "price": product.price,
-            "priceValidUntil": priceValidUntil.toISOString().split('T')[0],
-            "itemCondition": "https://schema.org/NewCondition",
-            "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-            "shippingDetails": {
-                "@type": "OfferShippingDetails",
-                "shippingRate": {
-                    "@type": "MonetaryAmount",
-                    "value": product.category === '3d_printer' ? 0 : 199,
-                    "currency": "INR"
-                },
-                "shippingDestination": {
-                    "@type": "DefinedRegion",
-                    "addressCountry": "IN"
-                }
-            },
-            "hasMerchantReturnPolicy": {
-                "@type": "MerchantReturnPolicy",
-                "applicableCountry": "IN",
-                "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
-                "merchantReturnDays": 7,
-                "returnMethod": "https://schema.org/ReturnByMail"
-            }
-        },
-        ...(reviews.length > 0 && {
-            "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": product.average_rating || 5,
-                "reviewCount": product.review_count || reviews.length
-            },
-            "review": reviews.slice(0, 5).map(r => ({
-                "@type": "Review",
-                "reviewRating": { "@type": "Rating", "ratingValue": r.rating },
-                "author": { "@type": "Person", "name": r.user },
-                "datePublished": r.created_at ? new Date(r.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                "reviewBody": r.comment
-            }))
-        })
-    } : null;
+    const toAbsolute = (url: string) => (url.startsWith('http') ? url : `${SITE_URL}${url}`);
+    const productImages = allImages.map(toAbsolute);
+    const [categoryName, categoryPath] = CATEGORY_PAGES[product?.category ?? ''] ?? ['Shop', '/shop'];
 
     if (loading) return <div className="min-h-screen pt-32 flex justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
     if (!product) return null;
@@ -661,25 +594,14 @@ const ProductDetail = () => {
 
     return (
         <>
-            {product && (
-                <Helmet>
-                    <title>{`${product.name} - Buy Online | ProtoDesign`}</title>
-                    <meta name="description" content={`Buy ${product.name} at ProtoDesign. ${product.short_description || product.description.substring(0, 120)}`} />
-                    <link rel="canonical" href={currentUrl} />
-
-                    <meta property="og:title" content={`${product.name} | ProtoDesign`} />
-                    <meta property="og:description" content={product.short_description || product.description.substring(0, 160)} />
-                    <meta property="og:image" content={fullImageUrl} />
-                    <meta property="og:url" content={currentUrl} />
-                    <meta property="og:type" content="product" />
-                    <meta property="product:price:amount" content={product.price.toString()} />
-                    <meta property="product:price:currency" content="INR" />
-
-                    <script type="application/ld+json">
-                        {JSON.stringify(productSchema)}
-                    </script>
-                </Helmet>
-            )}
+            <Seo
+                title={productTitle(product.name, categoryName)}
+                description={productDescription(product)}
+                canonicalPath={new URL(productUrl(product)).pathname}
+                image={productImages[0]}
+                type="product"
+                jsonLd={productLd({ ...product, images: productImages }, categoryName, categoryPath)}
+            />
         <div className="min-h-screen bg-background pt-24 pb-16 font-sans relative">
 
             {isAdmin && (

@@ -24,6 +24,16 @@ export interface Product {
     is_archived?: boolean;
 }
 
+/** Ordered image URLs for a product, falling back to its legacy single image_url. */
+export function productImageUrls(product: Product): string[] {
+    const images = [...(product.product_images || product.images || [])]
+        .sort((a, b) => a.display_order - b.display_order)
+        .map((img) => img.image_url || img.image_data)
+        .filter((url): url is string => Boolean(url));
+    if (images.length === 0 && product.image_url) images.push(product.image_url);
+    return images;
+}
+
 export const CATEGORY_LABELS: Record<string, string> = {
     '3d_printer': 'Printer',
     filament: 'Filament',
