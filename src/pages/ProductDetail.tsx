@@ -41,6 +41,7 @@ import { formatINR } from "@/lib/currency";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
 import { Helmet } from "react-helmet-async";
+import { CATEGORY_LABELS } from '@/components/shop/product';
 
 // --- INTERFACES ---
 interface ProductImage {
@@ -848,7 +849,7 @@ const ProductDetail = () => {
                             ) : (
                                 <>
                                     <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                                        {(product.category || 'Uncategorized').replace(/_/g, ' ')}
+                                        {CATEGORY_LABELS[product.category] ?? 'Product'}
                                     </span>
                                     {product.sub_category && (
                                         <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">

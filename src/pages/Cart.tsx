@@ -8,6 +8,7 @@ import { formatINR } from '@/lib/currency';
 import { Minus, Plus, Trash2, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
+import { CATEGORY_LABELS } from '@/components/shop/product';
 
 const Cart = () => {
     const navigate = useNavigate();
@@ -80,7 +81,7 @@ const Cart = () => {
                                         )}
                                         <div className="flex-1">
                                             <h3 className="font-semibold text-lg mb-1">{item.product.name}</h3>
-                                            <p className="text-sm text-muted-foreground mb-2 capitalize">{item.product.category.replace(/_/g, ' ')}</p>
+                                            <p className="text-sm text-muted-foreground mb-2">{CATEGORY_LABELS[item.product.category] ?? 'Product'}</p>
                                             <p className="text-primary font-bold text-lg">{formatINR(item.product.price)} each</p>
                                         </div>
                                         <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-4">
