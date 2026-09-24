@@ -165,3 +165,14 @@ All colors MUST be HSL.
         scroll-behavior: auto !important;
     }
 }
+
+/* iOS Safari zooms the page when a focused field's text is under 16px, and
+   several pages shrink inputs with text-sm. Enforce the floor on phones only;
+   desktop keeps each component's own sizing. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

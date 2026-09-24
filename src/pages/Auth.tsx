@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,15 @@ export default function Auth() {
     const [showLoginPassword, setShowLoginPassword] = useState(false);
     const [showSignupPassword, setShowSignupPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // Google renders its button in an iframe at a fixed pixel width (max 400)
+    // and never resizes it, so measure the slot once and hand that over.
+    const googleSlotRef = useRef<HTMLDivElement>(null);
+    const [googleWidth, setGoogleWidth] = useState(0);
+    useEffect(() => {
+        const w = googleSlotRef.current?.clientWidth ?? 0;
+        setGoogleWidth(Math.min(400, Math.floor(w)));
+    }, []);
 
     const [loginData, setLoginData] = useState({ email: '', password: '' });
     const [signupData, setSignupData] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
@@ -101,19 +110,21 @@ export default function Auth() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
+        // pt-24 clears the fixed h-20 nav; the card is top-aligned on phones so the
+        // form sits above the keyboard, and centred once there is room.
+        <div className="flex flex-col items-center min-h-[100svh] px-4 pt-24 pb-8 sm:justify-center bg-gray-50">
             <Card className="w-full max-w-md shadow-lg">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <CardHeader>
-                        {/* -mx-6 cancels CardHeader's own p-6 horizontal padding for just this
-                            row. Without it, the card's 448px width minus that padding leaves
-                            only 400px -- not enough for a 2.5x-sized logo at this wordmark's 3:1
-                            aspect ratio (needs 420px+) without either overflowing or falling
-                            short of the requested size. This uses the full card width instead
-                            of quietly settling for a smaller logo to fit inside the padding. */}
-                        <CardTitle className="flex justify-center -mx-6">
+                    <CardHeader className="p-5 sm:p-6">
+                        {/* The nav already shows the wordmark, and on a phone a second copy at
+                            h-36 pushed the form below the fold. Phones get a text heading; the
+                            large wordmark returns from sm up, where there is room for both.
+                            -mx-6 there cancels CardHeader's padding: the 448px card minus
+                            padding leaves 400px, short of the 420px+ this 3:1 wordmark needs. */}
+                        <CardTitle className="text-center text-2xl sm:hidden">Welcome</CardTitle>
+                        <div className="hidden sm:flex justify-center -mx-6">
                             <img src={protodesignWordmark} alt="ProtoDesign" className="h-36 w-auto" />
-                        </CardTitle>
+                        </div>
                         <CardDescription className="text-center">
                             Login or create an account to manage your orders
                         </CardDescription>
@@ -123,7 +134,7 @@ export default function Auth() {
                         </TabsList>
                     </CardHeader>
 
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 px-5 sm:px-6">
                         <TabsContent value="login">
                             <form onSubmit={handleLogin} className="space-y-4">
                                 <div className="space-y-2">
@@ -131,6 +142,8 @@ export default function Auth() {
                                     <Input
                                         id="email"
                                         type="email"
+                                        autoComplete="email"
+                                        inputMode="email"
                                         placeholder="m@example.com"
                                         required
                                         value={loginData.email}
@@ -146,13 +159,15 @@ export default function Auth() {
                                     </div>
                                     <div className="relative">
                                         <Input
+                                            className="pr-11"
                                             id="password"
                                             type={showLoginPassword ? "text" : "password"}
+                                            autoComplete="current-password"
                                             required
                                             value={loginData.password}
                                             onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                                         />
-                                        <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} className="absolute right-3 top-2.5 text-gray-500">
+                                        <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} aria-label={showLoginPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500">
                                             {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
@@ -169,6 +184,7 @@ export default function Auth() {
                                     <Label htmlFor="fullName">Full Name</Label>
                                     <Input
                                         id="fullName"
+                                        autoComplete="name"
                                         required
                                         value={signupData.fullName}
                                         onChange={(e) => setSignupData({...signupData, fullName: e.target.value})}
@@ -179,6 +195,8 @@ export default function Auth() {
                                     <Input
                                         id="signup-email"
                                         type="email"
+                                        autoComplete="email"
+                                        inputMode="email"
                                         required
                                         value={signupData.email}
                                         onChange={(e) => setSignupData({...signupData, email: e.target.value})}
@@ -188,13 +206,15 @@ export default function Auth() {
                                     <Label htmlFor="signup-password">Password</Label>
                                     <div className="relative">
                                         <Input
+                                            className="pr-11"
                                             id="signup-password"
                                             type={showSignupPassword ? "text" : "password"}
+                                            autoComplete="new-password"
                                             required
                                             value={signupData.password}
                                             onChange={(e) => setSignupData({...signupData, password: e.target.value})}
                                         />
-                                        <button type="button" onClick={() => setShowSignupPassword(!showSignupPassword)} className="absolute right-3 top-2.5 text-gray-500">
+                                        <button type="button" onClick={() => setShowSignupPassword(!showSignupPassword)} aria-label={showSignupPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500">
                                             {showSignupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
@@ -203,13 +223,15 @@ export default function Auth() {
                                     <Label htmlFor="confirm-password">Confirm Password</Label>
                                     <div className="relative">
                                         <Input
+                                            className="pr-11"
                                             id="confirm-password"
                                             type={showConfirmPassword ? "text" : "password"}
+                                            autoComplete="new-password"
                                             required
                                             value={signupData.confirmPassword}
                                             onChange={(e) => setSignupData({...signupData, confirmPassword: e.target.value})}
                                         />
-                                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-2.5 text-gray-500">
+                                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500">
                                             {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
@@ -223,21 +245,21 @@ export default function Auth() {
                 </Tabs>
 
                 {/* --- GOOGLE LOGIN BUTTON --- */}
-                <div className="px-6 pb-6">
+                <div className="px-5 pb-5 sm:px-6 sm:pb-6">
                     <div className="relative my-4">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
                         <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground">Or continue with</span></div>
                     </div>
 
-                    <div className="flex justify-center">
-                        <GoogleLogin
+                    <div ref={googleSlotRef} className="flex justify-center min-h-[44px]">
+                        {googleWidth > 0 && <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={() => toast.error('Google login failed')}
                             useOneTap={false}
                             theme="outline"
                             size="large"
-                            width="400"
-                        />
+                            width={String(googleWidth)}
+                        />}
                     </div>
                 </div>
             </Card>
