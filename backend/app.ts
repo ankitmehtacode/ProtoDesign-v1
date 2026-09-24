@@ -85,6 +85,28 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
+// Under Lambda the parsers above never run. serverless-http builds a request
+// with no socket, already marked complete; body-parser 2 (Express 5) reads that
+// as "body already consumed" and skips it, leaving req.body as the raw Buffer
+// serverless-http attached -- so every JSON field arrived undefined (login,
+// Google sign-in, cart, checkout). Parse that Buffer here instead. Multipart
+// bodies are left alone: multer reads the stream itself.
+app.use((req, res, next) => {
+    if (!Buffer.isBuffer(req.body)) return next();
+    const type = req.headers['content-type'] || '';
+    const text = req.body.toString('utf8');
+    if (type.includes('application/json')) {
+        try {
+            req.body = text ? JSON.parse(text) : {};
+        } catch {
+            return next(Object.assign(new Error('Malformed JSON body'), { status: 400 }));
+        }
+    } else if (type.includes('application/x-www-form-urlencoded')) {
+        req.body = Object.fromEntries(new URLSearchParams(text));
+    }
+    next();
+});
+
 // ============================================
 // 3. REQUEST LOGGING
 // ============================================
