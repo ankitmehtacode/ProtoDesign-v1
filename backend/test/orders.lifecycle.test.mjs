@@ -79,8 +79,11 @@ async function seedUser({ admin = false } = {}) {
     await db.none('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [u.id, admin ? 'admin' : 'user']);
     return u.id;
 }
-const seedProduct = async ({ stock = 10, price = '199.00' } = {}) =>
-    (await db.one('INSERT INTO products (name, price, stock) VALUES ($1, $2, $3) RETURNING id', [`Widget ${++seq}`, price, stock])).id;
+// The column default category is '3d_printer', which changes shipping and COD
+// rules, so fixtures default to an ordinary category.
+const seedProduct = async ({ stock = 10, price = '199.00', category = 'filament', specifications = {} } = {}) =>
+    (await db.one('INSERT INTO products (name, price, stock, category, specifications) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [`Widget ${++seq}`, price, stock, category, JSON.stringify(specifications)])).id;
 const stockOf = async (id) => (await db.one('SELECT stock FROM products WHERE id = $1', [id])).stock;
 const orderRow = (id) => db.one('SELECT * FROM orders WHERE id = $1', [id]);
 const place = async (userId, lines, paymentGateway = 'phonepe') => (await orders.createOrder({
@@ -111,10 +114,40 @@ describe('createOrder: server-side pricing and stock reservation', () => {
 
         assert.equal(order.subtotal_amount, '398.00');
         assert.equal(order.tax_amount, '71.64');
-        assert.equal(order.shipping_amount, '50.00');
-        assert.equal(order.total_amount, '519.64');
+        assert.equal(order.shipping_amount, '199.00');
+        assert.equal(order.total_amount, '668.64');
         assert.equal(order.status, 'pending');
         assert.equal(await stockOf(product), 8);
+    });
+
+    it('charges COD shipping for an eligible cash-on-delivery order', async () => {
+        const user = await seedUser();
+        const order = await place(user, [[await seedProduct({ price: '500.00' }), 1]], 'cod');
+        assert.deepEqual([order.shipping_amount, order.total_amount], ['300.00', '890.00']);
+    });
+
+    it('ships 3D printers free and refuses them as cash on delivery', async () => {
+        const user = await seedUser();
+        const printer = await seedProduct({ price: '20000.00', category: '3d_printer', stock: 5 });
+        const order = await place(user, [[printer, 1], [await seedProduct({ price: '100.00' }), 1]]);
+        assert.deepEqual([order.shipping_amount, order.total_amount], ['0.00', '23718.00']);
+
+        await rejectsWith(place(user, [[printer, 1]], 'cod'), 400);
+        assert.equal(await stockOf(printer), 4);
+    });
+
+    it('refuses cash on delivery at or above the subtotal limit unless a product overrides it', async () => {
+        const user = await seedUser();
+        const plain = await seedProduct({ price: '999.00', stock: 5 });
+        await rejectsWith(place(user, [[plain, 1]], 'cod'), 400);
+        assert.equal(await stockOf(plain), 5);
+
+        // Both shapes the product editor has written for specifications.
+        for (const specifications of [[{ key: 'allow_cod_override', value: 'true' }], { allow_cod_override: 'TRUE' }]) {
+            const overridden = await seedProduct({ price: '999.00', specifications });
+            const order = await place(user, [[overridden, 1]], 'cod');
+            assert.equal(order.shipping_amount, '300.00');
+        }
     });
 
     it('rejects negative, zero, fractional, non-numeric and absurd quantities without touching stock', async () => {
@@ -206,16 +239,16 @@ describe('settlePayment: only PhonePe-verified, amount-matching payments count',
     const fresh = async () => {
         const user = await seedUser();
         const product = await seedProduct({ stock: 5, price: '100.00' });
-        return { user, product, order: await place(user, [[product, 1]]) }; // total 168.00
+        return { user, product, order: await place(user, [[product, 1]]) }; // total 317.00
     };
 
     it('marks paid when COMPLETED for the exact amount, and replays are no-ops', async () => {
         const { order } = await fresh();
-        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 16800 }), 'paid');
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 }), 'paid');
         const row = await orderRow(order.id);
         assert.equal(row.status, 'processing');
         assert.equal(row.payment_status, 'paid');
-        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 16800 }), 'noop');
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 }), 'noop');
     });
 
     it('refuses to mark paid when the collected amount differs or is missing', async () => {
@@ -239,7 +272,7 @@ describe('settlePayment: only PhonePe-verified, amount-matching payments count',
 
     it('ignores a late FAILED notice for an order that has since been paid', async () => {
         const { order, product } = await fresh();
-        await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 16800 });
+        await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 });
         assert.equal(await orders.settlePayment(order.id, { state: 'FAILED' }), 'noop');
         assert.equal((await orderRow(order.id)).status, 'processing');
         assert.equal(await stockOf(product), 4);
@@ -248,7 +281,7 @@ describe('settlePayment: only PhonePe-verified, amount-matching payments count',
     it('records and flags money received for an already-cancelled order', async () => {
         const { order, product } = await fresh();
         await orders.cancelOrder(order.id);
-        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 16800 }), 'paid_after_cancel');
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 }), 'paid_after_cancel');
         const row = await orderRow(order.id);
         assert.equal(row.status, 'cancelled');
         assert.equal(row.payment_status, 'paid', 'must be queryable as cancelled+paid to trigger a refund');
@@ -469,7 +502,7 @@ describe('POST /api/orders', () => {
         assert.ok(res.body.redirectUrl);
         const row = await orderRow(res.body.orderId);
         assert.deepEqual([row.subtotal_amount, row.tax_amount, row.shipping_amount, row.total_amount],
-            ['100.00', '18.00', '50.00', '168.00']);
+            ['100.00', '18.00', '199.00', '317.00']);
     });
 
     it('releases the reserved stock when payment initiation fails', async () => {

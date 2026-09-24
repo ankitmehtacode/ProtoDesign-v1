@@ -20,9 +20,18 @@ import { phonePeService } from './phonepe.service.js';
 export const PENDING_STATUSES = ['pending', 'pending_payment'];
 export const CANCELLABLE_STATUSES = [...PENDING_STATUSES, 'processing'];
 
-// Same flat fee and GST rate as src/pages/Cart.tsx and Checkout.tsx. The server
-// owns these: it must never accept a total or shipping fee from the client.
-export const SHIPPING_FEE_PAISE = 5000;
+// Shipping, cash-on-delivery and GST rules. src/pages/Cart.tsx and Checkout.tsx
+// display the same rules; the server owns them and must never accept a total or
+// shipping fee from the client. Change both sides together.
+//
+//  - A cart containing a 3D printer ships free and cannot be paid by COD.
+//  - Otherwise shipping is ONLINE_SHIPPING_PAISE, or COD_SHIPPING_PAISE for COD.
+//  - COD is allowed when the subtotal is under COD_SUBTOTAL_LIMIT_PAISE, or when
+//    any product carries the admin's 'allow_cod_override' specification.
+export const PRINTER_CATEGORY = '3d_printer';
+export const ONLINE_SHIPPING_PAISE = 19900;
+export const COD_SHIPPING_PAISE = 30000;
+export const COD_SUBTOTAL_LIMIT_PAISE = 99900;
 export const GST_RATE = 0.18;
 
 const ALLOWED_GATEWAYS = ['phonepe', 'cod'];
@@ -270,6 +279,37 @@ function normalizeItems(items) {
     return wanted;
 }
 
+/**
+ * True when a product's specifications carry allow_cod_override = true. The
+ * column holds admin-entered JSON in either shape the product editor has
+ * written: [{ key, value }] or { key: value }.
+ */
+function allowsCodOverride(specifications) {
+    let specs = specifications;
+    if (typeof specs === 'string') {
+        try { specs = JSON.parse(specs); } catch { return false; }
+    }
+    if (!specs || typeof specs !== 'object') return false;
+    const value = Array.isArray(specs)
+        ? specs.find((s) => s?.key === 'allow_cod_override')?.value
+        : specs.allow_cod_override;
+    return String(value).toLowerCase() === 'true';
+}
+
+/** Applies the shipping and COD rules above; throws 400 for an ineligible COD order. */
+function shippingPaiseFor({ products, subtotalPaise, gateway }) {
+    const hasPrinter = products.some((p) => p.category === PRINTER_CATEGORY);
+    if (hasPrinter) {
+        if (gateway === 'cod') throw httpError(400, 'Cash on delivery is not available for orders containing a 3D printer');
+        return 0;
+    }
+    if (gateway !== 'cod') return ONLINE_SHIPPING_PAISE;
+    if (subtotalPaise >= COD_SUBTOTAL_LIMIT_PAISE && !products.some((p) => allowsCodOverride(p.specifications))) {
+        throw httpError(400, 'Cash on delivery is not available for this order total');
+    }
+    return COD_SHIPPING_PAISE;
+}
+
 async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway }) {
     // Ascending id order: concurrent orders lock shared products in the same
     // order, so they queue instead of deadlocking.
@@ -277,7 +317,7 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
 
     return db.tx(async (t) => {
         const products = await t.any(
-            'SELECT id, name, price, stock FROM products WHERE id IN ($1:csv)',
+            'SELECT id, name, price, stock, category, specifications FROM products WHERE id IN ($1:csv)',
             [productIds]
         );
         const byId = new Map(products.map((p) => [p.id, p]));
@@ -296,15 +336,16 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
                 product_name: product.name, price: fromPaise(unitPaise)
             });
         }
+        const shippingPaise = shippingPaiseFor({ products, subtotalPaise, gateway });
         const gstPaise = Math.round(subtotalPaise * GST_RATE);
-        const totalPaise = subtotalPaise + gstPaise + SHIPPING_FEE_PAISE;
+        const totalPaise = subtotalPaise + gstPaise + shippingPaise;
 
         const order = await t.one(
             `INSERT INTO orders
                  (user_id, subtotal_amount, tax_amount, shipping_amount, total_amount, shipping_address, payment_gateway, status)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
              RETURNING *`,
-            [userId, fromPaise(subtotalPaise), fromPaise(gstPaise), fromPaise(SHIPPING_FEE_PAISE),
+            [userId, fromPaise(subtotalPaise), fromPaise(gstPaise), fromPaise(shippingPaise),
                 fromPaise(totalPaise), JSON.stringify(shippingAddress ?? null), gateway]
         );
 

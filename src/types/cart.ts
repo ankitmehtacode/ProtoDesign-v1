@@ -9,6 +9,8 @@ export interface CartItem {
         image_url?: string;
         category: string;
         stock: number;
+        // Admin-entered JSON; checkout reads its allow_cod_override flag.
+        specifications?: Record<string, string> | Array<{ key: string; value: string }>;
     };
 }
 
