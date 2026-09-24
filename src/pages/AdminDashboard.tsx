@@ -48,6 +48,7 @@ import {
 import { formatINR } from '@/lib/currency';
 import { apiService } from '@/services/api.service';
 import { useDropzone } from "react-dropzone";
+import { CATEGORY_LABELS } from '@/components/shop/product';
 
 // --- CONFIGURATION ---
 const MAIN_CATEGORIES = [
@@ -890,7 +891,7 @@ export default function AdminDashboard() {
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="font-bold text-lg">{product.name}</span>
                                                         {/* ✅ Safe Access to category */}
-                                                        <Badge variant="secondary">{(product.category || 'Unknown').replace(/_/g, ' ')}</Badge>
+                                                        <Badge variant="secondary">{CATEGORY_LABELS[product.category] ?? 'Uncategorized'}</Badge>
                                                         {product.sub_category && <Badge variant="outline">{product.sub_category}</Badge>}
                                                         {/* ✅ Archived Badge */}
                                                         {product.is_archived && <Badge className="bg-orange-500 text-white">Archived</Badge>}
