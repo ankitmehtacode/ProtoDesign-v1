@@ -94,6 +94,19 @@ Parameters:
     Default: production
     AllowedValues: [production, sandbox]
 
+  # Credentials set on the webhook in the PhonePe dashboard (SHA auth). The
+  # backend rejects callbacks whose Authorization header is not
+  # SHA256(username:password); left blank, that check is off and logged.
+  PhonePeWebhookUsername:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  PhonePeWebhookPassword:
+    Type: String
+    NoEcho: true
+    Default: ''
+
   # Comma-separated list of browser origins allowed by the app's own CORS
   # middleware (Express, not the Function URL -- see the Cors note below).
   FrontendUrls:
@@ -171,6 +184,8 @@ Resources:
           PHONEPE_CLIENT_SECRET: !Ref PhonePeClientSecret
           PHONEPE_CLIENT_VERSION: !Ref PhonePeClientVersion
           PHONEPE_ENV: !Ref PhonePeEnv
+          PHONEPE_WEBHOOK_USERNAME: !Ref PhonePeWebhookUsername
+          PHONEPE_WEBHOOK_PASSWORD: !Ref PhonePeWebhookPassword
           FRONTEND_URLS: !Join [',', !Ref FrontendUrls]
           FRONTEND_ORIGIN_PATTERN: !Ref FrontendOriginPattern
           BACKEND_URL: !Ref BackendUrl
