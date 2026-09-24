@@ -9,13 +9,15 @@ export interface CartItem {
         image_url?: string;
         category: string;
         stock: number;
+        // Admin-entered JSON; checkout reads its allow_cod_override flag.
+        specifications?: Record<string, string> | Array<{ key: string; value: string }>;
     };
 }
 
 export interface CartContextType {
     items: CartItem[];
     loading: boolean;
-    addToCart: (productId: string, quantity?: number) => Promise<void>;
+    addToCart: (productId: string, quantity?: number) => Promise<boolean>;
     removeFromCart: (productId: string) => Promise<void>;
     updateQuantity: (productId: string, quantity: number) => Promise<void>;
     clearCart: () => Promise<void>;

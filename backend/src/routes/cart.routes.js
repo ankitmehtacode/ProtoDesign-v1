@@ -35,7 +35,8 @@ router.get('/', authMiddleware, async (req, res, next) => {
                                                                  ELSE p.image_url
                                                     END,
                                                 'category', p.category,
-                                                'stock', p.stock
+                                                'stock', p.stock,
+                                                'specifications', p.specifications
                                                    )
                                 )
                                     ORDER BY ci.created_at

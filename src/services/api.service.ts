@@ -295,15 +295,14 @@ class ApiService {
         return this.request(`/orders/${id}`, { method: "GET" });
     }
 
-    async createOrder(items: any[], totalAmount: number, shippingAddress: any, paymentGateway: string, shippingAmount: number) {
+    // The server prices the order (subtotal, GST, shipping); it takes no amounts from here.
+    async createOrder(items: any[], shippingAddress: any, paymentGateway: string) {
         return this.request('/orders', {
             method: 'POST',
             body: JSON.stringify({
                 items,
-                totalAmount,
                 shippingAddress,
-                paymentGateway,
-                shippingAmount
+                paymentGateway
             }),
         });
     }

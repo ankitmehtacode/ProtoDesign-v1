@@ -1,0 +1,267 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ProtoDesign backend on Lambda. Deliberately has NO API Gateway: a Function URL
+  is used instead, because API Gateway is not always-free (1M calls/mo free for
+  12 months, then billed per-request) while Lambda's 1M requests + 400,000 GB-s
+  is perpetual. This one choice is what makes the zero-cost target achievable.
+  See docs/lambda-migration-plan.md for the full rationale.
+
+Parameters:
+  FunctionName:
+    Type: String
+    Default: protodesign-api
+    Description: >
+      Fixed name (not CFN-generated) so the CloudWatch Log Group name is known
+      up front and the Function -> LogGroup -> Role permissions do not form a
+      circular reference.
+
+  StlBucketName:
+    Type: String
+    Description: >
+      Globally-unique S3 bucket name for customer 3D models. Bucket names are
+      global across all AWS accounts, so this cannot have a template default.
+
+  # ── Runtime configuration ────────────────────────────────────────────────
+  # Every one of these is a Lambda environment variable, which Lambda encrypts
+  # at rest with an AWS-managed key at no extra cost -- no Secrets Manager
+  # (~$0.40/secret/month) or SSM SecureString parameters are used, since either
+  # would work against the zero-cost goal for a single-admin project this size.
+  # Anyone with lambda:GetFunctionConfiguration on this function can read these
+  # in plaintext; that is an accepted tradeoff here, not an oversight.
+  #
+  # None of these have template defaults containing real values. Fill them via
+  # infra/parameters.json (gitignored -- copy infra/parameters.example.json).
+
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: "Postgres connection string, POOLED endpoint (Neon: host containing -pooler)."
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+
+  JwtExpiry:
+    Type: String
+    Default: 7d
+
+  GoogleClientId:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  EmailUser:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  EmailPass:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  CloudinaryCloudName:
+    Type: String
+    Default: ''
+
+  CloudinaryApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  CloudinaryApiSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  PhonePeClientId:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  PhonePeClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+  PhonePeClientVersion:
+    Type: String
+    Default: '1'
+
+  PhonePeEnv:
+    Type: String
+    Default: production
+    AllowedValues: [production, sandbox]
+
+  # Comma-separated list of browser origins allowed by the app's own CORS
+  # middleware (Express, not the Function URL -- see the Cors note below).
+  FrontendUrls:
+    Type: CommaDelimitedList
+    Description: e.g. https://protodesign.vercel.app
+
+  # Optional. Matches Vercel preview-deployment origins (a unique URL per
+  # branch/PR) without wildcarding all of *.vercel.app, which is shared
+  # hosting -- that would trust every app anyone else deploys there too.
+  # Leave blank to allow only the exact origins in FrontendUrls.
+  FrontendOriginPattern:
+    Type: String
+    Default: ''
+    Description: >
+      A regex tested against the request Origin header, e.g.
+      ^https://protodesign-[a-z0-9-]+\.vercel\.app$
+
+  # PhonePe posts its settlement callback to <BackendUrl>/api/orders/payment/callback,
+  # and the customer is redirected to <FrontendUrl>/orders. Both are blank on the
+  # FIRST deploy, because the Function URL does not exist until after this stack
+  # creates it -- see the two-pass deploy note in infra/README.md. A stale value
+  # here means payments succeed at PhonePe and are never recorded as paid.
+  BackendUrl:
+    Type: String
+    Default: ''
+
+  FrontendUrl:
+    Type: String
+    Default: ''
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]   # Lambda bills less and starts faster on arm64 for this workload
+    MemorySize: 1024         # sized against the free tier -- see docs/lambda-migration-plan.md §2
+    Timeout: 20              # covers a DB write + PhonePe call + an awaited Gmail SMTP send
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      # Reuses infra/../backend/build.mjs (esbuild + a require() shim for CJS
+      # deps) rather than SAM's own esbuild integration, so the bundle that gets
+      # deployed is the exact one already verified in Phase 1/2.
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Ref FunctionName
+      Handler: lambda.handler
+      CodeUri: ../backend
+      FunctionUrlConfig:
+        AuthType: NONE
+        # No Cors block here on purpose: Express's own `cors` middleware
+        # (backend/app.ts) is kept as the single source of truth for allowed
+        # origins and credentials. Configuring CORS at both the Function URL
+        # and in Express risks duplicate Access-Control-* headers, which
+        # browsers reject outright. The cost is that OPTIONS preflights invoke
+        # Lambda instead of being absorbed by the URL itself; at this app's
+        # volume that is immaterial and still free-tier.
+        InvokeMode: BUFFERED
+      Environment:
+        Variables:
+          NODE_ENV: production
+          DATABASE_URL: !Ref DatabaseUrl
+          JWT_SECRET: !Ref JwtSecret
+          JWT_EXPIRY: !Ref JwtExpiry
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          EMAIL_USER: !Ref EmailUser
+          EMAIL_PASS: !Ref EmailPass
+          CLOUDINARY_CLOUD_NAME: !Ref CloudinaryCloudName
+          CLOUDINARY_API_KEY: !Ref CloudinaryApiKey
+          CLOUDINARY_API_SECRET: !Ref CloudinaryApiSecret
+          PHONEPE_CLIENT_ID: !Ref PhonePeClientId
+          PHONEPE_CLIENT_SECRET: !Ref PhonePeClientSecret
+          PHONEPE_CLIENT_VERSION: !Ref PhonePeClientVersion
+          PHONEPE_ENV: !Ref PhonePeEnv
+          FRONTEND_URLS: !Join [',', !Ref FrontendUrls]
+          FRONTEND_ORIGIN_PATTERN: !Ref FrontendOriginPattern
+          BACKEND_URL: !Ref BackendUrl
+          FRONTEND_URL: !Ref FrontendUrl
+          S3_STL_BUCKET: !Ref StlBucketName
+          # AWS_REGION is deliberately not set here: it is a reserved Lambda
+          # runtime variable that AWS populates automatically to the function's
+          # actual region, and CloudFormation rejects any attempt to set it
+          # explicitly. backend/src/services/storage.service.js reads it with a
+          # local fallback for non-Lambda runs; under Lambda it is always correct.
+      # Deliberately NOT attached to a VPC. A NAT Gateway (~$32/mo) would cost
+      # more than twice the App Runner bill this migration exists to remove,
+      # and the database is reached over public TLS -- see
+      # docs/lambda-migration-plan.md §2, "Never in a VPC".
+      Policies:
+        # Custom inline policy in place of the AWS-managed
+        # AWSLambdaBasicExecutionRole, which grants logs:* across every log
+        # group in the account/region. Scoped to exactly this function's log
+        # group instead.
+        - Statement:
+            - Sid: WriteOwnLogsOnly
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${FunctionName}:*'
+        - Statement:
+            # Scoped to the one prefix this app ever writes or reads, on the
+            # one bucket it owns -- not s3:*, not the whole bucket.
+            - Sid: ModelUploadsOnly
+              Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:HeadObject
+              Resource: !Sub '${StlBucket.Arn}/quotes/models/*'
+
+  # Explicit log group so retention is bounded. Without this, Lambda
+  # auto-creates one on first invoke with NO expiry -- logs (and their storage
+  # cost) accumulate forever.
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${FunctionName}'
+      RetentionInDays: 14
+
+  StlBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref StlBucketName
+      # Private: customer models are proprietary designs. The app hands out
+      # short-lived signed PUT/GET URLs per request instead of making anything
+      # in this bucket public. See backend/src/services/storage.service.js.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [PUT, GET, HEAD]
+            AllowedOrigins: !Ref FrontendUrls
+            AllowedHeaders: ['Content-Type', 'Content-Length']
+            MaxAge: 300
+      LifecycleConfiguration:
+        Rules:
+          # Cost/clutter hygiene only -- never deletes a completed upload.
+          # A browser PUT that is aborted mid-transfer can leave an incomplete
+          # multipart part behind that nothing else ever cleans up.
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+Outputs:
+  ApiFunctionUrl:
+    Description: >
+      Function URL (note the trailing slash). Strip the slash and append /api
+      for the frontend's VITE_API_URL; strip the slash and feed it back into
+      this stack as BackendUrl on a second deploy (see infra/README.md) so
+      PhonePe's settlement callback resolves correctly.
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+
+  StlBucketNameOut:
+    Description: S3 bucket holding customer 3D models.
+    Value: !Ref StlBucket
+
+  LogGroupName:
+    Value: !Ref ApiFunctionLogGroup

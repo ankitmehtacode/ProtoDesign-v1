@@ -211,13 +211,7 @@ const Checkout = () => {
                 quantity: item.quantity,
             }));
 
-            const response = await apiService.createOrder(
-                orderItems,
-                finalTotal,
-                formData,
-                selectedGateway,
-                shipping 
-            );
+            const response = await apiService.createOrder(orderItems, formData, selectedGateway);
 
             if (response && response.redirectUrl) {
                 toast.loading('Redirecting to Payment Gateway...');
