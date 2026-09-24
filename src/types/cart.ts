@@ -17,7 +17,7 @@ export interface CartItem {
 export interface CartContextType {
     items: CartItem[];
     loading: boolean;
-    addToCart: (productId: string, quantity?: number) => Promise<void>;
+    addToCart: (productId: string, quantity?: number) => Promise<boolean>;
     removeFromCart: (productId: string) => Promise<void>;
     updateQuantity: (productId: string, quantity: number) => Promise<void>;
     clearCart: () => Promise<void>;

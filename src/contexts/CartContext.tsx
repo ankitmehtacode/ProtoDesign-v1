@@ -48,13 +48,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => clearInterval(interval);
     }, []);
 
-    const addToCart = async (productId: string, quantity: number = 1) => {
+    // Reports its own success/failure toast; the boolean lets callers show inline state.
+    const addToCart = async (productId: string, quantity: number = 1): Promise<boolean> => {
         try {
             await apiService.addToCart(productId, quantity);
             await loadCart(true); // Silent update
             toast.success('Added to cart!');
+            return true;
         } catch (error: any) {
             toast.error(error.message || 'Failed to add to cart');
+            return false;
         }
     };
 
