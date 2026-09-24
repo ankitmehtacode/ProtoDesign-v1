@@ -60,20 +60,21 @@ export const authService = {
      * User login - Authenticate existing user
      */
     async login(email, password) {
-        if (!email || !password) throw new Error('Email and password are required');
+        if (!email || !password) throw Object.assign(new Error('Email and password are required'), { status: 400 });
 
         const user = await db.oneOrNone(
             'SELECT id, email, password_hash, full_name FROM users WHERE email = $1',
             [email.toLowerCase()]
         );
 
-        if (!user) throw new Error('Invalid credentials');
+        // 401 with one message for both cases, so the response does not reveal which emails exist.
+        if (!user) throw Object.assign(new Error('Invalid credentials'), { status: 401 });
 
         // Check password (password_hash or passwordHash depending on DB config)
         const dbPass = user.password_hash || user.passwordHash;
         const passwordMatch = await bcrypt.compare(password, dbPass);
 
-        if (!passwordMatch) throw new Error('Invalid credentials');
+        if (!passwordMatch) throw Object.assign(new Error('Invalid credentials'), { status: 401 });
 
         const role = await this._getUserRole(user.id);
         const token = this._generateToken(user.id, user.email, role);

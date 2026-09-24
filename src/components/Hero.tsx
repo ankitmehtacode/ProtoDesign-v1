@@ -62,7 +62,9 @@ export const Hero = () => {
             ref={imageRef}
             className="absolute inset-0 w-full h-[120%] -top-[10%]"
         >
-            <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/70 to-transparent z-10" />
+            {/* Phones: text spans the full width, so a left-to-right fade leaves the right
+                half of the copy over bare tiles. A flat scrim there; the fade from md up. */}
+            <div className="absolute inset-0 z-10 bg-background/85 md:bg-transparent md:bg-gradient-to-r md:from-background/95 md:via-background/70 md:to-transparent" />
             <DriftWall
                 items={heroWallItems}
                 columns={6}
@@ -78,7 +80,7 @@ export const Hero = () => {
         <div className="max-w-3xl">
           
           {/* ✅ DYNAMIC TYPOGRAPHY INJECTION */}
-          <div className="font-display text-6xl md:text-7xl lg:text-8xl mb-6 leading-tight">
+          <div className="font-display text-[2.75rem] leading-[1.05] sm:text-6xl sm:leading-tight md:text-7xl lg:text-8xl mb-6">
             <BlurText text="High-Fidelity" />
             <BlurText text="in Every Shade" />
           </div>
@@ -87,7 +89,7 @@ export const Hero = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-            className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl"
+            className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-8 sm:mb-10 max-w-2xl"
           >
             Premium 3D printing services with cutting-edge technology.
             Shop high-end printers or get instant quotes for custom prints.

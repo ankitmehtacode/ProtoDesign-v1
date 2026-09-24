@@ -283,17 +283,18 @@ export function ProductCatalog({ title, subtitle, category, categories, subCateg
         if (!isAdmin) return;
         setIsCreating(true);
         try {
-            const formData = new FormData();
-            formData.append('name', 'New Draft Product');
-            formData.append('description', 'Description goes here...');
-            formData.append('short_description', 'Short summary');
-            formData.append('price', '0');
-            formData.append('stock', '0');
-            formData.append('category', category ?? 'uncategorized');
-            formData.append('specifications', JSON.stringify({}));
-            formData.append('is_archived', 'true');
+            const draft = {
+                name: 'New Draft Product',
+                description: 'Description goes here...',
+                short_description: 'Short summary',
+                price: 0,
+                stock: 0,
+                category: category ?? 'uncategorized',
+                specifications: JSON.stringify({}),
+                is_archived: true,
+            };
 
-            const res = await apiService.createProduct(formData);
+            const res = await apiService.createProduct(draft);
             const newId = res.id || res.data?.id;
             if (!newId) throw new Error('No ID returned');
             toast.success('Draft created! Redirecting to editor...');
