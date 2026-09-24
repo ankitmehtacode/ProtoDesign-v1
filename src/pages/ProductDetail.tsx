@@ -377,23 +377,30 @@ const ProductDetail = () => {
                 specsToSave.push({ key: 'allow_cod_override', value: 'true' });
             }
 
-            const formData = new FormData();
-            formData.append('name', editState.name);
-            formData.append('description', editState.description);
-            formData.append('short_description', editState.short_description);
-            formData.append('price', String(editState.price));
-            formData.append('stock', String(editState.stock));
-            formData.append('category', editState.category);
-            formData.append('sub_category', editState.sub_category);
-            formData.append('specifications', JSON.stringify(specsToSave));
-            formData.append('is_archived', 'false');
+            // Media goes browser -> Cloudinary; the API receives URLs only, which
+            // keeps the request under Lambda's 6MB payload limit.
+            const images = await Promise.all(
+                editState.newImageFiles.map(file => apiService.uploadProductMedia(file, 'image'))
+            );
+            const videoUrl = editState.videoFile
+                ? await apiService.uploadProductMedia(editState.videoFile, 'video')
+                : null;
 
-            if (editState.deletedImageIds.length > 0) formData.append('imagesToDelete', JSON.stringify(editState.deletedImageIds));
-            editState.newImageFiles.forEach(file => formData.append('images', file));
-            if (editState.videoFile) formData.append('video', editState.videoFile);
-            if (editState.deleteVideo && !editState.videoFile) formData.append('delete_video', 'true');
-
-            await apiService.updateProduct(product.id, formData);
+            await apiService.updateProduct(product.id, {
+                name: editState.name,
+                description: editState.description,
+                short_description: editState.short_description,
+                price: editState.price,
+                stock: editState.stock,
+                category: editState.category,
+                sub_category: editState.sub_category,
+                specifications: JSON.stringify(specsToSave),
+                is_archived: false,
+                images,
+                videoUrl,
+                imagesToDelete: editState.deletedImageIds,
+                deleteVideo: editState.deleteVideo && !editState.videoFile,
+            });
             toast.success("Product published successfully!");
             setSearchParams({});
             window.location.reload();

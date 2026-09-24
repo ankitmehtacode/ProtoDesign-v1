@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
+import { isUuid } from '../services/order.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 
@@ -16,6 +17,12 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }, // a product CSV is text; 5MB is ample
 });
 
+// The random suffix avoids a uniqueness round-trip; collisions across 36^4
+// suffixes for the same name are negligible at catalogue scale.
+const generateUniqueSlug = (name) => {
+    const base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'product';
+    return `${base}-${Math.random().toString(36).substring(2, 6)}`;
+};
 
 // Helper function to parse CSV files
 const parseCSV = (buffer) => {
@@ -344,13 +351,17 @@ router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
         const { name, description, short_description, price, category, stock,
                 specifications, is_archived, images, videoUrl } = req.body || {};
 
+        if (typeof name !== 'string' || !name.trim()) {
+            return res.status(400).json({ error: 'Product name is required' });
+        }
+
         const imageUrls = sanitizeMediaUrls(images, { max: 10 });
         const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
 
         const product = await db.one(
-            `INSERT INTO products (name, description, short_description, price, category, stock, specifications, video_url, is_archived)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [name, description, short_description, price, category, stock, specifications,
+            `INSERT INTO products (name, slug, description, short_description, price, category, stock, specifications, video_url, is_archived)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [name, generateUniqueSlug(name), description, short_description, price, category, stock, specifications,
              video || null, is_archived === true || is_archived === 'true']
         );
 
@@ -369,57 +380,82 @@ router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
     }
 });
 
+// Accepts an array or its JSON-string form; anything that is not a UUID is
+// rejected up front rather than reaching Postgres as a 500.
+const parseImageIds = (value) => {
+    let list = value ?? [];
+    if (typeof list === 'string') {
+        try { list = JSON.parse(list); } catch { list = null; }
+    }
+    if (!Array.isArray(list) || !list.every(isUuid)) {
+        throw Object.assign(new Error('imagesToDelete must be an array of image ids'), { status: 400 });
+    }
+    return list;
+};
+
 router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
     try {
+        if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Product not found' });
+
         const { name, description, short_description, price, category, stock,
-                specifications, imagesToDelete, is_archived, images, videoUrl } = req.body || {};
+                specifications, imagesToDelete, is_archived, images, videoUrl, deleteVideo } = req.body || {};
+
+        // A multipart body parses to {} here, so this is also what an outdated
+        // client that still posts raw files would hit.
+        if (typeof name !== 'string' || !name.trim()) {
+            return res.status(400).json({ error: 'Product name is required' });
+        }
 
         const imageUrls = sanitizeMediaUrls(images, { max: 10 });
         const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
+        const idsToDelete = parseImageIds(imagesToDelete);
 
-        // ✅ FIX: Stringify specifications to prevent pg-promise from formatting arrays as text[]
-        let specsToSave = '{}';
-        try {
-            if (specifications) {
-                const parsed = typeof specifications === 'string' ? JSON.parse(specifications) : specifications;
-                specsToSave = JSON.stringify(parsed);
+        const existing = await db.oneOrNone('SELECT slug FROM products WHERE id = $1', [req.params.id]);
+        if (!existing) return res.status(404).json({ error: 'Product not found' });
+
+        // A slug is the product's public URL, so it is minted once and kept
+        // across renames; changing it would break shared links and the sitemap.
+        const slug = existing.slug || generateUniqueSlug(name);
+
+        // One transaction: a failed image insert must not leave the product
+        // half-updated with its old images already deleted.
+        await db.tx(async (t) => {
+            await t.none(
+                `UPDATE products
+                 SET name=$1, description=$2, short_description=$3, price=$4, category=$5, stock=$6,
+                     specifications=$7, is_archived=$8, slug=$9, updated_at=NOW()
+                 WHERE id=$10`,
+                [name, description, short_description, price, category, stock, specifications,
+                 is_archived === true || is_archived === 'true', slug, req.params.id]
+            );
+
+            if (video) {
+                await t.none('UPDATE products SET video_url = $1 WHERE id = $2', [video, req.params.id]);
+            } else if (deleteVideo === true) {
+                await t.none('UPDATE products SET video_url = NULL WHERE id = $1', [req.params.id]);
             }
-        } catch(e) {}
 
-        const existing = await db.one('SELECT name, slug FROM products WHERE id = $1', [req.params.id]);
-        let slug = existing.slug;
-        
-        if (!slug || name !== existing.name) {
-            slug = await generateUniqueSlug(name, req.params.id);
-        }
-
-        await db.none(
-            `UPDATE products
-             SET name=$1, description=$2, short_description=$3, price=$4, category=$5, stock=$6, specifications=$7, is_archived=$8, updated_at=NOW()
-             WHERE id=$9`,
-            [name, description, short_description, price, category, stock, specifications,
-             is_archived === true || is_archived === 'true', req.params.id]
-        );
-
-        if (video) {
-            await db.none('UPDATE products SET video_url = $1 WHERE id = $2', [video, req.params.id]);
-        }
-
-        if (imagesToDelete) {
-            const idsToDelete = JSON.parse(imagesToDelete);
-            if (idsToDelete.length > 0) await db.none('DELETE FROM product_images WHERE id IN ($1:csv)', [idsToDelete]);
-        }
-
-        if (imageUrls.length > 0) {
-            const maxOrdResult = await db.one('SELECT COALESCE(MAX(display_order), -1) as m FROM product_images WHERE product_id=$1', [req.params.id]);
-            let nextOrder = maxOrdResult.m + 1;
-            for (const url of imageUrls) {
-                await db.none('INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)', [req.params.id, url, nextOrder++]);
+            // Scoped to this product so an id belonging to another product is ignored.
+            if (idsToDelete.length > 0) {
+                await t.none('DELETE FROM product_images WHERE product_id = $1 AND id IN ($2:csv)', [req.params.id, idsToDelete]);
             }
-        }
 
-        const firstImage = await db.oneOrNone('SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY display_order ASC LIMIT 1', [req.params.id]);
-        if (firstImage) await db.none('UPDATE products SET image_url = $1 WHERE id = $2', [firstImage.image_url, req.params.id]);
+            if (imageUrls.length > 0) {
+                const { m } = await t.one('SELECT COALESCE(MAX(display_order), -1) AS m FROM product_images WHERE product_id = $1', [req.params.id]);
+                let nextOrder = m + 1;
+                for (const url of imageUrls) {
+                    await t.none('INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)', [req.params.id, url, nextOrder++]);
+                }
+            }
+
+            // Keep the denormalised cover in sync, including clearing it when every image was removed.
+            await t.none(
+                `UPDATE products SET image_url = (
+                     SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY display_order ASC LIMIT 1
+                 ) WHERE id = $1`,
+                [req.params.id]
+            );
+        });
 
         res.json({ message: "Product updated successfully" });
     } catch (error) {
