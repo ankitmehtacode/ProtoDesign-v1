@@ -90,7 +90,9 @@ const Cart = () => {
                                                 <Button variant="ghost" size="sm" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}><Plus className="w-4 h-4" /></Button>
                                             </div>
                                             <Button variant="ghost" size="sm" onClick={() => removeFromCart(item.product_id)} className="text-destructive hover:bg-destructive/10"><Trash2 className="w-4 h-4 mr-1" /> Remove</Button>
-                                            <div className="text-right"><p className="font-bold text-lg">{formatINR(item.product.price * item.quantity)}</p></div>
+                                            {/* Line total is hidden on phones: the row has no width left for it and it was
+                                                clipped off-screen. The order summary still carries the total. */}
+                                            <div className="hidden sm:block text-right"><p className="font-bold text-lg">{formatINR(item.product.price * item.quantity)}</p></div>
                                         </div>
                                     </div>
                                 </CardContent>
