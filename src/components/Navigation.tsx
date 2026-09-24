@@ -44,6 +44,10 @@ const CATEGORIES = [
     { name: "Spare Parts", path: "/spare-parts" },
 ];
 
+// Promoted out of the Products dropdown to top-level links; they stay in the
+// dropdown too so it remains the complete category list.
+const FEATURED_CATEGORIES = CATEGORIES.filter(c => ['/printers', '/printables', '/filaments'].includes(c.path));
+
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
@@ -130,7 +134,7 @@ export const Navigation = () => {
                     </Link>
 
                     {/* Desktop Nav */}
-                    <div className="hidden md:flex items-center space-x-8">
+                    <div className="hidden md:flex items-center space-x-6 xl:space-x-8">
                         <Link to="/" className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
                             Home
                         </Link>
@@ -154,6 +158,18 @@ export const Navigation = () => {
                                 ))}
                             </div>
                         </div>
+
+                        {/* lg+ only: between md and lg the wordmark and icons leave no room,
+                            and these remain reachable through Products there. */}
+                        {FEATURED_CATEGORIES.map(cat => (
+                            <Link
+                                key={cat.path}
+                                to={cat.path}
+                                className={`hidden lg:block text-sm font-medium transition-colors hover:text-primary ${location.pathname === cat.path ? 'text-primary' : 'text-foreground/80'}`}
+                            >
+                                {cat.name}
+                            </Link>
+                        ))}
 
                         <Link to="/custom" className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
                             Custom Printing
@@ -284,6 +300,17 @@ export const Navigation = () => {
                                         ))}
                                     </div>
                                 </div>
+
+                                {FEATURED_CATEGORIES.map(cat => (
+                                    <Link
+                                        key={cat.path}
+                                        to={cat.path}
+                                        onClick={() => setIsOpen(false)}
+                                        className={`block py-3 px-3 font-medium hover:bg-accent rounded-lg ${location.pathname === cat.path ? 'text-primary bg-primary/10' : ''}`}
+                                    >
+                                        {cat.name}
+                                    </Link>
+                                ))}
 
                                 <Link to="/custom" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg">Custom Printing</Link>
 
