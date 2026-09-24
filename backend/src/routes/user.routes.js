@@ -1,60 +1,9 @@
 import express from 'express';
-import nodemailer from 'nodemailer';
 import authMiddleware from '../middleware/auth.js';
 import db from '../config/database.js';
-import dns from 'dns';
-import util from 'util';
 
 const router = express.Router();
-const resolve4 = util.promisify(dns.resolve4);
 
-router.get('/test-email', async (req, res) => {
-    const user = process.env.EMAIL_USER;
-    const pass = process.env.EMAIL_PASS;
-
-    if (!user || !pass) return res.status(500).json({ error: "Missing Env Vars" });
-
-    try {
-        console.log("🔍 Resolving Gmail IPv4...");
-        const addresses = await resolve4('smtp.gmail.com');
-        const gmailIp = addresses[0];
-        console.log(`✅ Found Gmail IP: ${gmailIp}`);
-
-        const transporter = nodemailer.createTransport({
-            host: gmailIp,          // Direct IP
-            port: 587,              // ✅ Switch to Port 587
-            secure: false,          // ✅ False for 587 (Upgrades via STARTTLS)
-            auth: { user, pass },
-            tls: {
-                servername: 'smtp.gmail.com', // Necessary for IP connection
-                rejectUnauthorized: false     // Loose security to bypass strict firewalls
-            },
-            connectionTimeout: 15000
-        });
-
-        console.log(`Attempting connection to ${gmailIp}:587...`);
-        await transporter.verify();
-        console.log("✅ SMTP Connection Successful");
-
-        const info = await transporter.sendMail({
-            from: `"ProtoDesign System" <${user}>`,
-            to: user,
-            subject: "Test Email (Port 587)",
-            text: "If you see this, Port 587 is open!"
-        });
-
-        res.json({ success: true, message: "Email Sent!", info });
-
-    } catch (error) {
-        console.error("❌ Email Test Failed:", error);
-        res.status(500).json({ 
-            error: "All SMTP Ports Blocked", 
-            message: error.message,
-            code: error.code,
-            solution: "Switch to Resend (HTTP API)"
-        });
-    }
-});
 // ==========================================
 // 👤 PROFILE ROUTES
 // ==========================================
