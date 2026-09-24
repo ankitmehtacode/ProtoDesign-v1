@@ -7,35 +7,39 @@ import { Navigation } from "@/components/Navigation";
 import { CartProvider } from "@/contexts/CartContext";
 
 // --- NEW DYNAMISM IMPORTS ---
-import { HelmetProvider } from "react-helmet-async";
+import { lazy, Suspense } from "react";
+import { RouteSeo } from "@/seo/RouteSeo";
 import { SmoothScroll } from "@/components/animations/SmoothScroll";
 
 // --- PAGE IMPORTS ---
 import Index from "./pages/Index";
 import Shop from "./pages/Shop";
-import CustomPrinting from "./pages/CustomPrinting";
-import ProductDetail from "./pages/ProductDetail";
 import CategoryPage from "./pages/CategoryPage";
-import Auth from "./pages/Auth";
-import AdminDashboard from "./pages/AdminDashboard";
-import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import Orders from "./pages/Orders";
 import NotFound from "./pages/NotFound";
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Profile from "./pages/Profile";
-import BulkUpload from "./pages/BulkUpload.tsx";
 import { TermsPage, PrivacyPage, RefundPage, ReturnPage, ShippingPage, ContactPage } from "@/pages/Legal.tsx";
 import { Footer } from "@/components/Footer"; 
 import ScrollToTop from "@/components/ScrollToTop";
+
+
+// Split out of the main bundle: the quote page pulls in three.js (~1 MB) and
+// admin/checkout are only for signed-in users. Home, shop and category pages
+// stay eager because they are where search visitors land.
+const CustomPrinting = lazy(() => import("./pages/CustomPrinting"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Auth = lazy(() => import("./pages/Auth"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const Orders = lazy(() => import("./pages/Orders"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Profile = lazy(() => import("./pages/Profile"));
+const BulkUpload = lazy(() => import("./pages/BulkUpload.tsx"));
 
 const queryClient = new QueryClient();
 
 const App = () => (
     <QueryClientProvider client={queryClient}>
-        {/* NEW: SEO Meta Tag Provider */}
-        <HelmetProvider>
             {/* NEW: Premium Physics-based Smooth Scrolling */}
             <SmoothScroll>
                 <TooltipProvider>
@@ -44,11 +48,13 @@ const App = () => (
                         <Sonner />
                         <BrowserRouter>
                             <ScrollToTop />
+                            <RouteSeo />
                             {/* Main Layout Wrapper */}
                             <div className="flex flex-col min-h-screen">
                                 <Navigation />
                                 {/* Content Grows to fill space */}
                                 <div className="flex-1">
+                                    <Suspense fallback={<div className="min-h-screen" />}>
                                     <Routes>
                                         <Route path="/" element={<Index />} />
 
@@ -61,8 +67,9 @@ const App = () => (
                                         <Route path="/printers" element={
                                             <CategoryPage
                                                 category="3d_printer"
-                                                title="3D Printers"
-                                                subtitle="FDM, SLA, Metal 3D Printer, 3D Pen & More"
+                                                eyebrow="3D Printers"
+                                                title="Machines that make things."
+                                                subtitle="FDM, resin and metal printers, plus 3D pens. From a first print to production runs."
                                                 subCategories={['FDM', 'SLA', 'Metal 3D Printer', '3D Pen', 'Others']}
                                             />
                                         } />
@@ -71,8 +78,9 @@ const App = () => (
                                         <Route path="/printables" element={
                                             <CategoryPage
                                                 category="3dprintables"
-                                                title="3D Printables"
-                                                subtitle="Ready-to-print models and designs."
+                                                eyebrow="3D Printables"
+                                                title="Ready to take home."
+                                                subtitle="Finished pieces, designed and printed by us."
                                                 subCategories={[]}
                                             />
                                         } />
@@ -81,8 +89,9 @@ const App = () => (
                                         <Route path="/filaments" element={
                                             <CategoryPage
                                                 category="filament"
-                                                title="Premium Filaments"
-                                                subtitle="High-quality materials for your FDM printer."
+                                                eyebrow="Filaments"
+                                                title="Colour by the spool."
+                                                subtitle="PLA, PETG, ABS, nylon and carbon fibre for FDM printers."
                                                 subCategories={['ABS', 'PETG', 'PLA', 'Carbon Fiber', 'Nylon Fiber', 'Others']}
                                             />
                                         } />
@@ -91,8 +100,9 @@ const App = () => (
                                         <Route path="/accessories" element={
                                             <CategoryPage
                                                 category="accessory"
-                                                title="Accessories"
-                                                subtitle="Tools and upgrades for your workstation."
+                                                eyebrow="Accessories"
+                                                title="Small things, better prints."
+                                                subtitle="Tools and upgrades for the bench."
                                                 subCategories={[]}
                                             />
                                         } />
@@ -101,8 +111,9 @@ const App = () => (
                                         <Route path="/spare-parts" element={
                                             <CategoryPage
                                                 category="spare_part"
-                                                title="Spare Parts"
-                                                subtitle="Essential components for maintenance and repair."
+                                                eyebrow="Spare parts"
+                                                title="Keep it running."
+                                                subtitle="Replacement parts for maintenance and repair."
                                                 subCategories={[]}
                                             />
                                         } />
@@ -111,8 +122,9 @@ const App = () => (
                                         <Route path="/resins" element={
                                             <CategoryPage
                                                 category="resin"
-                                                title="Resins"
-                                                subtitle="Photopolymer resins for high-detail SLA/DLP printing."
+                                                eyebrow="Resins"
+                                                title="Detail, down to the layer."
+                                                subtitle="Photopolymer resins for SLA and DLP printers."
                                                 subCategories={['Standard', 'Water-Washable', 'Tough', 'Others']}
                                             />
                                         } />
@@ -142,6 +154,7 @@ const App = () => (
                                         <Route path="*" element={<NotFound />} />
 
                                     </Routes>
+                                    </Suspense>
                                     {/* ✅ 2. Add Footer Here */}
                                     <Footer />
                                 </div>
@@ -150,7 +163,6 @@ const App = () => (
                     </CartProvider>
                 </TooltipProvider>
             </SmoothScroll>
-        </HelmetProvider>
     </QueryClientProvider>
 );
 

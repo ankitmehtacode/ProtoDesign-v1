@@ -1,12 +1,16 @@
 {
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/sitemap.xml",
       "destination": "https://bfblueg5u7ddkz4lf2xh2yhfhu0yoetn.lambda-url.ap-southeast-1.on.aws/sitemap.xml"
     },
+    { "source": "/product/:slug", "destination": "/_app.html" }
+  ],
+  "headers": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ]
 }

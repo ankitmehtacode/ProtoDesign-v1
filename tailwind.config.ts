@@ -9,7 +9,7 @@ export default {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "87.5rem", // rem so it follows the 90% desktop scale in index.css
       },
     },
     extend: {

@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Mail, Phone, MapPin, Facebook, Instagram, Youtube } from "lucide-react";
-import {Logo} from "@/components/Logo.tsx";
-import protodesignWordmark from "@/assets/protodesign-wordmark.webp";
+import logoLockup from "@/assets/logo-lockup-light.webp";
 
 function LinkedIn(props: { className: string }) {
     return null;
@@ -16,14 +15,9 @@ export const Footer = () => {
 
                     {/* Column 1: Brand */}
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            {/* Logo */}
-                            <Link to="/" className="flex items-center gap-2 group">
-                                <Logo className="w-10 h-10" /> {/* Slightly larger to show detail */}
-                                <img src={protodesignWordmark} alt="ProtoDesign" className="h-24 w-auto" />
-                            </Link>
-
-                        </div>
+                        <Link to="/" className="inline-block">
+                            <img src={logoLockup} alt="ProtoDesign Technologies, additive manufacturing" width={767} height={640} loading="lazy" className="h-32 w-auto" />
+                        </Link>
                         <p className="text-sm text-foreground/80 leading-relaxed">
                             Empowering creators with premium 3D printing solutions. From high-end printers to custom prototyping services.
                         </p>

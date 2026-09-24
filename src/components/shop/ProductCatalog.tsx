@@ -18,6 +18,8 @@ export interface CategoryOption {
 }
 
 interface ProductCatalogProps {
+    /** Short label for the kicker line, e.g. "Printers". */
+    eyebrow: string;
     title: string;
     subtitle: string;
     /** Fixed category fetched from the API; omit for the whole catalog. */
@@ -135,7 +137,7 @@ function FilterTabs({ id, options, value, onChange, label, variant }: {
     );
 }
 
-export function ProductCatalog({ title, subtitle, category, categories, subCategories: fixedSubCategories = NO_SUBCATEGORIES }: ProductCatalogProps) {
+export function ProductCatalog({ eyebrow, title, subtitle, category, categories, subCategories: fixedSubCategories = NO_SUBCATEGORIES }: ProductCatalogProps) {
     const navigate = useNavigate();
     const { addToCart } = useCart();
 
@@ -324,9 +326,26 @@ export function ProductCatalog({ title, subtitle, category, categories, subCateg
             )}
 
             <div className="container mx-auto px-4">
-                <header className="max-w-2xl pb-5 pt-8 md:pt-12">
-                    <h1 className="text-4xl font-extrabold leading-none tracking-tight text-foreground md:text-6xl">{title}</h1>
-                    <p className="mt-3 text-base text-muted-foreground md:text-lg">{subtitle}</p>
+                <header className="grid gap-4 border-b border-border pb-5 pt-6 md:grid-cols-[1fr_auto] md:items-end md:pt-10">
+                    <div>
+                        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-primary">
+                            {eyebrow}
+                            <span className="text-muted-foreground md:hidden">
+                                {' · '}{loading ? '…' : `${products.length} ${products.length === 1 ? 'product' : 'products'}`}
+                            </span>
+                        </p>
+                        <h1 className="mt-2 font-display text-3xl font-bold leading-tight tracking-tight text-foreground md:text-[2.75rem]">{title}</h1>
+                        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">{subtitle}</p>
+                    </div>
+                    {/* Live count from the catalogue: a real number, not decoration */}
+                    <div aria-hidden className="hidden text-right md:block">
+                        <p className="font-display text-4xl font-bold leading-none tabular-nums text-foreground/90">
+                            {loading ? '—' : String(products.length).padStart(2, '0')}
+                        </p>
+                        <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                            {products.length === 1 ? 'Product' : 'Products'}
+                        </p>
+                    </div>
                 </header>
 
                 {/* Stays under the fixed 80px nav so filters are one thumb-reach away while scrolling. */}
