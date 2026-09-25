@@ -42,6 +42,12 @@ check('url is presigned PUT', ok.uploadUrl.includes('X-Amz-Signature='));
 check('signature pins content length', ok.uploadUrl.includes('content-length'), ok.uploadUrl.slice(0,200));
 check('short TTL', ok.uploadUrl.includes('X-Amz-Expires=300'));
 
+console.log('\n-- accepts the other model formats --');
+for (const [filename, contentType] of [['part.obj', 'model/obj'], ['part.3mf', 'model/3mf'], ['part.step', 'model/step']]) {
+    const res = await storageService.createModelUploadUrl({ userId: 'u1', filename, contentType, contentLength: 100 });
+    check(`${filename} as ${contentType}`, res.contentType === contentType && res.key.endsWith(filename.slice(4)), res.key);
+}
+
 console.log('\n-- key ownership cannot be forged across users --');
 const other = await storageService.createModelUploadUrl({
     userId: 'user-xyz', filename: 'a.stl', contentType: 'model/stl', contentLength: 100

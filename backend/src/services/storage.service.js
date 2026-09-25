@@ -31,12 +31,19 @@ const UPLOAD_URL_TTL_SECONDS = 300;      // 5 minutes to start the upload
 const DOWNLOAD_URL_TTL_SECONDS = 300;    // 5 minutes to fetch a model
 const MAX_STL_BYTES = 200 * 1024 * 1024; // 200MB
 
-// Browsers and CAD tools disagree about the MIME type for STL, so accept the
-// known spellings rather than a single value. The extension is checked too.
+// Browsers and CAD tools disagree about the MIME type for each model format, so
+// accept the known spellings for every allowed extension rather than a single
+// value. The extension is checked too. This stays an allowlist because the type
+// is stored on the object and later served back with it.
 const ALLOWED_STL_TYPES = new Set([
     'model/stl',
     'application/sla',
     'application/vnd.ms-pki.stl',
+    'model/obj',
+    'model/3mf',
+    'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+    'model/step',
+    'application/step',
     'application/octet-stream'
 ]);
 const ALLOWED_STL_EXTENSIONS = new Set(['.stl', '.obj', '.3mf', '.step', '.stp']);
