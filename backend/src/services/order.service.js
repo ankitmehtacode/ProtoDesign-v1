@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { phonePeService } from './phonepe.service.js';
+import { notifyOrder } from './whatsapp.service.js';
 
 /**
  * Order lifecycle: creation, payment settlement, cancellation.
@@ -159,6 +160,10 @@ export async function settlePayment(orderId, gatewayData) {
     );
     if (settled) {
         logEvent('order_paid', { orderId });
+        // Only here: after PhonePe's status API confirmed the exact amount, and
+        // only for the call that actually flipped the order (so exactly once).
+        // Queues the message and returns; it never throws into settlement.
+        await notifyOrder(orderId, 'paid');
         return 'paid';
     }
 

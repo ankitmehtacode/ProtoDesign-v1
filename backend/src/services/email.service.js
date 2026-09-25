@@ -134,6 +134,19 @@ export const emailService = {
             `
         };
         return transporter.sendMail(mailOptions);
+    },
+
+    /**
+     * Plain-text alert to the shop's own inbox (EMAIL_USER), e.g. a new
+     * WhatsApp conversation or a model file sent in chat.
+     */
+    async sendAdminAlert(subject, text) {
+        return transporter.sendMail({
+            from: `"ProtoDesign System" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject,
+            text
+        });
     }
 
 };

@@ -449,6 +449,35 @@ class ApiService {
         });
     }
 
+    // --- WhatsApp -----------------------------------------------------------
+    // The backend holds every WhatsApp credential. The browser only ever gets
+    // wa.me links, which open the customer's own WhatsApp.
+
+    async getWhatsAppStatus(): Promise<{ enabled: boolean; chatUrl?: string }> {
+        return this.request("/whatsapp/status", { skipAuth: true });
+    }
+
+    /** A wa.me link whose pre-filled message links this order/quote to the chat. */
+    async getWhatsAppLink(kind: "order" | "quote", id: string): Promise<string> {
+        const { url } = await this.request(`/whatsapp/link?kind=${kind}&id=${encodeURIComponent(id)}`);
+        return url;
+    }
+
+    async getWhatsAppOverview() {
+        return this.request("/whatsapp/admin/overview");
+    }
+
+    async getWhatsAppMessages(contactId: string) {
+        return this.request(`/whatsapp/admin/contacts/${contactId}/messages`);
+    }
+
+    async sendWhatsAppReply(contactId: string, text: string) {
+        return this.request(`/whatsapp/admin/contacts/${contactId}/reply`, {
+            method: "POST",
+            body: JSON.stringify({ text }),
+        });
+    }
+
     async getAllQuotes() {
         return this.request('/quotes/admin/all');
     }

@@ -14,6 +14,10 @@ import quotesRoutes from './src/routes/quotes.routes.js';
 import errorHandler from './src/middleware/errorHandler.js';
 import userRoutes from './src/routes/user.routes.js';
 import sitemapRoutes from './src/routes/sitemap.routes.js';
+import whatsappRoutes, { webhookRouter as whatsappWebhookRoutes } from './src/routes/whatsapp.routes.js';
+import { WORKER_EVENT_SOURCE } from './src/services/whatsapp.service.js';
+import { runWorker } from './src/services/whatsapp.worker.js';
+import { CATALOG_SYNC_EVENT_SOURCE, runCatalogSync } from './src/services/catalog.sync.js';
 
 const app = express();
 
@@ -82,7 +86,9 @@ app.use(cors({
 // ============================================
 // NOTE: Lambda caps the synchronous invoke payload at 6MB. Large files must go
 // browser -> S3/Cloudinary directly via presigned upload, never through here.
-app.use(express.json({ limit: '5mb' }));
+// `verify` keeps the exact bytes: webhook signatures (Meta's
+// X-Hub-Signature-256) are computed over the raw body, not the parsed JSON.
+app.use(express.json({ limit: '5mb', verify: (req, res, buf) => { (req as any).rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Under Lambda the parsers above never run. serverless-http builds a request
@@ -94,6 +100,7 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use((req, res, next) => {
     if (!Buffer.isBuffer(req.body)) return next();
     const type = req.headers['content-type'] || '';
+    (req as any).rawBody = req.body;
     const text = req.body.toString('utf8');
     if (type.includes('application/json')) {
         try {
@@ -135,6 +142,8 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/webhooks/whatsapp', whatsappWebhookRoutes);
 
 // ============================================
 // 5. ERROR HANDLING
@@ -151,7 +160,22 @@ app.use(errorHandler);
 
 // Lambda entrypoint. serverless-http translates the Function URL event into the
 // req/res pair Express expects, so routing above is unchanged.
-export const handler = serverless(app);
+//
+// The two other event shapes are the WhatsApp worker's own async self-invoke
+// (see dispatch.kick) and the weekly catalog sync from EventBridge. Both can
+// only arrive through lambda:InvokeFunction, which requires IAM; a Function URL
+// request is always wrapped in an HTTP event, so it can never be mistaken for
+// either.
+const httpHandler = serverless(app);
+export const handler = async (event: any, context: any) => {
+    if (event?.source === WORKER_EVENT_SOURCE) {
+        return runWorker({ remainingMs: () => context.getRemainingTimeInMillis() });
+    }
+    if (event?.source === CATALOG_SYNC_EVENT_SOURCE) {
+        return runCatalogSync({ remainingMs: () => context.getRemainingTimeInMillis() });
+    }
+    return httpHandler(event, context);
+};
 
 // Local / container entrypoint. Skipped under Lambda, where listening on a port
 // would do nothing.

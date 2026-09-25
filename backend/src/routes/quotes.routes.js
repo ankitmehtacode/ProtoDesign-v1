@@ -4,6 +4,7 @@ import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
+import { notifyQuote } from '../services/whatsapp.service.js';
 
 const router = express.Router();
 
@@ -92,9 +93,10 @@ router.post('/request', authMiddleware, async (req, res, next) => {
         const printDims = specs.printDimensions || {};
 
         // 3. Insert into DB (LINK TO LOGGED IN USER: req.userId)
-        await db.none(`
+        const quote = await db.one(`
             INSERT INTO quotes (user_id, email, phone, file_url, file_name, specifications, estimated_price, admin_notes, status)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+            RETURNING id
         `, [req.userId, email, phone, fileUrl, file.originalname, specs, estPrice, notes]);
 
         // 4. Prepare Email Content (The "Dark Theme" Format)
@@ -213,7 +215,8 @@ router.post('/request', authMiddleware, async (req, res, next) => {
         // the quote itself, while the .catch handlers above keep it observable.
         await Promise.allSettled([adminMail, customerMail]);
 
-        res.json({ success: true, message: "Quote requested successfully" });
+        // quoteId lets the page offer "Get updates on WhatsApp" for this quote.
+        res.json({ success: true, message: "Quote requested successfully", quoteId: quote.id });
 
     } catch (error) {
         console.error('Quote Process Error:', error);
@@ -266,7 +269,12 @@ router.get('/admin/all', authMiddleware, isAdmin, async (req, res) => {
 router.put('/:id/status', authMiddleware, isAdmin, async (req, res) => {
     try {
         const { status } = req.body;
-        await db.none('UPDATE quotes SET status = $1 WHERE id = $2', [status, req.params.id]);
+        const updated = await db.oneOrNone(
+            'UPDATE quotes SET status = $1 WHERE id = $2 AND status IS DISTINCT FROM $1 RETURNING id',
+            [status, req.params.id]
+        );
+        // Only a real change notifies; re-saving the same status does not.
+        if (updated) await notifyQuote(updated.id, status);
         res.json({ success: true });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });

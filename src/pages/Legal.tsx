@@ -30,7 +30,7 @@ const LegalPageLayout = ({ title, lastUpdated, children }: { title: string, last
 
                         {/* Trust/Contact Block */}
                         <div className="flex flex-col gap-2 text-sm text-muted-foreground md:text-right bg-muted/30 p-4 rounded-lg border border-border/50">
-                            <div className="font-semibold text-foreground mb-1">ProtoDesign Studio</div>
+                            <div className="font-semibold text-foreground mb-1">ProtoDesign</div>
                             <a href="mailto:help@protodesignstudio.com" className="flex items-center gap-2 hover:text-primary transition-colors justify-start md:justify-end">
                                 <Mail className="h-3.5 w-3.5" /> help@protodesignstudio.com
                             </a>
@@ -49,7 +49,7 @@ const LegalPageLayout = ({ title, lastUpdated, children }: { title: string, last
 
                     {/* Footer for Legal Pages */}
                     <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-                        <p>© 2025 Zon Robotics and AI Pvt. Ltd. All rights reserved.</p>
+                        <p>© {new Date().getFullYear()} Zon Robotics and AI Pvt. Ltd. All rights reserved.</p>
                         <div className="flex gap-6">
                             <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy</Link>
                             <Link to="/terms-and-conditions" className="hover:text-primary transition-colors">Terms</Link>
@@ -67,13 +67,13 @@ export const TermsPage = () => (
     <LegalPageLayout title="Terms & Conditions" lastUpdated="January 12, 2026">
         <h3>1. Introduction</h3>
         <p>
-            Welcome to <strong>ProtoDesign Studio</strong>. By accessing our website and using our services, you agree to be bound by these Terms and Conditions.
+            Welcome to <strong>ProtoDesign</strong>. By accessing our website and using our services, you agree to be bound by these Terms and Conditions.
             If you do not agree with any part of these terms, please do not use our platform.
         </p>
 
         <h3>2. Legal Entity Declaration</h3>
         <p>
-            "ProtoDesign Studio" is a brand property owned and operated by <strong>Zon Robotics and AI Pvt. Ltd.</strong><br/>
+            "ProtoDesign" is a brand owned and operated by <strong>Zon Robotics and AI Pvt. Ltd.</strong><br/>
             All invoices and payments will be processed under the name of <strong>Zon Robotics and AI Pvt. Ltd.</strong></p>
 
         <h3>3. Company Information</h3>
@@ -152,8 +152,8 @@ export const RefundPage = () => (
             We prioritize quality. Returns or replacements are accepted ONLY under the following conditions:
         </p>
         <ul className="list-disc pl-5">
-            <li>Cancellations will only be considered if the request is made 7 days of placing the order. However, cancellation requests may not be entertained if the orders have been communicated to such sellers / merchant(s) listed on the Platform and they have initiated the process of shipping them, or the product is out for delivery. In such an event, you may choose to reject the product at the doorstep.</li>
-            <li>In case of receipt of damaged or defective items, please report to our customer service team. The request would be entertained once the seller/ merchant listed on the Platform, has checked and determined the same at its own end. This should be reported within 7 days of receipt of products. In case you feel that the product received is not as shown on the site or as per your expectations, you must bring it to the notice of our customer service within 7 days of receiving the product. The customer service team after looking into your complaint will take an appropriate decision.</li>
+            <li>Cancellations will only be considered if the request is made within 7 days of placing the order. However, cancellation requests may not be accepted once we have shipped the order or it is out for delivery. In such an event, you may choose to reject the product at the doorstep.</li>
+            <li>In case of receipt of damaged or defective items, please report to our customer service team. The request will be accepted once we have inspected the item and confirmed the damage or defect. This should be reported within 7 days of receipt of products. In case you feel that the product received is not as shown on the site or as per your expectations, you must bring it to the notice of our customer service within 7 days of receiving the product. The customer service team after looking into your complaint will take an appropriate decision.</li>
             <li>In case of complaints regarding the products that come with a warranty from the manufacturers, please refer the issue to them.</li>
             <li>In case of any refunds approved by ProtoDesign, it will take 7 days for the refund to be processed to you.</li>
             <li>If any damaged/defective/replacement products are inspected and accepted then it will be delivered within 5 to 7 business days </li>

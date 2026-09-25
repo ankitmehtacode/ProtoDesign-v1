@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { WhatsAppPanel } from '@/components/admin/WhatsAppPanel';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
@@ -89,7 +90,8 @@ interface Product {
 
 interface Quote {
     id: string;
-    email: string;
+    email: string | null; // null for quotes sent as a file over WhatsApp
+    source?: 'web' | 'whatsapp';
     phone: string;
     file_url: string;
     file_name: string;
@@ -680,7 +682,7 @@ export default function AdminDashboard() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                 <div className="bg-background rounded-xl border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                     <div className="p-6 border-b flex justify-between items-center bg-muted/20 sticky top-0 bg-background/95 backdrop-blur z-10">
-                        <div><h3 className="text-xl font-bold flex items-center gap-2"><FileText className="text-primary" />{quote.file_name}</h3><p className="text-sm text-muted-foreground mt-1">Submitted by {quote.email}</p></div>
+                        <div><h3 className="text-xl font-bold flex items-center gap-2"><FileText className="text-primary" />{quote.file_name}</h3><p className="text-sm text-muted-foreground mt-1">Submitted by {quote.email || `${quote.phone} via WhatsApp`}</p></div>
                         <Button variant="ghost" size="icon" onClick={onClose}><X /></Button>
                     </div>
                     <div className="p-6 space-y-8">
@@ -1063,7 +1065,7 @@ export default function AdminDashboard() {
                                     {displayedQuotes.map((quote) => (
                                         <tr key={quote.id} className="border-b hover:bg-muted/5">
                                             <td className="px-4 py-3">{new Date(quote.created_at).toLocaleDateString()}</td>
-                                            <td className="px-4 py-3"><div className="font-medium">{quote.email}</div><div className="text-xs text-muted-foreground">{quote.phone}</div></td>
+                                            <td className="px-4 py-3"><div className="font-medium">{quote.email || 'Via WhatsApp'}</div><div className="text-xs text-muted-foreground">{quote.phone}</div></td>
                                             <td className="px-4 py-3"><button type="button" onClick={() => openQuoteFile(quote.id)} className="text-blue-600 hover:underline flex items-center gap-1"><FileText size={14} /> {quote.file_name.substring(0, 15)}...</button></td>
                                             <td className="px-4 py-3 font-bold">₹{quote.estimated_price}</td>
                                             <td className="px-4 py-3">
@@ -1078,6 +1080,8 @@ export default function AdminDashboard() {
                         )}
                     </CardContent>
                 </Card>
+
+                <WhatsAppPanel />
 
                 {/* SPECS MODAL */}
                 {selectedQuote && <QuoteSpecsModal quote={selectedQuote} onClose={() => setSelectedQuote(null)} />}

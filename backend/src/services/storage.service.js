@@ -48,6 +48,10 @@ const ALLOWED_STL_TYPES = new Set([
 ]);
 const ALLOWED_STL_EXTENSIONS = new Set(['.stl', '.obj', '.3mf', '.step', '.stp']);
 
+/** True when the filename has one of the model extensions we accept. */
+export const isModelFilename = (filename) =>
+    ALLOWED_STL_EXTENSIONS.has(path.extname(String(filename || '')).toLowerCase());
+
 function assertBucketConfigured() {
     if (!STL_BUCKET) {
         throw Object.assign(new Error('S3_STL_BUCKET is not configured'), { status: 500 });
@@ -107,6 +111,34 @@ export const storageService = {
         );
 
         return { uploadUrl, key, contentType: type, expiresIn: UPLOAD_URL_TTL_SECONDS };
+    },
+
+    /**
+     * Store a model that reached us server-side (a file sent in WhatsApp chat),
+     * as opposed to a browser upload. The content type is fixed rather than
+     * taken from the sender, because it is served back with the object.
+     *
+     * @param {object} p
+     * @param {string} p.ownerKey   folder under quotes/models/ (never client-chosen)
+     * @param {string} p.filename   used only for its extension
+     * @param {ReadableStream|Buffer} p.body
+     * @param {number} p.contentLength
+     * @returns {Promise<string>} the object key
+     */
+    async storeModel({ ownerKey, filename, body, contentLength }) {
+        assertBucketConfigured();
+        if (!isModelFilename(filename)) {
+            throw Object.assign(new Error('Unsupported model file type'), { status: 400 });
+        }
+        const key = `quotes/models/${ownerKey}/${randomUUID()}${path.extname(filename).toLowerCase()}`;
+        await s3.send(new PutObjectCommand({
+            Bucket: STL_BUCKET,
+            Key: key,
+            Body: body,
+            ContentType: 'application/octet-stream',
+            ContentLength: contentLength
+        }));
+        return key;
     },
 
     /**

@@ -6,6 +6,13 @@ import { isUuid } from '../services/order.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 
+// True when the reviewer has a delivered or completed order containing the
+// product. Computed on read, so it stays correct as order statuses change.
+const VERIFIED_PURCHASE_SQL = `EXISTS (
+    SELECT 1 FROM orders o JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.user_id = r.user_id AND oi.product_id = r.product_id
+       AND o.status IN ('delivered', 'completed'))`;
+
 const router = express.Router();
 
 // Multer now serves the CSV bulk import only. Product images and video are
@@ -214,7 +221,7 @@ router.get('/:id', async (req, res) => {
         product.product_images = images;
 
         const reviews = await db.any(`
-            SELECT r.*, COALESCE(u.full_name, 'Anonymous') as user
+            SELECT r.*, COALESCE(u.full_name, 'Anonymous') as user, ${VERIFIED_PURCHASE_SQL} AS verified_purchase
             FROM reviews r LEFT JOIN users u ON r.user_id = u.id
             WHERE r.product_id = $1 ORDER BY r.created_at DESC
         `, [product.id]);
@@ -259,9 +266,22 @@ router.post('/:id/reviews', authMiddleware, async (req, res) => {
         const product = await db.oneOrNone(query, [param]);
         if (!product) return res.status(404).json({ error: 'Product not found' });
 
-        const { rating, comment } = req.body;
+        const { rating, comment } = req.body ?? {};
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            return res.status(400).json({ error: 'Rating must be a whole number from 1 to 5' });
+        }
+        if (comment != null && (typeof comment !== 'string' || comment.length > 2000)) {
+            return res.status(400).json({ error: 'Comment must be text of at most 2000 characters' });
+        }
 
-        // 2. Insert Review (Using req.userId)
+        // 2. Any signed-in user may review, once per product. Buyers are marked
+        //    verified on read (VERIFIED_PURCHASE_SQL).
+        const reviewed = await db.oneOrNone(
+            'SELECT 1 FROM reviews WHERE product_id = $1 AND user_id = $2', [product.id, req.userId]);
+        if (reviewed) {
+            return res.status(409).json({ error: 'You have already reviewed this product' });
+        }
+
         await db.none(
             'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4)',
             [product.id, req.userId, rating, comment]
@@ -280,7 +300,7 @@ router.post('/:id/reviews', authMiddleware, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error("Post Review Error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Failed to post review' });
     }
 });
 
@@ -301,7 +321,7 @@ router.get('/:id/reviews', async (req, res) => {
         if (!product) return res.status(404).json({ error: 'Product not found' });
 
         const reviews = await db.any(`
-            SELECT r.*, COALESCE(u.full_name, 'Anonymous') as user
+            SELECT r.*, COALESCE(u.full_name, 'Anonymous') as user, ${VERIFIED_PURCHASE_SQL} AS verified_purchase
             FROM reviews r LEFT JOIN users u ON r.user_id = u.id
             WHERE r.product_id = $1 ORDER BY r.created_at DESC
         `, [product.id]);

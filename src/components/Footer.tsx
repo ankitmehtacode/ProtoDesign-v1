@@ -2,12 +2,11 @@ import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Mail, Phone, MapPin, Facebook, Instagram, Youtube } from "lucide-react";
 import logoLockup from "@/assets/logo-lockup-light.webp";
-
-function LinkedIn(props: { className: string }) {
-    return null;
-}
+import { FaWhatsapp } from "react-icons/fa";
+import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status";
 
 export const Footer = () => {
+    const { data: whatsapp } = useWhatsAppStatus();
     return (
         <footer className="bg-secondary/20 border-t border-border mt-auto">
             <div className="container mx-auto px-4 py-12">
@@ -60,31 +59,43 @@ export const Footer = () => {
                                 <Phone className="w-4 h-4 text-primary" />
                                 <a href="tel:+918249581682" className="hover:text-primary">+91 8249581682</a>
                             </li>
+                            {whatsapp?.enabled && whatsapp.chatUrl && (
+                                <li className="flex items-center gap-2">
+                                    <FaWhatsapp className="w-4 h-4 text-primary" />
+                                    <a href={whatsapp.chatUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary">Chat with ProtoDesign</a>
+                                </li>
+                            )}
                             <li className="flex items-start gap-2">
                                 <MapPin className="w-4 h-4 text-primary mt-0.5" />
-                                <span>Indore, Madhya Pradesh, India</span>
+                                <span>I2, Gymnasia, Almas Amber, Kanupriya Nagar, Rau, Indore, Madhya Pradesh 453331</span>
                             </li>
                         </ul>
                         {/* Social Icons */}
                         <div className="flex gap-4 mt-4">
                             <a
                                 href="https://www.instagram.com/protodesignstudio.3d/"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="p-2 bg-background rounded-full border hover:border-primary/50 transition-colors"
-                                aria-label="Follow us on Instagram" // <--- ADD THIS
+                                aria-label="Follow us on Instagram"
                             >
                                 <Instagram className="w-4 h-4" />
                             </a>
                             <a
                                 href="https://www.youtube.com/@ProtoDesignStudio3d"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="p-2 bg-background rounded-full border hover:border-primary/50 transition-colors"
-                                aria-label="Subscribe to our YouTube channel" // <--- ADD THIS
+                                aria-label="Subscribe to our YouTube channel"
                             >
                                 <Youtube className="w-4 h-4" />
                             </a>
                             <a
                                 href="https://www.facebook.com/profile.php?id=61586266060055"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="p-2 bg-background rounded-full border hover:border-primary/50 transition-colors"
-                                aria-label="Follow us on Facebook" // <--- ADD THIS
+                                aria-label="Follow us on Facebook"
                             >
                                 <Facebook className="w-4 h-4" />
                             </a>
@@ -95,13 +106,14 @@ export const Footer = () => {
                 <Separator className="my-8" />
 
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-foreground/80">
-                    <p>© 2025 Zon Robotics and AI Pvt. Ltd. All rights reserved.</p>
-                    <div className="flex gap-4">
-                        <span>Secure Payments</span>
+                    <p>© {new Date().getFullYear()} Zon Robotics and AI Pvt. Ltd. ProtoDesign is a brand of Zon Robotics and AI Pvt. Ltd.</p>
+                    {/* Each claim here must match the shipping policy and checkout. */}
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                        <span>Pay via PhonePe or cash on delivery</span>
                         <span>•</span>
-                        <span>Fast Delivery</span>
+                        <span>Dispatched in 2–3 business days</span>
                         <span>•</span>
-                        <span>Quality Support</span>
+                        <span>Email replies within 24 hours</span>
                     </div>
                 </div>
             </div>
