@@ -185,6 +185,14 @@ Parameters:
     Type: String
     Default: ''
 
+  # Weekly import of trending, commercially licensed Printables models as
+  # made-to-order products (backend/src/services/catalog.sync.js). DISABLED
+  # stops it without a code change.
+  CatalogSyncState:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -206,6 +214,14 @@ Resources:
       FunctionName: !Ref FunctionName
       Handler: lambda.handler
       CodeUri: ../backend
+      Events:
+        CatalogSyncSchedule:
+          Type: Schedule
+          Properties:
+            # Mondays 09:00 IST. One run adds at most 5 products.
+            Schedule: cron(30 3 ? * MON *)
+            State: !Ref CatalogSyncState
+            Input: '{"source":"protodesign.catalog-sync"}'
       FunctionUrlConfig:
         AuthType: NONE
         # No Cors block here on purpose: Express's own `cors` middleware

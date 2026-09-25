@@ -17,6 +17,7 @@ import sitemapRoutes from './src/routes/sitemap.routes.js';
 import whatsappRoutes, { webhookRouter as whatsappWebhookRoutes } from './src/routes/whatsapp.routes.js';
 import { WORKER_EVENT_SOURCE } from './src/services/whatsapp.service.js';
 import { runWorker } from './src/services/whatsapp.worker.js';
+import { CATALOG_SYNC_EVENT_SOURCE, runCatalogSync } from './src/services/catalog.sync.js';
 
 const app = express();
 
@@ -160,14 +161,18 @@ app.use(errorHandler);
 // Lambda entrypoint. serverless-http translates the Function URL event into the
 // req/res pair Express expects, so routing above is unchanged.
 //
-// The one other event shape is the WhatsApp worker's own async self-invoke
-// (see dispatch.kick). It can only arrive through lambda:InvokeFunction, which
-// requires IAM; a Function URL request is always wrapped in an HTTP event, so
-// it can never be mistaken for this.
+// The two other event shapes are the WhatsApp worker's own async self-invoke
+// (see dispatch.kick) and the weekly catalog sync from EventBridge. Both can
+// only arrive through lambda:InvokeFunction, which requires IAM; a Function URL
+// request is always wrapped in an HTTP event, so it can never be mistaken for
+// either.
 const httpHandler = serverless(app);
 export const handler = async (event: any, context: any) => {
     if (event?.source === WORKER_EVENT_SOURCE) {
         return runWorker({ remainingMs: () => context.getRemainingTimeInMillis() });
+    }
+    if (event?.source === CATALOG_SYNC_EVENT_SOURCE) {
+        return runCatalogSync({ remainingMs: () => context.getRemainingTimeInMillis() });
     }
     return httpHandler(event, context);
 };

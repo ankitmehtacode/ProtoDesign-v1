@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, Heart, Loader2, Plus, Star } from 'lucide-react';
 import { formatINR } from '@/lib/currency';
-import { CATEGORY_LABELS, Product, productImageUrls as imageUrls } from './product';
+import { CATEGORY_LABELS, Product, isMadeToOrder, productImageUrls as imageUrls } from './product';
 
 // Only genuinely scarce stock earns the badge; flagging most of the catalog would make it noise.
 const LOW_STOCK_THRESHOLD = 3;
@@ -16,6 +16,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 function statusBadge(product: Product): { label: string; tone: 'alert' | 'brand' | 'muted' } | null {
     if (product.stock <= 0) return { label: 'Sold out', tone: 'muted' };
+    // Its stock is an order cap, not scarcity; "Only N left" would be false.
+    if (isMadeToOrder(product)) return { label: 'Made to order', tone: 'brand' };
     if (product.stock <= LOW_STOCK_THRESHOLD) return { label: `Only ${product.stock} left`, tone: 'alert' };
     if (product.created_at && Date.now() - new Date(product.created_at).getTime() < NEW_FOR_DAYS * DAY_MS) {
         return { label: 'New', tone: 'brand' };

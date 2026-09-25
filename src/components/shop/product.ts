@@ -22,6 +22,7 @@ export interface Product {
     product_images?: ProductImage[];
     images?: ProductImage[];
     is_archived?: boolean;
+    specifications?: Record<string, string> | Array<{ key: string; value: string }>;
 }
 
 /** Ordered image URLs for a product, falling back to its legacy single image_url. */
@@ -42,3 +43,15 @@ export const CATEGORY_LABELS: Record<string, string> = {
     accessory: 'Accessory',
     spare_part: 'Spare part',
 };
+
+/**
+ * Printed after it is ordered, so there is no shelf stock to report. Set by the
+ * catalog sync (backend/src/services/catalog.sync.js, MADE_TO_ORDER_SPEC) and
+ * editable by an admin like any other specification.
+ */
+export function isMadeToOrder(product: Pick<Product, 'specifications'>): boolean {
+    const specs = product.specifications;
+    if (!specs) return false;
+    const entries = Array.isArray(specs) ? specs : Object.entries(specs).map(([key, value]) => ({ key, value }));
+    return entries.some(s => s.key === 'Fulfilment' && s.value === 'Made to order');
+}

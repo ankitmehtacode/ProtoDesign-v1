@@ -43,7 +43,7 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
 import { Seo } from "@/seo/Seo";
 import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, productUrl } from "@/seo/site.js";
-import { CATEGORY_LABELS } from '@/components/shop/product';
+import { CATEGORY_LABELS, isMadeToOrder } from '@/components/shop/product';
 
 // --- INTERFACES ---
 interface ProductImage {
@@ -591,6 +591,7 @@ const ProductDetail = () => {
     if (!product) return null;
 
     const inStock = isEditing ? (editState?.stock ?? 0) > 0 : product.stock > 0;
+    const madeToOrder = isMadeToOrder(product);
     const averageRating = product.average_rating ? Number(product.average_rating) : 0;
     const displaySpecs = normalizeSpecs(product.specifications).filter(s => s.key !== 'allow_cod_override');
 
@@ -841,7 +842,7 @@ const ProductDetail = () => {
                                     <p className="text-5xl font-bold text-foreground">{formatINR(product.price)}</p>
                                     <p className={`mt-3 text-sm font-medium flex items-center gap-2 ${inStock ? 'text-green-600' : 'text-red-600'}`}>
                                         {inStock ? <Check className="w-4 h-4"/> : null}
-                                        {inStock ? `${product.stock} In Stock & Ready to Ship` : 'Out of Stock'}
+                                        {!inStock ? 'Out of Stock' : madeToOrder ? 'Made to order: printed after you order' : `${product.stock} In Stock & Ready to Ship`}
                                     </p>
                                 </>
                             )}
