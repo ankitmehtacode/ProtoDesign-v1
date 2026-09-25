@@ -99,6 +99,21 @@ describe('PUT /api/products/:id', () => {
         assert.equal(slug, 'widget-keep');
     });
 
+    it('saves sub_category, and stores a blank one as NULL', async () => {
+        const p = await seedProduct();
+        await put(p.id, { ...base, sub_category: '  PLA  ' });
+        assert.equal((await db.one('SELECT sub_category FROM products WHERE id = $1', [p.id])).sub_category, 'PLA');
+
+        await put(p.id, { ...base, sub_category: '' });
+        assert.equal((await db.one('SELECT sub_category FROM products WHERE id = $1', [p.id])).sub_category, null);
+    });
+
+    it('rejects a non-string sub_category with 400', async () => {
+        const p = await seedProduct();
+        const res = await put(p.id, { ...base, sub_category: ['PLA'] });
+        assert.equal(res.status, 400);
+    });
+
     it('answers a multipart body with 400, not 500', async () => {
         const p = await seedProduct();
         const res = await put(p.id, '--x\r\nContent-Disposition: form-data; name="name"\r\n\r\nW\r\n--x--', 'multipart/form-data; boundary=x');

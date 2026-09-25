@@ -332,6 +332,15 @@ const sanitizeMediaUrls = (value, { max }) => {
     return list;
 };
 
+// Blank means "no sub-category" and is stored as NULL, the column default.
+const parseSubCategory = (value) => {
+    if (value == null) return null;
+    if (typeof value !== 'string') {
+        throw Object.assign(new Error('sub_category must be a string'), { status: 400 });
+    }
+    return value.trim() || null;
+};
+
 /**
  * Mint Cloudinary upload credentials for the browser. Scoped to a folder and
  * short-lived; admin-only because only admins add product media.
@@ -348,7 +357,7 @@ router.post('/upload-signature', authMiddleware, isAdmin, async (req, res, next)
 
 router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
     try {
-        const { name, description, short_description, price, category, stock,
+        const { name, description, short_description, price, category, sub_category, stock,
                 specifications, is_archived, images, videoUrl } = req.body || {};
 
         if (typeof name !== 'string' || !name.trim()) {
@@ -357,11 +366,12 @@ router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
 
         const imageUrls = sanitizeMediaUrls(images, { max: 10 });
         const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
+        const subCategory = parseSubCategory(sub_category);
 
         const product = await db.one(
-            `INSERT INTO products (name, slug, description, short_description, price, category, stock, specifications, video_url, is_archived)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-            [name, generateUniqueSlug(name), description, short_description, price, category, stock, specifications,
+            `INSERT INTO products (name, slug, description, short_description, price, category, sub_category, stock, specifications, video_url, is_archived)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+            [name, generateUniqueSlug(name), description, short_description, price, category, subCategory, stock, specifications,
              video || null, is_archived === true || is_archived === 'true']
         );
 
@@ -397,7 +407,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
     try {
         if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Product not found' });
 
-        const { name, description, short_description, price, category, stock,
+        const { name, description, short_description, price, category, sub_category, stock,
                 specifications, imagesToDelete, is_archived, images, videoUrl, deleteVideo } = req.body || {};
 
         // A multipart body parses to {} here, so this is also what an outdated
@@ -409,6 +419,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         const imageUrls = sanitizeMediaUrls(images, { max: 10 });
         const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
         const idsToDelete = parseImageIds(imagesToDelete);
+        const subCategory = parseSubCategory(sub_category);
 
         const existing = await db.oneOrNone('SELECT slug FROM products WHERE id = $1', [req.params.id]);
         if (!existing) return res.status(404).json({ error: 'Product not found' });
@@ -422,10 +433,10 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         await db.tx(async (t) => {
             await t.none(
                 `UPDATE products
-                 SET name=$1, description=$2, short_description=$3, price=$4, category=$5, stock=$6,
-                     specifications=$7, is_archived=$8, slug=$9, updated_at=NOW()
-                 WHERE id=$10`,
-                [name, description, short_description, price, category, stock, specifications,
+                 SET name=$1, description=$2, short_description=$3, price=$4, category=$5, sub_category=$6, stock=$7,
+                     specifications=$8, is_archived=$9, slug=$10, updated_at=NOW()
+                 WHERE id=$11`,
+                [name, description, short_description, price, category, subCategory, stock, specifications,
                  is_archived === true || is_archived === 'true', slug, req.params.id]
             );
 
