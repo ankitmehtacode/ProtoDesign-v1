@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
+import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 
 // --- OPTIONS CONSTANTS ---
 const PRINTER_QUALITIES = [
@@ -66,6 +67,7 @@ export default function CustomPrinting() {
     const [infill, setInfill] = useState(20);
 
     const [contact, setContact] = useState({ email: "", phone: "", notes: "" });
+    const [quoteId, setQuoteId] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
     // null when idle; 0..1 while the model is uploading to storage.
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -118,7 +120,7 @@ export default function CustomPrinting() {
             setUploadProgress(0);
             const fileKey = await apiService.uploadModel(file, setUploadProgress);
 
-            await apiService.sendQuoteRequest({
+            const result = await apiService.sendQuoteRequest({
                 fileKey,
                 fileName: file.name,
                 email: contact.email,
@@ -127,6 +129,7 @@ export default function CustomPrinting() {
                 specifications: specs,
             });
 
+            setQuoteId(result?.quoteId ?? null);
             toast.success("Quote sent successfully!");
             setIsSuccess(true);
         } catch (error: any) {
@@ -213,7 +216,10 @@ export default function CustomPrinting() {
                     <p className="text-muted-foreground mb-8">
                         Our team will verify your file and send the payment link to <strong>{contact.email}</strong> shortly.
                     </p>
-                    <Button onClick={() => window.location.reload()}>Submit Another</Button>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        {quoteId && <WhatsAppUpdatesButton kind="quote" id={quoteId} size="default" />}
+                        <Button onClick={() => window.location.reload()}>Submit Another</Button>
+                    </div>
                 </div>
             </div>
         );

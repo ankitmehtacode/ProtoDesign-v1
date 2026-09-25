@@ -32,6 +32,18 @@ FrontendUrls=https://your-app.vercel.app
 FrontendOriginPattern=
 BackendUrl=
 FrontendUrl=https://your-app.vercel.app
+WhatsAppMode=off
+WhatsAppAccessToken=
+WhatsAppPhoneNumberId=
+WhatsAppBusinessNumber=
+WhatsAppVerifyToken=
+MetaAppSecret=
+WhatsAppApiVersion=v23.0
+WhatsAppPaidTemplates=false
+WhatsAppTemplateOrderUpdate=
+WhatsAppTemplateQuoteUpdate=
+WhatsAppTemplateLanguage=en
+WhatsAppTestRecipients=
 PARAMS
 )
 export PARAMETER_OVERRIDES

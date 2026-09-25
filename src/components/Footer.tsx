@@ -2,12 +2,15 @@ import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Mail, Phone, MapPin, Facebook, Instagram, Youtube } from "lucide-react";
 import logoLockup from "@/assets/logo-lockup-light.webp";
+import { FaWhatsapp } from "react-icons/fa";
+import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status";
 
 function LinkedIn(props: { className: string }) {
     return null;
 }
 
 export const Footer = () => {
+    const { data: whatsapp } = useWhatsAppStatus();
     return (
         <footer className="bg-secondary/20 border-t border-border mt-auto">
             <div className="container mx-auto px-4 py-12">
@@ -60,6 +63,12 @@ export const Footer = () => {
                                 <Phone className="w-4 h-4 text-primary" />
                                 <a href="tel:+918249581682" className="hover:text-primary">+91 8249581682</a>
                             </li>
+                            {whatsapp?.enabled && whatsapp.chatUrl && (
+                                <li className="flex items-center gap-2">
+                                    <FaWhatsapp className="w-4 h-4 text-primary" />
+                                    <a href={whatsapp.chatUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary">Chat with ProtoDesign</a>
+                                </li>
+                            )}
                             <li className="flex items-start gap-2">
                                 <MapPin className="w-4 h-4 text-primary mt-0.5" />
                                 <span>Indore, Madhya Pradesh, India</span>

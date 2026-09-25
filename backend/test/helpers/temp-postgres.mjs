@@ -51,7 +51,7 @@ export async function startTempPostgres() {
         const psql = (db, args) => run('psql', ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres',
             '-v', 'ON_ERROR_STOP=1', '-d', db, ...args]);
         psql('postgres', ['-c', 'CREATE DATABASE protodesign_test']);
-        for (const file of ['001_initial_schema.sql', '009_add_payment_status.sql', '010_add_product_slug.sql']) {
+        for (const file of ['001_initial_schema.sql', '009_add_payment_status.sql', '010_add_product_slug.sql', '011_whatsapp.sql']) {
             psql('protodesign_test', ['-q', '-f', join(MIGRATIONS, file)]);
         }
     } catch (err) {

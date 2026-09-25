@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { motion } from "framer-motion";
+import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 
 // --- TYPES ---
 interface OrderItem {
@@ -293,6 +294,8 @@ export default function Orders() {
                                         <div className="text-sm text-muted-foreground">
                                             {order.total_quantity} Item{order.total_quantity !== 1 && 's'}
                                         </div>
+                                        <div className="flex items-center gap-2">
+                                        {order.status !== 'cancelled' && <WhatsAppUpdatesButton kind="order" id={order.id} className="hidden sm:inline-flex" />}
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -302,11 +305,14 @@ export default function Orders() {
                                             {expandedOrderId === order.id ? 'Hide Details' : 'View Details'}
                                             <ChevronRight className={`ml-1 w-4 h-4 transition-transform duration-200 ${expandedOrderId === order.id ? "rotate-90" : ""}`} />
                                         </Button>
+                                        </div>
                                     </div>
 
                                     {/* EXPANDED CONTENT */}
                                     {expandedOrderId === order.id && (
                                         <div className="mt-6 pt-6 border-t border-border/50 animate-in slide-in-from-top-2 fade-in duration-300">
+                                            {/* On phones the toggle bar is too narrow for this; show it here instead. */}
+                                            {order.status !== 'cancelled' && <WhatsAppUpdatesButton kind="order" id={order.id} className="sm:hidden w-full mb-6" />}
 
                                             <div className="grid md:grid-cols-2 gap-8 mb-8">
                                                 {/* CUSTOMER DETAILS */}

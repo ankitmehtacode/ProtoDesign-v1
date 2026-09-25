@@ -137,6 +137,54 @@ Parameters:
     Type: String
     Default: ''
 
+  # ── WhatsApp Cloud API (docs/whatsapp-integration.md) ───────────────────
+  # Off by default: deploying with these unset changes nothing.
+  WhatsAppMode:
+    Type: String
+    Default: 'off'
+    AllowedValues: ['off', 'mock', 'live']
+  WhatsAppAccessToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+  WhatsAppPhoneNumberId:
+    Type: String
+    Default: ''
+  WhatsAppBusinessNumber:
+    Type: String
+    Default: ''
+    Description: The WhatsApp number customers message, digits with country code (e.g. 918249581682).
+  WhatsAppVerifyToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+  MetaAppSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+  WhatsAppApiVersion:
+    Type: String
+    Default: v23.0
+  # 'false' keeps WhatsApp at zero message cost: nothing is sent outside the
+  # free 24-hour window. 'true' allows billed templates there.
+  WhatsAppPaidTemplates:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+  WhatsAppTemplateOrderUpdate:
+    Type: String
+    Default: ''
+  WhatsAppTemplateQuoteUpdate:
+    Type: String
+    Default: ''
+  WhatsAppTemplateLanguage:
+    Type: String
+    Default: en
+  # Outside NODE_ENV=production, live mode only messages these numbers.
+  WhatsAppTestRecipients:
+    Type: String
+    Default: ''
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -191,6 +239,18 @@ Resources:
           BACKEND_URL: !Ref BackendUrl
           FRONTEND_URL: !Ref FrontendUrl
           S3_STL_BUCKET: !Ref StlBucketName
+          WHATSAPP_MODE: !Ref WhatsAppMode
+          WHATSAPP_ACCESS_TOKEN: !Ref WhatsAppAccessToken
+          WHATSAPP_PHONE_NUMBER_ID: !Ref WhatsAppPhoneNumberId
+          WHATSAPP_BUSINESS_NUMBER: !Ref WhatsAppBusinessNumber
+          WHATSAPP_VERIFY_TOKEN: !Ref WhatsAppVerifyToken
+          META_APP_SECRET: !Ref MetaAppSecret
+          WHATSAPP_API_VERSION: !Ref WhatsAppApiVersion
+          WHATSAPP_PAID_TEMPLATES: !Ref WhatsAppPaidTemplates
+          WHATSAPP_TEMPLATE_ORDER_UPDATE: !Ref WhatsAppTemplateOrderUpdate
+          WHATSAPP_TEMPLATE_QUOTE_UPDATE: !Ref WhatsAppTemplateQuoteUpdate
+          WHATSAPP_TEMPLATE_LANGUAGE: !Ref WhatsAppTemplateLanguage
+          WHATSAPP_TEST_RECIPIENTS: !Ref WhatsAppTestRecipients
           # AWS_REGION is deliberately not set here: it is a reserved Lambda
           # runtime variable that AWS populates automatically to the function's
           # actual region, and CloudFormation rejects any attempt to set it
@@ -223,6 +283,15 @@ Resources:
                 - s3:GetObject
                 - s3:HeadObject
               Resource: !Sub '${StlBucket.Arn}/quotes/models/*'
+        - Statement:
+            # The WhatsApp worker runs as an async invoke of this same function,
+            # so a webhook can answer Meta at once and do the slow work (media
+            # download, Graph API calls) in a separate invocation. Built from the
+            # name parameter, not !GetAtt, to avoid a self-reference cycle.
+            - Sid: InvokeSelfForWhatsAppWorker
+              Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}'
 
   # Explicit log group so retention is bounded. Without this, Lambda
   # auto-creates one on first invoke with NO expiry -- logs (and their storage

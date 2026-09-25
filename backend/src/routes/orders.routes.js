@@ -4,6 +4,7 @@ import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 import { emailService } from '../services/email.service.js';
 import { phonePeService } from '../services/phonepe.service.js';
+import { notifyOrder } from '../services/whatsapp.service.js';
 import {
     PENDING_STATUSES,
     CANCELLABLE_STATUSES,
@@ -277,6 +278,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         const order = await db.one('SELECT * FROM orders WHERE id = $1', [id]);
 
         if (['shipped', 'delivered', 'cancelled'].includes(status)) {
+            await notifyOrder(order.id, status);
             const user = await db.oneOrNone('SELECT email, full_name FROM users WHERE id = $1', [order.user_id]);
             if (user) {
                 try {
