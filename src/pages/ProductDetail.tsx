@@ -31,7 +31,8 @@ import {
     ImagePlus,
     Video,
     RefreshCcw,
-    GripVertical
+    GripVertical,
+    BadgeCheck
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -78,6 +79,7 @@ interface Review {
     rating: number;
     comment: string;
     created_at: string;
+    verified_purchase?: boolean;
 }
 
 // --- EDITING INTERFACES ---
@@ -801,13 +803,16 @@ const ProductDetail = () => {
                             />
                         )}
 
-                        <div className="flex items-center gap-4 mb-8 pb-8 border-b">
-                            <div className="flex items-center gap-2">
-                                <StarRating rating={averageRating} size={20} />
-                                <span className="text-base font-bold text-foreground">{averageRating.toFixed(1)}</span>
+                        {/* A 0.0 rating reads as "nobody buys this"; show nothing until there is a review. */}
+                        {reviews.length > 0 && (
+                            <div className="flex items-center gap-4 mb-8 pb-8 border-b">
+                                <div className="flex items-center gap-2">
+                                    <StarRating rating={averageRating} size={20} />
+                                    <span className="text-base font-bold text-foreground">{averageRating.toFixed(1)}</span>
+                                </div>
+                                <span className="text-sm text-muted-foreground">{reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}</span>
                             </div>
-                            <span className="text-sm text-muted-foreground">{reviews.length} Reviews</span>
-                        </div>
+                        )}
 
                         <div className="mb-8">
                             {isEditing && editState ? (
@@ -963,12 +968,18 @@ const ProductDetail = () => {
 
                         <div className="space-y-6">
                             {reviews.length === 0 ? (
-                                <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed"><p className="text-muted-foreground">No reviews yet. Be the first!</p></div>
+                                <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed"><p className="text-muted-foreground">No reviews yet.</p></div>
                             ) : (
                                 reviews.slice((reviewPage - 1) * REVIEWS_PER_PAGE, reviewPage * REVIEWS_PER_PAGE).map(r => (
                                     <div key={r.id} className="border-b pb-6 last:border-0 last:pb-0">
                                         <div className="flex justify-between items-start mb-2">
-                                            <div><span className="font-bold text-sm block">{r.user}</span><span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span></div>
+                                            <div>
+                                                <span className="font-bold text-sm block">{r.user}</span>
+                                                <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
+                                                {r.verified_purchase && (
+                                                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400"><BadgeCheck size={12} /> Verified purchase</span>
+                                                )}
+                                            </div>
                                             <StarRating rating={r.rating} size={14} />
                                         </div>
                                         <p className="text-muted-foreground text-sm leading-relaxed">{r.comment}</p>
