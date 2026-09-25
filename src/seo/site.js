@@ -19,12 +19,13 @@ export const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;
 
 export const ORG = {
     legalName: "Zon Robotics and AI Pvt. Ltd.",
+    cin: "U72100MP2025PTC077687",
     email: "help@protodesignstudio.com",
     telephone: "+91-8249581682",
     address: {
         addressLocality: "Indore",
         addressRegion: "Madhya Pradesh",
-        postalCode: "453331",
+        postalCode: "452009",
         addressCountry: "IN",
     },
     logo: `${SITE_URL}/apple-touch-icon.png`,
@@ -125,7 +126,7 @@ export const PAGES = {
         crumbs: [{ name: "Contact", path: "/contact" }],
     },
     "/shipping-policy": { title: "Shipping Policy | ProtoDesign", description: "Dispatch in 2–3 business days; delivery in 3–5 working days to metro cities and 5–7 to the rest of India." },
-    "/return-policy": { title: "Return Policy | ProtoDesign", description: "Returns and exchanges within 7 days of purchase for eligible items." },
+    "/return-policy": { title: "Return Policy | ProtoDesign", description: "Returns within 7 days of delivery for items that arrive defective, damaged or not as described." },
     "/refund-policy": { title: "Refund Policy | ProtoDesign", description: "How refunds work at ProtoDesign." },
     "/privacy-policy": { title: "Privacy Policy | ProtoDesign", description: "How ProtoDesign collects and uses your data." },
     "/terms-and-conditions": { title: "Terms and Conditions | ProtoDesign", description: "Terms for using protodesignstudio.com." },
@@ -156,6 +157,7 @@ export const organizationLd = () => ({
     logo: ORG.logo,
     email: ORG.email,
     telephone: ORG.telephone,
+    identifier: { "@type": "PropertyValue", propertyID: "CIN", value: ORG.cin },
     address: { "@type": "PostalAddress", ...ORG.address },
     areaServed: { "@type": "Country", name: "India" },
 });
