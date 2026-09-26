@@ -101,6 +101,18 @@ export const TermsPage = () => (
         <p>
             These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising out of these terms shall be subject to the exclusive jurisdiction of the courts in Indore, Madhya Pradesh.
         </p>
+
+        <h3>7. Grievance Redressal</h3>
+        <p>
+            In accordance with the Consumer Protection (E-Commerce) Rules, 2020, complaints can be sent to our Grievance Officer:<br/>
+            <strong>Ankit Kumar Mehta</strong>, Grievance Officer, Zon Robotics and AI Pvt. Ltd.<br/>
+            Phone: +91 8249581682<br/>
+            Email: help@protodesignstudio.com<br/>
+            01, Marg, Jawahar Tekri, Sinhasa, Indore, Madhya Pradesh 452009
+        </p>
+        <p>
+            We acknowledge every complaint within 48 hours and resolve it within one month of receiving it.
+        </p>
     </LegalPageLayout>
 );
 
@@ -262,6 +274,16 @@ export const ContactPage = () => (
                 <p>01, Marg, Jawahar Tekri, Sinhasa</p>
                 <p>Indore, Madhya Pradesh, 452009</p>
                 <p>India</p>
+            </div>
+
+            <div className="p-6 border rounded-lg bg-muted/20 md:col-span-2">
+                <h4 className="font-semibold text-lg mb-2">Grievance Officer</h4>
+                <p><strong>Ankit Kumar Mehta</strong></p>
+                <p>Phone: +91 8249581682</p>
+                <p>Email: help@protodesignstudio.com</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                    Complaints are acknowledged within 48 hours and resolved within one month (Consumer Protection (E-Commerce) Rules, 2020).
+                </p>
             </div>
         </div>
     </LegalPageLayout>
