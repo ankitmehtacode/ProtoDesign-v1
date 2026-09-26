@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import {
     CATEGORY_PAGES, DEFAULT_IMAGE, NOT_FOUND, PAGES, SITE_NAME, SITE_URL,
     breadcrumbLd, organizationLd, plainText, productDescription, productLd,
-    productTitle, productUrl, quoteServiceLd, websiteLd,
+    productTitle, productUrl, quoteServiceLd, specMap, websiteLd,
 } from "../src/seo/site.js";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
@@ -70,7 +70,7 @@ function productBody(p, categoryName, categoryPath) {
     const desc = plainText(p.description || p.short_description || "", 1200);
     return shell(`${nav()}<p class="mt-8 text-sm text-muted-foreground"><a href="${categoryPath}">${esc(categoryName)}</a></p>` +
         `<h1 class="mt-2 font-display text-3xl font-bold">${esc(plainText(p.name, 200))}</h1>` +
-        `<p class="mt-3 text-lg">${inr(p.price)} · ${p.stock > 0 ? "In stock" : "Sold out"} · Delivered across India</p>` +
+        `<p class="mt-3 text-lg">${inr(p.price)} · ${p.stock <= 0 ? "Sold out" : specMap(p.specifications).Fulfilment === "Made to order" ? "Made to order" : "In stock"} · Delivered across India</p>` +
         (desc ? `<p class="mt-4 max-w-xl text-muted-foreground">${esc(desc)}</p>` : ""));
 }
 

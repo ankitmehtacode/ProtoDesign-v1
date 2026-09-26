@@ -7,6 +7,7 @@ export type PageMeta = {
 type ProductInput = {
     name: string; slug?: string; id: string; description?: string; short_description?: string;
     price: number | string; stock: number; image_url?: string | null; images?: string[]; category?: string;
+    specifications?: unknown;
 };
 export const SITE_URL: string;
 export const SITE_NAME: string;
@@ -21,6 +22,7 @@ export function breadcrumbLd(crumbs: Crumb[]): object;
 export function quoteServiceLd(): object;
 export function productLd(p: ProductInput, categoryName: string, categoryPath: string): object[];
 export function productUrl(p: { slug?: string; id: string }): string;
+export function specMap(specs: unknown): Record<string, string>;
 export function plainText(s?: string, max?: number): string;
 export function productTitle(name: string, categoryName: string): string;
 export function productDescription(p: { name: string; price: number | string; short_description?: string; description?: string }): string;

@@ -192,6 +192,13 @@ Parameters:
     Type: String
     Default: ENABLED
     AllowedValues: [ENABLED, DISABLED]
+  # Vercel deploy hook (Project → Settings → Git → Deploy Hooks). The sync
+  # calls it after adding products so their pages are prerendered for search.
+  # Empty skips the rebuild; new products then rely on client-side rendering.
+  VercelDeployHookUrl:
+    Type: String
+    NoEcho: true
+    Default: ''
 
 Globals:
   Function:
@@ -267,6 +274,7 @@ Resources:
           WHATSAPP_TEMPLATE_QUOTE_UPDATE: !Ref WhatsAppTemplateQuoteUpdate
           WHATSAPP_TEMPLATE_LANGUAGE: !Ref WhatsAppTemplateLanguage
           WHATSAPP_TEST_RECIPIENTS: !Ref WhatsAppTestRecipients
+          VERCEL_DEPLOY_HOOK_URL: !Ref VercelDeployHookUrl
           # AWS_REGION is deliberately not set here: it is a reserved Lambda
           # runtime variable that AWS populates automatically to the function's
           # actual region, and CloudFormation rejects any attempt to set it

@@ -54,6 +54,17 @@ export const COMMERCIAL_LICENSES = new Map([
 // Materials we print. Printables reports PETG as "PET".
 const MATERIALS = new Map([['PLA', 'PLA'], ['PETG', 'PETG'], ['PET', 'PETG'], ['ABS', 'ABS']]);
 
+// One honest line per material for the product copy.
+const MATERIAL_NOTES = {
+    PLA: 'PLA is rigid and holds fine detail well; it suits indoor use away from heat.',
+    PETG: 'PETG is tougher and more heat-tolerant than PLA, so it copes with everyday handling.',
+    ABS: 'ABS is strong and heat-resistant, suited to parts that get warm or take knocks.',
+};
+
+// Vercel deploy hook: rebuilding the site prerenders the new products, so
+// crawlers get their full title, description and Product data in the HTML.
+const DEPLOY_HOOK_RE = /^https:\/\/api\.vercel\.com\/v1\/integrations\/deploy\/[A-Za-z0-9_/-]+$/;
+
 // Printables reports 0 g for models without slicer data; that is no price basis.
 const MIN_GRAMS = 5;
 
@@ -157,13 +168,15 @@ export function toListing(item) {
 
     const name = cleanName(plainText(item.name, 120));
     const summary = plainText(item.summary, 400);
-    const tags = (item.tags ?? []).map(t => plainText(t?.name, 40)).join(' ');
+    const tagList = [...new Set((item.tags ?? []).map(t => plainText(t?.name, 40).toLowerCase()).filter(Boolean))].slice(0, 5);
+    const tags = tagList.join(' ');
     if (!name) return { skip: 'malformed' };
     const text = `${name} ${summary} ${tags}`;
     if (BLOCKED_RE.test(text)) return { skip: 'blocked_term' };
     if (LEGO_RE.test(text) && !COMPATIBLE_RE.test(name)) return { skip: 'blocked_term' };
 
     const grams = Number(item.weight);
+    const hours = Number(item.printDuration);
     if (!Number.isFinite(grams) || grams < MIN_GRAMS) return { skip: 'weight' };
 
     const reported = (item.materials ?? []).map(m => String(m?.name ?? '').toUpperCase());
@@ -185,10 +198,15 @@ export function toListing(item) {
         sourceUrl,
         imageUrls: imagePaths.map(p => PRINTABLES_MEDIA + p),
         price: priceFor(grams),
-        shortDescription: summary || `${name}, 3D printed in ${material} to order.`,
+        // Written from this listing's own facts. Copying the Printables text
+        // would make the page a duplicate that search engines rank below the original.
+        shortDescription: `3D printed to order in ${material} in Indore, about ${Math.round(grams)} g.`,
         description: [
-            summary,
-            `Printed to order in ${material} at our Indore workshop, then shipped across India.`,
+            `${name}, 3D printed to order in ${material} at our workshop in Indore and delivered anywhere in India.`,
+            MATERIAL_NOTES[material],
+            `It weighs about ${Math.round(grams)} g${hours > 0 ? ` and takes about ${Math.max(1, Math.round(hours))} hour${Math.round(hours) > 1 ? 's' : ''} to print` : ''}. We print it after you order and pack it for shipping.`,
+            tagList.length >= 2 ? `Good for: ${tagList.join(', ')}.` : '',
+            summary ? `From the designer: "${summary}"` : '',
             `Design: "${name}" by ${designer}, published on Printables under ${license}. Source: ${sourceUrl}`,
         ].filter(Boolean).join('\n'),
         specifications: [
@@ -285,5 +303,21 @@ export async function runCatalogSync({
     } catch (err) {
         log('catalog_sync_failed', { error: err.message });
         throw err;
+    } finally {
+        if (created.length > 0) await triggerRebuild(fetchImpl);
+    }
+}
+
+/** Asks Vercel to rebuild the site. Never fails the sync; every outcome is logged. */
+async function triggerRebuild(fetchImpl) {
+    const hook = process.env.VERCEL_DEPLOY_HOOK_URL;
+    if (!hook) return log('catalog_sync_rebuild_skipped', { reason: 'VERCEL_DEPLOY_HOOK_URL unset' });
+    // The hook URL is a credential: validated, never logged.
+    if (!DEPLOY_HOOK_RE.test(hook)) return log('catalog_sync_rebuild_skipped', { reason: 'VERCEL_DEPLOY_HOOK_URL is not a Vercel deploy hook' });
+    try {
+        const res = await fetchImpl(hook, { method: 'POST', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+        log(res.ok ? 'catalog_sync_rebuild_triggered' : 'catalog_sync_rebuild_failed', { status: res.status });
+    } catch (err) {
+        log('catalog_sync_rebuild_failed', { error: err.message });
     }
 }

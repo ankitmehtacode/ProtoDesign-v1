@@ -37,16 +37,20 @@ const model = (overrides = {}) => {
     };
 };
 
-/** A fetch stub serving the given pages in order, recording each request. */
+const HOOK = 'https://api.vercel.com/v1/integrations/deploy/prj_test/abc123';
+
+/** A fetch stub serving the given Printables pages in order, recording each request. */
 const printables = (...pages) => {
     const calls = [];
+    const hookCalls = [];
     const fetchImpl = async (url, init) => {
+        if (url === HOOK) { hookCalls.push(init.method); return { ok: true, status: 201 }; }
         calls.push(JSON.parse(init.body));
         const items = pages[calls.length - 1] ?? [];
         const cursor = calls.length < pages.length ? `c${calls.length}` : null;
         return { ok: true, json: async () => ({ data: { morePrints: { cursor, items } } }) };
     };
-    return { fetchImpl, calls };
+    return { fetchImpl, calls, hookCalls };
 };
 
 const uploads = [];
@@ -74,6 +78,10 @@ describe('runCatalogSync', () => {
         assert.equal(specs.Designer, 'Maker');
         assert.equal(specs.Source, `https://www.printables.com/model/${m.id}-${m.slug}`);
         assert.match(p.description, /by Maker, published on Printables under CC BY 4\.0/);
+        // Own copy first; the designer's text is only quoted, so the page is not a duplicate.
+        assert.match(p.description, new RegExp(`^${m.name}, 3D printed to order in PLA at our workshop in Indore`));
+        assert.match(p.description, /From the designer: "Keeps desk cables tidy\."/);
+        assert.equal(p.short_description, '3D printed to order in PLA in Indore, about 20 g.');
         assert.equal((await db.one('SELECT count(*)::int AS n FROM product_images WHERE product_id = $1', [p.id])).n, 1);
     });
 
@@ -150,6 +158,27 @@ describe('runCatalogSync', () => {
         const fetchImpl = async () => ({ ok: true, json: async () => ({ errors: [{ message: 'Unknown field' }] }) });
         await assert.rejects(runCatalogSync({ fetchImpl, uploadImage }), /Unexpected Printables response/);
         assert.equal((await db.one('SELECT count(*)::int AS n FROM products')).n, 0);
+    });
+
+    it('triggers a site rebuild only when products were added and the hook is valid', async () => {
+        const saved = process.env.VERCEL_DEPLOY_HOOK_URL;
+        try {
+            process.env.VERCEL_DEPLOY_HOOK_URL = HOOK;
+            const added = printables([model()]);
+            await runCatalogSync({ fetchImpl: added.fetchImpl, uploadImage });
+            assert.deepEqual(added.hookCalls, ['POST']);
+
+            const nothingNew = printables([]);
+            await runCatalogSync({ fetchImpl: nothingNew.fetchImpl, uploadImage });
+            assert.deepEqual(nothingNew.hookCalls, []);
+
+            process.env.VERCEL_DEPLOY_HOOK_URL = 'https://evil.example/steal';
+            const badHook = printables([model()]);
+            await runCatalogSync({ fetchImpl: badHook.fetchImpl, uploadImage });
+            assert.deepEqual(badHook.hookCalls, []);
+        } finally {
+            if (saved === undefined) delete process.env.VERCEL_DEPLOY_HOOK_URL; else process.env.VERCEL_DEPLOY_HOOK_URL = saved;
+        }
     });
 
     it('stops before the Lambda deadline', async () => {
