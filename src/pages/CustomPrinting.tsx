@@ -12,6 +12,7 @@ import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
+import { Faq } from "@/components/Faq";
 
 // --- OPTIONS CONSTANTS ---
 const PRINTER_QUALITIES = [
@@ -549,6 +550,7 @@ export default function CustomPrinting() {
 
                     </div>
                 </div>
+                <Faq />
             </div>
         </div>
     );

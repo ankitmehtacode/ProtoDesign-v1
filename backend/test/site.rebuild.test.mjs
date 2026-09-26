@@ -16,6 +16,7 @@ process.env.DATABASE_URL = pg.url;
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.AWS_LAMBDA_FUNCTION_NAME = 'site-rebuild-test';
 process.env.VERCEL_DEPLOY_HOOK_URL = HOOK;
+process.env.FRONTEND_URL = 'https://www.example.test';
 
 const { handler } = await import('../app.ts');
 const { default: db, pgp } = await import('../src/config/database.js');
@@ -23,8 +24,10 @@ const { requestSiteRebuild } = await import('../src/services/site.rebuild.js');
 
 const realFetch = globalThis.fetch;
 let hookCalls = 0;
+let announced = [];
 globalThis.fetch = async (url, init) => {
     if (url === HOOK) { hookCalls++; return { ok: true, status: 201 }; }
+    if (url === 'https://api.indexnow.org/indexnow') { announced.push(JSON.parse(init.body)); return { ok: true, status: 202 }; }
     return realFetch(url, init);
 };
 
@@ -36,7 +39,7 @@ after(async () => {
     await pgp.end();
     pg.stop();
 });
-beforeEach(() => { hookCalls = 0; });
+beforeEach(() => { hookCalls = 0; announced = []; });
 
 const admin = await db.one(`INSERT INTO users (email, password_hash, full_name) VALUES ('admin@test.local', 'x', 'Admin') RETURNING id`);
 await db.none(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin')`, [admin.id]);
@@ -71,14 +74,40 @@ describe('admin product changes trigger a site rebuild', () => {
         assert.equal(hookCalls, 5);
     });
 
+    it('announces created and edited product pages over IndexNow', async () => {
+        const created = await call('POST', '/api/products', { name: 'Cable clip', price: 99, category: '3dprintables', stock: 5 });
+        const path = `/product/${created.body.slug}`;
+        const edit = { name: 'Cable clip', price: 109, category: '3dprintables', stock: 5, specifications: [] };
+        await call('PUT', `/api/products/${created.body.id}`, edit);
+
+        assert.equal(announced.length, 2);
+        for (const body of announced) {
+            assert.equal(body.host, 'www.example.test');
+            assert.equal(body.keyLocation, `https://www.example.test/${body.key}.txt`);
+            assert.deepEqual(body.urlList, [`https://www.example.test${path}`]);
+        }
+    });
+
     it('not when the change is rejected', async () => {
         assert.equal((await call('POST', '/api/products', { price: 199 })).status, 400);
         assert.equal((await call('PUT', '/api/products/not-a-uuid', { price: 1 })).status, 404);
         assert.equal(hookCalls, 0);
+        assert.equal(announced.length, 0);
     });
 });
 
 describe('requestSiteRebuild', () => {
+    it('does not announce a non-https site (local or preview)', async () => {
+        const saved = process.env.FRONTEND_URL;
+        process.env.FRONTEND_URL = 'http://localhost:8080';
+        try {
+            await requestSiteRebuild('test', { paths: ['/product/x'] });
+            assert.equal(announced.length, 0);
+        } finally {
+            process.env.FRONTEND_URL = saved;
+        }
+    });
+
     it('never throws, even when Vercel is unreachable', async () => {
         const down = async () => { throw new Error('network down'); };
         await requestSiteRebuild('test', { fetchImpl: down });

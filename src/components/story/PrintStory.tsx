@@ -1009,7 +1009,7 @@ export const PrintStory = () => {
                     <div data-cta className="pointer-events-auto flex max-w-xl flex-col items-center text-center">
                         <p className="text-balance font-display text-4xl leading-[1.05] md:text-6xl">That car started as a&nbsp;file.</p>
                         <p className="mt-4 max-w-[26rem] text-pretty text-sm leading-relaxed text-white/65 md:text-base">
-                            Send us yours: STL, OBJ, 3MF or STEP, up to 200&nbsp;MB. We quote, print and ship&nbsp;it.
+                            Send us yours: STL or OBJ, up to 200&nbsp;MB. We quote, print and ship&nbsp;it.
                         </p>
                         <div className="mt-6 flex flex-wrap justify-center gap-3">
                             <Link to="/custom" className="group/cta inline-flex min-h-11 items-center gap-2 rounded-full bg-[hsl(352_68%_40%)] px-5 font-medium text-white transition-transform active:scale-95">
