@@ -197,12 +197,16 @@ export const quoteServiceLd = () => ({
 
 /**
  * @param {{ name: string, slug?: string, id: string, description?: string, short_description?: string,
- *           price: number | string, stock: number, image_url?: string | null, images?: string[], category?: string }} p
+ *           price: number | string, stock: number, image_url?: string | null, images?: string[], category?: string,
+ *           specifications?: unknown }} p
  * @param {string} categoryName
  * @param {string} categoryPath
  */
 export const productLd = (p, categoryName, categoryPath) => {
     const url = productUrl(p);
+    const specs = specMap(p.specifications);
+    const madeToOrder = specs.Fulfilment === "Made to order";
+    const grams = parseFloat(specs["Approx. weight"] ?? "");
     return [
         {
             "@context": "https://schema.org",
@@ -212,7 +216,17 @@ export const productLd = (p, categoryName, categoryPath) => {
             description: plainText(p.short_description || p.description || p.name, 5000),
             image: p.images?.length ? p.images : p.image_url ? [p.image_url] : undefined,
             sku: p.id,
+            brand: { "@type": "Brand", name: SITE_NAME },
             category: categoryName,
+            material: specs.Material || undefined,
+            weight: grams > 0 ? { "@type": "QuantitativeValue", value: grams, unitCode: "GRM" } : undefined,
+            // Credits the original design (required by CC BY licences).
+            isBasedOn: specs.Source ? {
+                "@type": "CreativeWork",
+                url: specs.Source,
+                author: specs.Designer ? { "@type": "Person", name: specs.Designer } : undefined,
+                license: specs.License || undefined,
+            } : undefined,
             // No aggregateRating: rating markup is only allowed for genuine reviews,
             // and review_count can include seeded placeholder reviews.
             offers: {
@@ -220,7 +234,8 @@ export const productLd = (p, categoryName, categoryPath) => {
                 url,
                 priceCurrency: "INR",
                 price: Number(p.price).toFixed(2),
-                availability: p.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                availability: p.stock <= 0 ? "https://schema.org/OutOfStock"
+                    : madeToOrder ? "https://schema.org/MadeToOrder" : "https://schema.org/InStock",
                 itemCondition: "https://schema.org/NewCondition",
                 seller: { "@id": `${SITE_URL}/#organization` },
                 shippingDetails: {
@@ -256,6 +271,18 @@ export const CATEGORY_PAGES = Object.fromEntries(
         .filter(([, m]) => m.category)
         .map(([path, m]) => [/** @type {string} */ (m.category), [/** @type {string} */ (m.h1), path]]),
 );
+
+/**
+ * Specifications arrive as [{ key, value }] (admin editor, catalog sync) or a
+ * plain object (older rows). Returns a plain object either way.
+ * @param {unknown} specs
+ * @returns {Record<string, string>}
+ */
+export function specMap(specs) {
+    if (!specs || typeof specs !== "object") return {};
+    const entries = Array.isArray(specs) ? specs.map((s) => [s?.key, s?.value]) : Object.entries(specs);
+    return Object.fromEntries(entries.filter(([k, v]) => typeof k === "string" && v != null).map(([k, v]) => [k, String(v)]));
+}
 
 /** Strip markup and collapse whitespace, then trim to a word boundary. */
 export function plainText(s = "", max = 160) {
