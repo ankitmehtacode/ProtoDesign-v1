@@ -25,6 +25,9 @@ export const CANCELLABLE_STATUSES = [...PENDING_STATUSES, 'processing'];
 // display the same rules; the server owns them and must never accept a total or
 // shipping fee from the client. Change both sides together.
 //
+//  - Listed prices include GST. tax_amount records the GST inside the subtotal
+//    (for invoices); it is not added again. total = subtotal + shipping.
+//    Orders placed before 2026-09-27 had GST added on top instead.
 //  - A cart containing a 3D printer ships free and cannot be paid by COD.
 //  - Otherwise shipping is ONLINE_SHIPPING_PAISE, or COD_SHIPPING_PAISE for COD.
 //  - COD is allowed when the subtotal is under COD_SUBTOTAL_LIMIT_PAISE, or when
@@ -34,6 +37,9 @@ export const ONLINE_SHIPPING_PAISE = 19900;
 export const COD_SHIPPING_PAISE = 30000;
 export const COD_SUBTOTAL_LIMIT_PAISE = 99900;
 export const GST_RATE = 0.18;
+
+/** GST contained in a GST-inclusive amount, in paise. */
+export const gstIncludedPaise = (grossPaise) => grossPaise - Math.round(grossPaise / (1 + GST_RATE));
 
 const ALLOWED_GATEWAYS = ['phonepe', 'cod'];
 const MAX_LINE_ITEMS = 50;
@@ -342,8 +348,8 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
             });
         }
         const shippingPaise = shippingPaiseFor({ products, subtotalPaise, gateway });
-        const gstPaise = Math.round(subtotalPaise * GST_RATE);
-        const totalPaise = subtotalPaise + gstPaise + shippingPaise;
+        const gstPaise = gstIncludedPaise(subtotalPaise);
+        const totalPaise = subtotalPaise + shippingPaise;
 
         const order = await t.one(
             `INSERT INTO orders

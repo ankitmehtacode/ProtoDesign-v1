@@ -107,15 +107,15 @@ after(async () => {
 
 // ===========================================================================
 describe('createOrder: server-side pricing and stock reservation', () => {
-    it('computes GST, shipping and total from the database and reserves stock', async () => {
+    it('computes GST (included in the price), shipping and total from the database and reserves stock', async () => {
         const user = await seedUser();
         const product = await seedProduct({ stock: 10, price: '199.00' });
         const order = await place(user, [[product, 2]]);
 
         assert.equal(order.subtotal_amount, '398.00');
-        assert.equal(order.tax_amount, '71.64');
+        assert.equal(order.tax_amount, '60.71');     // 398 - 398/1.18
         assert.equal(order.shipping_amount, '199.00');
-        assert.equal(order.total_amount, '668.64');
+        assert.equal(order.total_amount, '597.00');   // subtotal + shipping; GST is not added on top
         assert.equal(order.status, 'pending');
         assert.equal(await stockOf(product), 8);
     });
@@ -123,14 +123,14 @@ describe('createOrder: server-side pricing and stock reservation', () => {
     it('charges COD shipping for an eligible cash-on-delivery order', async () => {
         const user = await seedUser();
         const order = await place(user, [[await seedProduct({ price: '500.00' }), 1]], 'cod');
-        assert.deepEqual([order.shipping_amount, order.total_amount], ['300.00', '890.00']);
+        assert.deepEqual([order.shipping_amount, order.total_amount], ['300.00', '800.00']);
     });
 
     it('ships 3D printers free and refuses them as cash on delivery', async () => {
         const user = await seedUser();
         const printer = await seedProduct({ price: '20000.00', category: '3d_printer', stock: 5 });
         const order = await place(user, [[printer, 1], [await seedProduct({ price: '100.00' }), 1]]);
-        assert.deepEqual([order.shipping_amount, order.total_amount], ['0.00', '23718.00']);
+        assert.deepEqual([order.shipping_amount, order.total_amount], ['0.00', '20100.00']);
 
         await rejectsWith(place(user, [[printer, 1]], 'cod'), 400);
         assert.equal(await stockOf(printer), 4);
@@ -239,16 +239,16 @@ describe('settlePayment: only PhonePe-verified, amount-matching payments count',
     const fresh = async () => {
         const user = await seedUser();
         const product = await seedProduct({ stock: 5, price: '100.00' });
-        return { user, product, order: await place(user, [[product, 1]]) }; // total 317.00
+        return { user, product, order: await place(user, [[product, 1]]) }; // total 299.00 (GST included)
     };
 
     it('marks paid when COMPLETED for the exact amount, and replays are no-ops', async () => {
         const { order } = await fresh();
-        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 }), 'paid');
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 29900 }), 'paid');
         const row = await orderRow(order.id);
         assert.equal(row.status, 'processing');
         assert.equal(row.payment_status, 'paid');
-        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 }), 'noop');
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 29900 }), 'noop');
     });
 
     it('refuses to mark paid when the collected amount differs or is missing', async () => {
@@ -272,7 +272,7 @@ describe('settlePayment: only PhonePe-verified, amount-matching payments count',
 
     it('ignores a late FAILED notice for an order that has since been paid', async () => {
         const { order, product } = await fresh();
-        await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 });
+        await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 29900 });
         assert.equal(await orders.settlePayment(order.id, { state: 'FAILED' }), 'noop');
         assert.equal((await orderRow(order.id)).status, 'processing');
         assert.equal(await stockOf(product), 4);
@@ -281,7 +281,7 @@ describe('settlePayment: only PhonePe-verified, amount-matching payments count',
     it('records and flags money received for an already-cancelled order', async () => {
         const { order, product } = await fresh();
         await orders.cancelOrder(order.id);
-        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 31700 }), 'paid_after_cancel');
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount: 29900 }), 'paid_after_cancel');
         const row = await orderRow(order.id);
         assert.equal(row.status, 'cancelled');
         assert.equal(row.payment_status, 'paid', 'must be queryable as cancelled+paid to trigger a refund');
@@ -502,7 +502,7 @@ describe('POST /api/orders', () => {
         assert.ok(res.body.redirectUrl);
         const row = await orderRow(res.body.orderId);
         assert.deepEqual([row.subtotal_amount, row.tax_amount, row.shipping_amount, row.total_amount],
-            ['100.00', '18.00', '199.00', '317.00']);
+            ['100.00', '15.25', '199.00', '299.00']);
     });
 
     it('releases the reserved stock when payment initiation fails', async () => {

@@ -18,6 +18,13 @@ export const usdToINR = (usd: number): number => {
 };
 
 /**
+ * GST (18%) contained in a GST-inclusive amount. Listed prices include GST;
+ * mirrors gstIncludedPaise in backend/src/services/order.service.js.
+ */
+export const gstIncluded = (grossInr: number): number =>
+  (Math.round(grossInr * 100) - Math.round((grossInr * 100) / 1.18)) / 100;
+
+/**
  * Material pricing in INR per gram
  */
 export const MATERIAL_PRICES = {

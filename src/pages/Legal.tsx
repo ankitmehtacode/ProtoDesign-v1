@@ -81,6 +81,7 @@ export const TermsPage = () => (
             <strong>Registered Office:</strong><br/>
             Zon Robotics and AI Pvt. Ltd.<br/>
             CIN: U72100MP2025PTC077687<br/>
+            GSTIN: 23AACCZ6818Q1ZO<br/>
             01, Marg, Jawahar Tekri, Sinhasa<br/>
             Indore, Madhya Pradesh, 452009, India.
         </p>
@@ -257,7 +258,7 @@ export const ContactPage = () => (
 
             <div className="p-6 border rounded-lg bg-muted/20 md:col-span-2">
                 <h4 className="font-semibold text-lg mb-2 flex items-center gap-2"><MapPin className="w-5 h-5 text-primary"/> Registered Office</h4>
-                <p>Zon Robotics and AI Pvt. Ltd. (CIN U72100MP2025PTC077687)</p>
+                <p>Zon Robotics and AI Pvt. Ltd. (CIN U72100MP2025PTC077687, GSTIN 23AACCZ6818Q1ZO)</p>
                 <p>01, Marg, Jawahar Tekri, Sinhasa</p>
                 <p>Indore, Madhya Pradesh, 452009</p>
                 <p>India</p>
