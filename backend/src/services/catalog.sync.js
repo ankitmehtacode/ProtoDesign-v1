@@ -68,9 +68,9 @@ const DEPLOY_HOOK_RE = /^https:\/\/api\.vercel\.com\/v1\/integrations\/deploy\/[
 // Printables reports 0 g for models without slicer data; that is no price basis.
 const MIN_GRAMS = 5;
 
-// Confirmed by the business (2026-09-26). Mirrors the quote page's ₹8 base
-// rate and ₹150 setup fee, applied per gram of filament.
-const PRICE_PER_GRAM = 8;
+// Set by the business (2026-09-27): ₹6 per gram of filament plus a ₹150 setup
+// fee. Listed prices include GST (see order.service.js).
+const PRICE_PER_GRAM = 6;
 const BASE_PRICE = 150;
 
 // Made-to-order items have no real stock; this caps open orders per item and

@@ -20,6 +20,7 @@ export const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;
 export const ORG = {
     legalName: "Zon Robotics and AI Pvt. Ltd.",
     cin: "U72100MP2025PTC077687",
+    gstin: "23AACCZ6818Q1ZO",
     email: "help@protodesignstudio.com",
     telephone: "+91-8249581682",
     address: {
@@ -158,6 +159,7 @@ export const organizationLd = () => ({
     email: ORG.email,
     telephone: ORG.telephone,
     identifier: { "@type": "PropertyValue", propertyID: "CIN", value: ORG.cin },
+    taxID: ORG.gstin,
     address: { "@type": "PostalAddress", ...ORG.address },
     areaServed: { "@type": "Country", name: "India" },
 });

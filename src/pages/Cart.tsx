@@ -4,7 +4,7 @@ import { useCart } from "@/hooks/use-cart";
 import { apiService } from '@/services/api.service';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatINR } from '@/lib/currency';
+import { formatINR, gstIncluded } from '@/lib/currency';
 import { Minus, Plus, Trash2, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
@@ -23,10 +23,10 @@ const Cart = () => {
     // --- 160 IQ Shipping Sync Logic ---
     const hasPrinter = items.some(item => item.product.category === '3d_printer');
     const subtotal = total;
-    const gst = total * 0.18;
+    const gst = gstIncluded(total);
     // Default to online shipping (₹199) or FREE (₹0) for printers
     const shipping = hasPrinter ? 0 : 199; 
-    const finalTotal = subtotal + gst + shipping;
+    const finalTotal = subtotal + shipping;
 
     if (loading) {
         return (
@@ -119,7 +119,7 @@ const Cart = () => {
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">GST (18%):</span>
+                                        <span className="text-muted-foreground">Includes GST (18%):</span>
                                         <span>{formatINR(gst)}</span>
                                     </div>
                                 </div>

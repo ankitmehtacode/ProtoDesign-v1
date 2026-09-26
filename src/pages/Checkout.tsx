@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { PaymentGatewaySelector } from '@/components/PaymentGatewaySelector';
-import { formatINR } from '@/lib/currency';
+import { formatINR, gstIncluded } from '@/lib/currency';
 import { toast } from 'sonner';
 import { Loader2, Truck, CheckCircle2, MapPin } from 'lucide-react';
 import { apiService } from '@/services/api.service';
@@ -79,8 +79,8 @@ const Checkout = () => {
     };
 
     const shipping = getShippingCharge();
-    const gst = subtotal * 0.18;
-    const finalTotal = subtotal + gst + shipping;
+    const gst = gstIncluded(subtotal);
+    const finalTotal = subtotal + shipping;
 
     // Failsafe: If they somehow had COD selected but their cart crosses limit and has no override, force it back to PhonePe
     useEffect(() => {
@@ -350,7 +350,7 @@ const Checkout = () => {
                                     </span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span>GST (18%)</span>
+                                    <span>Includes GST (18%)</span>
                                     <span className="font-medium">{formatINR(gst)}</span>
                                 </div>
                                 <Separator className="my-2" />

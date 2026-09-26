@@ -62,7 +62,8 @@ interface ShippingAddress {
 interface Order {
     id: string;
     total_amount: number;
-    tax_amount?: number;       // ✅ Add this
+    subtotal_amount?: number;
+    tax_amount?: number;
     shipping_amount?: number;
     status: string;
     created_at: string;
@@ -389,7 +390,11 @@ export default function Orders() {
                                                         <span className="font-bold text-sm">{formatINR(order.shipping_amount || 0)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center p-3 bg-muted/30 border border-dashed rounded-lg">
-                                                        <span className="text-sm font-medium text-muted-foreground">GST (18%)</span>
+                                                        {/* Orders before 2026-09-27 added GST on top; later ones include it in the price. */}
+                                                        <span className="text-sm font-medium text-muted-foreground">
+                                                            {Math.abs(Number(order.subtotal_amount ?? 0) + Number(order.shipping_amount ?? 0) - Number(order.total_amount)) < 0.01
+                                                                ? 'Includes GST (18%)' : 'GST (18%)'}
+                                                        </span>
                                                         <span className="font-bold text-sm">{formatINR(order.tax_amount || 0)}</span>
                                                     </div>
 
