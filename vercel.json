@@ -5,6 +5,10 @@
       "source": "/sitemap.xml",
       "destination": "https://bfblueg5u7ddkz4lf2xh2yhfhu0yoetn.lambda-url.ap-southeast-1.on.aws/sitemap.xml"
     },
+    {
+      "source": "/feeds/google-products.xml",
+      "destination": "https://bfblueg5u7ddkz4lf2xh2yhfhu0yoetn.lambda-url.ap-southeast-1.on.aws/feeds/google-products.xml"
+    },
     { "source": "/product/:slug", "destination": "/_app" }
   ],
   "headers": [
