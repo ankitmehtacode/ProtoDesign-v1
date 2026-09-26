@@ -80,8 +80,9 @@ export const TermsPage = () => (
         <p>
             <strong>Registered Office:</strong><br/>
             Zon Robotics and AI Pvt. Ltd.<br/>
-            I2, Gymnasia, Almas Amber, Kanupriya Nagar, Rau<br/>
-            Indore, Madhya Pradesh, 453331, India.
+            CIN: U72100MP2025PTC077687<br/>
+            01, Marg, Jawahar Tekri, Sinhasa<br/>
+            Indore, Madhya Pradesh, 452009, India.
         </p>
 
         <h3>4. Products & Services</h3>
@@ -153,7 +154,7 @@ export const RefundPage = () => (
         </p>
         <ul className="list-disc pl-5">
             <li>Cancellations will only be considered if the request is made within 7 days of placing the order. However, cancellation requests may not be accepted once we have shipped the order or it is out for delivery. In such an event, you may choose to reject the product at the doorstep.</li>
-            <li>In case of receipt of damaged or defective items, please report to our customer service team. The request will be accepted once we have inspected the item and confirmed the damage or defect. This should be reported within 7 days of receipt of products. In case you feel that the product received is not as shown on the site or as per your expectations, you must bring it to the notice of our customer service within 7 days of receiving the product. The customer service team after looking into your complaint will take an appropriate decision.</li>
+            <li>In case of receipt of damaged or defective items, please report to our customer service team. The request will be accepted once we have inspected the item and confirmed the damage or defect. This should be reported within 7 days of receipt of products. If the product received is different from its description on the site, you must bring it to the notice of our customer service within 7 days of receiving the product. The customer service team after looking into your complaint will take an appropriate decision.</li>
             <li>In case of complaints regarding the products that come with a warranty from the manufacturers, please refer the issue to them.</li>
             <li>In case of any refunds approved by ProtoDesign, it will take 7 days for the refund to be processed to you.</li>
             <li>If any damaged/defective/replacement products are inspected and accepted then it will be delivered within 5 to 7 business days </li>
@@ -166,24 +167,39 @@ export const RefundPage = () => (
     </LegalPageLayout>
 );
 
-// --- 3. REFUND POLICY ---
+// --- 3. RETURN POLICY ---
 export const ReturnPage = () => (
-    <LegalPageLayout title="Return Policy" lastUpdated="January 12, 2026">
+    <LegalPageLayout title="Return Policy" lastUpdated="September 26, 2026">
         <div className="p-4 bg-primary/10 border-l-4 border-primary rounded-r-md mb-6">
             <p className="font-medium text-foreground">
-                <strong>Standard Returns:</strong> We accept returns for manufacturing defects reported within 7 days.
+                <strong>Defects only:</strong> We accept returns only for items that arrive defective, damaged, or different from their description, reported within 7 days of delivery.
             </p>
         </div>
 
-        <h3>1. Returns</h3>
+        <h3>1. What we accept</h3>
+        <p>We will replace or refund an item that:</p>
+        <ul className="list-disc pl-5">
+            <li>has a manufacturing defect,</li>
+            <li>arrived damaged in transit, or</li>
+            <li>is different from what was described on the product page (wrong item, material or size).</li>
+        </ul>
         <p>
-            We offer return / exchange within first 7 days from the date of your purchase. If 7 days have passed since your purchase, you will not be offered a return, exchange or refund of any kind. In order to become eligible for a return or an exchange, (i) the purchased item should be unused and in the same condition as you received it, (ii) the item must have original packaging, (iii) if the item that you purchased on a sale, then the item may not be eligible for a return / exchange. Further, only such items are replaced by us (based on an exchange request), if such items are found defective or damaged.
-        </p>
-        <p>
-            You agree that there may be a certain category of products / items that are exempted from returns or refunds. Such categories of the products would be identified to you at the item of purchase. For exchange / return accepted request(s) (as applicable), once your returned product / item is received and inspected by us, we will send you an email to notify you about receipt of the returned / exchanged product. Further. If the same has been approved after the quality check at our end, your request (i.e. return / exchange) will be processed in accordance with our policies.
+            Report it within <strong>7 days of delivery</strong> to help@protodesignstudio.com or +91 8249581682, with your order number and photos of the item and packaging.
         </p>
 
-        <h3>2. Custom 3D Printing</h3>
+        <h3>2. What we do not accept</h3>
+        <p>
+            We do not accept returns or exchanges for a change of mind, or for items damaged after delivery through misuse or incorrect installation.
+            Requests made more than 7 days after delivery cannot be accepted.
+        </p>
+
+        <h3>3. How a return is handled</h3>
+        <p>
+            We may ask you to send the item back so we can inspect it. Once we confirm the defect, damage or mismatch, we will send a replacement or refund you as you prefer.
+            Refunds follow our Refund Policy.
+        </p>
+
+        <h3>4. Custom 3D Printing</h3>
         <p>
             Due to the personalized nature of Custom 3D Printing services, these orders are <strong>non-returnable</strong> unless the printed part is broken upon arrival or significantly deviates from the design file provided.
         </p>
@@ -241,8 +257,9 @@ export const ContactPage = () => (
 
             <div className="p-6 border rounded-lg bg-muted/20 md:col-span-2">
                 <h4 className="font-semibold text-lg mb-2 flex items-center gap-2"><MapPin className="w-5 h-5 text-primary"/> Registered Office</h4>
-                <p>I2, Gymnasia, Almas Amber, Kanupriya Nagar, Rau</p>
-                <p>Indore, Madhya Pradesh, 453331</p>
+                <p>Zon Robotics and AI Pvt. Ltd. (CIN U72100MP2025PTC077687)</p>
+                <p>01, Marg, Jawahar Tekri, Sinhasa</p>
+                <p>Indore, Madhya Pradesh, 452009</p>
                 <p>India</p>
             </div>
         </div>

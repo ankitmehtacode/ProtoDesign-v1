@@ -67,7 +67,7 @@ export const Footer = () => {
                             )}
                             <li className="flex items-start gap-2">
                                 <MapPin className="w-4 h-4 text-primary mt-0.5" />
-                                <span>I2, Gymnasia, Almas Amber, Kanupriya Nagar, Rau, Indore, Madhya Pradesh 453331</span>
+                                <span>01, Marg, Jawahar Tekri, Sinhasa, Indore, Madhya Pradesh 452009</span>
                             </li>
                         </ul>
                         {/* Social Icons */}
@@ -106,7 +106,7 @@ export const Footer = () => {
                 <Separator className="my-8" />
 
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-foreground/80">
-                    <p>© {new Date().getFullYear()} Zon Robotics and AI Pvt. Ltd. ProtoDesign is a brand of Zon Robotics and AI Pvt. Ltd.</p>
+                    <p>© {new Date().getFullYear()} Zon Robotics and AI Pvt. Ltd. (CIN U72100MP2025PTC077687). ProtoDesign is a brand of Zon Robotics and AI Pvt. Ltd.</p>
                     {/* Each claim here must match the shipping policy and checkout. */}
                     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
                         <span>Pay via PhonePe or cash on delivery</span>

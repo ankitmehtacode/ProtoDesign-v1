@@ -57,8 +57,8 @@ const MATERIALS = new Map([['PLA', 'PLA'], ['PETG', 'PETG'], ['PET', 'PETG'], ['
 // Printables reports 0 g for models without slicer data; that is no price basis.
 const MIN_GRAMS = 5;
 
-// PLACEHOLDER PRICING -- confirm before relying on it. Mirrors the quote
-// page's ₹8 base rate and ₹150 setup fee, applied per gram of filament.
+// Confirmed by the business (2026-09-26). Mirrors the quote page's ₹8 base
+// rate and ₹150 setup fee, applied per gram of filament.
 const PRICE_PER_GRAM = 8;
 const BASE_PRICE = 150;
 
