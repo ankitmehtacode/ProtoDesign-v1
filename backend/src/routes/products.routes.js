@@ -5,6 +5,7 @@ import { storageService } from '../services/storage.service.js';
 import { isUuid } from '../services/order.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
+import { requestSiteRebuild } from '../services/site.rebuild.js';
 
 // True when the reviewer has a delivered or completed order containing the
 // product. Computed on read, so it stays correct as order statuses change.
@@ -143,6 +144,7 @@ router.post('/bulk', authMiddleware, isAdmin, upload.single('file'), async (req,
                 results.errors.push(`Failed ${p.name}: ${err.message}`);
             }
         }
+        if (results.success > 0) await requestSiteRebuild('admin_product_bulk');
         res.json({ message: 'Bulk processing complete', results });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -403,6 +405,7 @@ router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
             if (i === 0) await db.none('UPDATE products SET image_url = $1 WHERE id = $2', [imageUrls[i], product.id]);
         }
 
+        await requestSiteRebuild('admin_product_create');
         res.status(201).json(product);
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });
@@ -488,6 +491,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
             );
         });
 
+        await requestSiteRebuild('admin_product_update');
         res.json({ message: "Product updated successfully" });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });
@@ -501,16 +505,22 @@ router.delete('/:id', authMiddleware, isAdmin, async (req, res) => {
             await db.none('DELETE FROM product_images WHERE product_id = $1', [req.params.id]);
             await db.none('DELETE FROM reviews WHERE product_id = $1', [req.params.id]);
             await db.none('DELETE FROM products WHERE id = $1', [req.params.id]);
+            await requestSiteRebuild('admin_product_delete');
             res.json({ message: 'Deleted permanently' });
         } else {
             await db.none('UPDATE products SET is_archived = true WHERE id = $1', [req.params.id]);
+            await requestSiteRebuild('admin_product_archive');
             res.json({ message: 'Archived' });
         }
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 router.patch('/:id/restore', authMiddleware, isAdmin, async (req, res) => {
-    try { await db.none('UPDATE products SET is_archived = false WHERE id = $1', [req.params.id]); res.json({ message: 'Restored' }); } catch (error) { res.status(500).json({ error: error.message }); }
+    try {
+        await db.none('UPDATE products SET is_archived = false WHERE id = $1', [req.params.id]);
+        await requestSiteRebuild('admin_product_restore');
+        res.json({ message: 'Restored' });
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // ==========================================
