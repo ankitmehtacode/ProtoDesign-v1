@@ -185,7 +185,7 @@ Parameters:
     Type: String
     Default: ''
 
-  # Weekly import of trending, commercially licensed Printables models as
+  # Daily import of trending, commercially licensed Printables models as
   # made-to-order products (backend/src/services/catalog.sync.js). DISABLED
   # stops it without a code change.
   CatalogSyncState:
@@ -218,8 +218,8 @@ Resources:
         CatalogSyncSchedule:
           Type: Schedule
           Properties:
-            # Mondays 09:00 IST. One run adds at most 5 products.
-            Schedule: cron(30 3 ? * MON *)
+            # Every day at 09:00 IST. One run adds at most 5 products.
+            Schedule: cron(30 3 * * ? *)
             State: !Ref CatalogSyncState
             Input: '{"source":"protodesign.catalog-sync"}'
       FunctionUrlConfig:

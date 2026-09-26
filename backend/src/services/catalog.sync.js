@@ -1,5 +1,5 @@
 /**
- * Weekly catalog sync: lists trending, commercially licensed Printables models
+ * Daily catalog sync: lists trending, commercially licensed Printables models
  * as made-to-order products in the '3dprintables' category.
  *
  * Runs as an EventBridge-scheduled invoke of the API function (see
@@ -271,7 +271,7 @@ export async function runCatalogSync({
                     const id = await createProduct(listing, uploadImage);
                     created.push({ id, name: listing.name, source: listing.sourceUrl, price: listing.price });
                 } catch (err) {
-                    // One bad model must not stop the run; it is logged and retried next week.
+                    // One bad model must not stop the run; it is logged and retried on the next run.
                     failed.push(listing.sourceUrl);
                     log('catalog_sync_item_failed', { source: listing.sourceUrl, error: err.message });
                 }

@@ -162,7 +162,7 @@ app.use(errorHandler);
 // req/res pair Express expects, so routing above is unchanged.
 //
 // The two other event shapes are the WhatsApp worker's own async self-invoke
-// (see dispatch.kick) and the weekly catalog sync from EventBridge. Both can
+// (see dispatch.kick) and the daily catalog sync from EventBridge. Both can
 // only arrive through lambda:InvokeFunction, which requires IAM; a Function URL
 // request is always wrapped in an HTTP event, so it can never be mistaken for
 // either.
