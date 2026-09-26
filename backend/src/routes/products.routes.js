@@ -405,7 +405,7 @@ router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
             if (i === 0) await db.none('UPDATE products SET image_url = $1 WHERE id = $2', [imageUrls[i], product.id]);
         }
 
-        await requestSiteRebuild('admin_product_create');
+        await requestSiteRebuild('admin_product_create', { paths: [`/product/${product.slug}`] });
         res.status(201).json(product);
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });
@@ -491,7 +491,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
             );
         });
 
-        await requestSiteRebuild('admin_product_update');
+        await requestSiteRebuild('admin_product_update', { paths: [`/product/${slug}`] });
         res.json({ message: "Product updated successfully" });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });

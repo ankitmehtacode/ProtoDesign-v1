@@ -228,14 +228,14 @@ async function createProduct(listing, uploadImage) {
     return db.tx(async t => {
         const product = await t.one(
             `INSERT INTO products (name, slug, description, short_description, price, category, stock, specifications, image_url)
-             VALUES ($1, $2, $3, $4, $5, '3dprintables', $6, $7::jsonb, $8) RETURNING id`,
+             VALUES ($1, $2, $3, $4, $5, '3dprintables', $6, $7::jsonb, $8) RETURNING id, slug`,
             [listing.name, slugify(listing.name), listing.description, listing.shortDescription, listing.price,
              MADE_TO_ORDER_STOCK, JSON.stringify(listing.specifications), images[0]]);
         for (let i = 0; i < images.length; i++) {
             await t.none('INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
                 [product.id, images[i], i]);
         }
-        return product.id;
+        return product;
     });
 }
 
@@ -284,8 +284,8 @@ export async function runCatalogSync({
                 if (await alreadyImported(listing.sourceUrl)) { skipped.duplicate = (skipped.duplicate ?? 0) + 1; continue; }
 
                 try {
-                    const id = await createProduct(listing, uploadImage);
-                    created.push({ id, name: listing.name, source: listing.sourceUrl, price: listing.price });
+                    const { id, slug } = await createProduct(listing, uploadImage);
+                    created.push({ id, slug, name: listing.name, source: listing.sourceUrl, price: listing.price });
                 } catch (err) {
                     // One bad model must not stop the run; it is logged and retried on the next run.
                     failed.push(listing.sourceUrl);
@@ -303,6 +303,8 @@ export async function runCatalogSync({
         throw err;
     } finally {
         // Prerenders the new product pages for crawlers.
-        if (created.length > 0) await requestSiteRebuild('catalog_sync', { fetchImpl });
+        if (created.length > 0) {
+            await requestSiteRebuild('catalog_sync', { fetchImpl, paths: created.map(c => `/product/${c.slug}`) });
+        }
     }
 }

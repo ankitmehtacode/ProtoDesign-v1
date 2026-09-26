@@ -12,8 +12,10 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { createServer } from "vite";
+import { FAQ, faqLd } from "../src/seo/faq.js";
 import {
-    CATEGORY_PAGES, DEFAULT_IMAGE, NOT_FOUND, PAGES, SITE_NAME, SITE_URL,
+    CATEGORY_PAGES, DEFAULT_IMAGE, NOT_FOUND, ORG, PAGES, SITE_NAME, SITE_URL,
     breadcrumbLd, organizationLd, plainText, productDescription, productLd,
     productTitle, productUrl, quoteServiceLd, specMap, websiteLd,
 } from "../src/seo/site.js";
@@ -56,14 +58,14 @@ const nav = () => {
 };
 const inr = (n) => `₹${Math.round(Number(n)).toLocaleString("en-IN")}`;
 
-function pageBody(meta, products = []) {
+function pageBody(meta, products = [], extra = "") {
     if (!meta.h1) return "";
     const list = products.length
         ? `<ul class="mt-8 space-y-2">${products
             .map((p) => `<li><a href="${new URL(productUrl(p)).pathname}">${esc(plainText(p.name, 200))}</a>: ${inr(p.price)}${p.stock > 0 ? "" : " (sold out)"}</li>`)
             .join("")}</ul>`
         : "";
-    return shell(`${nav()}<h1 class="mt-8 font-display text-3xl font-bold">${esc(meta.h1)}</h1><p class="mt-3 max-w-xl text-muted-foreground">${esc(meta.intro ?? meta.description)}</p>${list}`);
+    return shell(`${nav()}<h1 class="mt-8 font-display text-3xl font-bold">${esc(meta.h1)}</h1><p class="mt-3 max-w-xl text-muted-foreground">${esc(meta.intro ?? meta.description)}</p>${list}${extra}`);
 }
 
 function productBody(p, categoryName, categoryPath) {
@@ -109,6 +111,12 @@ async function fetchProducts() {
 
 const template = await readFile(join(DIST, "index.html"), "utf8");
 
+// Renders real app components (legal pages, FAQ) to HTML at build time, so the
+// static page matches what visitors see. Vite compiles the TSX and resolves "@/".
+const ROOT = new URL("../", import.meta.url).pathname;
+const vite = await createServer({ root: ROOT, appType: "custom", logLevel: "error", server: { middlewareMode: true, hmr: false } });
+const { renderPage, renderFaq } = await vite.ssrLoadModule("/src/seo/ssr.tsx");
+
 let products = [];
 try {
     products = await fetchProducts();
@@ -124,13 +132,13 @@ for (const [route, meta] of Object.entries(PAGES)) {
     if (!meta.noindex) {
         if (route === "/") ld.push(organizationLd(), websiteLd());
         if (meta.crumbs) ld.push(breadcrumbLd(meta.crumbs));
-        if (meta.service) ld.push(quoteServiceLd());
+        if (meta.service) ld.push(quoteServiceLd(), faqLd());
     }
     const inCategory = meta.category ? products.filter((p) => p.category === meta.category)
         : route === "/shop" ? products : [];
     await write(route, render(template,
         head({ title: meta.title, description: meta.description, canonical: `${SITE_URL}${route}`, noindex: meta.noindex, ld }),
-        meta.noindex ? "" : pageBody(meta, inCategory)));
+        meta.noindex ? "" : renderedBody(route) ?? pageBody(meta, inCategory, route === "/custom" ? renderFaq() : "")));
     count++;
 }
 
@@ -154,4 +162,46 @@ for (const p of products) {
 await write("/_app", render(template, head({ title: SITE_NAME, description: PAGES["/"].description, canonical: "" }), ""));
 await write("/404", render(template, head({ ...NOT_FOUND, canonical: "" }), ""));
 
-console.log(`[prerender] wrote ${count} pages (${products.length} products) + _app.html, 404.html`);
+await writeFile(join(DIST, "llms.txt"), llmsTxt(products));
+await vite.close();
+
+console.log(`[prerender] wrote ${count} pages (${products.length} products) + _app.html, 404.html, llms.txt`);
+
+/** A route's real component, rendered, under the site nav; null when it has none. */
+function renderedBody(route) {
+    const html = renderPage(route);
+    return html === null ? null : `<div class="container mx-auto px-4 pt-28">${nav()}</div>${html}`;
+}
+
+/**
+ * /llms.txt (llmstxt.org): a plain-Markdown brief for AI assistants and agents,
+ * built from the same data as the pages so it never goes stale.
+ */
+function llmsTxt(list) {
+    const a = ORG.address;
+    const md = (s) => String(s).replace(/\s+/g, " ").trim();
+    const indexable = Object.entries(PAGES).filter(([, m]) => !m.noindex);
+    const byCategory = Object.entries(CATEGORY_PAGES).map(([key, [name, path]]) => {
+        const items = list.filter((p) => p.category === key);
+        return items.length ? [`### ${name} (${SITE_URL}${path})`, ...items.map((p) => `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${inr(p.price)}, GST included`), ""] : [];
+    }).flat();
+    return [
+        `# ${SITE_NAME}`,
+        "",
+        `> ${md(ORG.description)}`,
+        "",
+        `- Operator: ${ORG.legalName}, CIN ${ORG.cin}, GSTIN ${ORG.gstin}`,
+        `- Address: ${a.streetAddress}, ${a.addressLocality}, ${a.addressRegion} ${a.postalCode}, India`,
+        `- Contact: ${ORG.email}, ${ORG.telephone}`,
+        `- Grievance officer: ${ORG.grievanceOfficer}, ${ORG.telephone}, ${ORG.email}`,
+        `- Social: ${ORG.sameAs.join(", ")}`,
+        "",
+        "## Pages",
+        ...indexable.map(([path, m]) => `- [${md(m.h1 ?? m.title)}](${SITE_URL}${path === "/" ? "/" : path}): ${md(m.description)}`),
+        "",
+        "## Frequently asked questions",
+        ...FAQ.flatMap(({ q, a: ans }) => [`### ${q}`, ans, ""]),
+        "## Products",
+        ...byCategory,
+    ].join("\n") + "\n";
+}
