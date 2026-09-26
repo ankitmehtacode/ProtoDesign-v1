@@ -28,6 +28,7 @@
 
 import db from '../config/database.js';
 import { storageService } from './storage.service.js';
+import { requestSiteRebuild } from './site.rebuild.js';
 
 export const CATALOG_SYNC_EVENT_SOURCE = 'protodesign.catalog-sync';
 
@@ -61,9 +62,6 @@ const MATERIAL_NOTES = {
     ABS: 'ABS is strong and heat-resistant, suited to parts that get warm or take knocks.',
 };
 
-// Vercel deploy hook: rebuilding the site prerenders the new products, so
-// crawlers get their full title, description and Product data in the HTML.
-const DEPLOY_HOOK_RE = /^https:\/\/api\.vercel\.com\/v1\/integrations\/deploy\/[A-Za-z0-9_/-]+$/;
 
 // Printables reports 0 g for models without slicer data; that is no price basis.
 const MIN_GRAMS = 5;
@@ -304,20 +302,7 @@ export async function runCatalogSync({
         log('catalog_sync_failed', { error: err.message });
         throw err;
     } finally {
-        if (created.length > 0) await triggerRebuild(fetchImpl);
-    }
-}
-
-/** Asks Vercel to rebuild the site. Never fails the sync; every outcome is logged. */
-async function triggerRebuild(fetchImpl) {
-    const hook = process.env.VERCEL_DEPLOY_HOOK_URL;
-    if (!hook) return log('catalog_sync_rebuild_skipped', { reason: 'VERCEL_DEPLOY_HOOK_URL unset' });
-    // The hook URL is a credential: validated, never logged.
-    if (!DEPLOY_HOOK_RE.test(hook)) return log('catalog_sync_rebuild_skipped', { reason: 'VERCEL_DEPLOY_HOOK_URL is not a Vercel deploy hook' });
-    try {
-        const res = await fetchImpl(hook, { method: 'POST', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-        log(res.ok ? 'catalog_sync_rebuild_triggered' : 'catalog_sync_rebuild_failed', { status: res.status });
-    } catch (err) {
-        log('catalog_sync_rebuild_failed', { error: err.message });
+        // Prerenders the new product pages for crawlers.
+        if (created.length > 0) await requestSiteRebuild('catalog_sync', { fetchImpl });
     }
 }
