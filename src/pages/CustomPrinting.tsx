@@ -11,40 +11,9 @@ import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
+import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, holdQuote, modelFileProblem, quotePrice, takeHeldQuote } from "@/lib/quote";
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
-
-// --- OPTIONS CONSTANTS ---
-const PRINTER_QUALITIES = [
-    { id: "0.2-std-0.6-nozzle", name: "0.2 mm Standard (0.6mm Nozzle)", multiplier: 1.0 },
-    { id: "0.2-std", name: "0.2 mm Standard", multiplier: 1.2 },
-    { id: "0.15-med", name: "0.15 mm Medium", multiplier: 1.5 },
-    { id: "0.1-high", name: "0.1 mm High Detail", multiplier: 2.0 },
-];
-
-// Added 'density' (g/cm3) for weight calculation
-const MATERIALS = [
-    { id: "abs", name: "ABS", density: 1.04, colors: ["Black", "White", "Grey", "Red", "Blue"] },
-    { id: "pla", name: "PLA", density: 1.24, colors: ["Black", "White", "Grey", "Yellow", "Green"] },
-    { id: "petg", name: "PETG", density: 1.27, colors: ["Translucent", "Black"] },
-];
-
-const INFILLS = [20, 30, 40, 50, 60, 70, 80, 90, 100];
-
-// Helper to map display names to CSS colors for the viewer
-const getColorHex = (name: string) => {
-    const map: Record<string, string> = {
-        "Black": "#1a1a1a",
-        "White": "#f5f5f5",
-        "Grey": "#808080",
-        "Red": "#ef4444",
-        "Blue": "#3b82f6",
-        "Yellow": "#eab308",
-        "Green": "#22c55e",
-        "Translucent": "#e5e7eb", // Light grey for translucent
-    };
-    return map[name] || "#10b981"; // Default green if not found
-};
 
 export default function CustomPrinting() {
     // --- STATE ---
@@ -65,7 +34,7 @@ export default function CustomPrinting() {
     const [quality, setQuality] = useState(PRINTER_QUALITIES[0]);
     const [material, setMaterial] = useState(MATERIALS[0]);
     const [color, setColor] = useState(MATERIALS[0].colors[0]);
-    const [infill, setInfill] = useState(20);
+    const [infill, setInfill] = useState(DEFAULT_INFILL);
 
     const [contact, setContact] = useState({ email: "", phone: "", notes: "" });
     const [quoteId, setQuoteId] = useState<string | null>(null);
@@ -75,6 +44,25 @@ export default function CustomPrinting() {
     const [isSuccess, setIsSuccess] = useState(false)
 
     const navigate = useNavigate();
+
+    // A model dropped on the home page, or held while the visitor signed in.
+    // In an effect so StrictMode's double render cannot take it and lose it.
+    useEffect(() => {
+        const held = takeHeldQuote();
+        if (!held) return;
+        setFile(held.file);
+        const s = held.settings;
+        if (!s) return;
+        const heldMaterial = MATERIALS.find(m => m.id === s.materialId);
+        setQuality(PRINTER_QUALITIES.find(q => q.id === s.qualityId) ?? PRINTER_QUALITIES[0]);
+        if (heldMaterial) {
+            setMaterial(heldMaterial);
+            setColor(heldMaterial.colors.includes(s.color) ? s.color : heldMaterial.colors[0]);
+        }
+        setInfill(s.infill);
+        setScale(s.scale);
+        setRotation(s.rotation);
+    }, []);
 
     // --- ACTIONS ---
 
@@ -89,8 +77,16 @@ export default function CustomPrinting() {
     const handleSendQuote = async () => {
         // --- ADD THIS BLOCK AT THE START ---
         if (!apiService.isAuthenticated()) {
-            toast.error("Please sign in to send a quote request.");
-            navigate('/auth'); // Redirects to login page
+            // Keep the model and settings through sign-in; Auth brings the visitor back here.
+            if (file) {
+                holdQuote({
+                    file,
+                    settings: { qualityId: quality.id, materialId: material.id, color, infill, scale, rotation },
+                });
+            }
+            localStorage.setItem('redirectAfterLogin', '/custom');
+            toast.info("Sign in to send your quote. Your model and settings are kept.");
+            navigate('/auth');
             return;
         }
         setIsSending(true);
@@ -146,9 +142,6 @@ export default function CustomPrinting() {
 
     // --- LOGIC: DIMENSION SCALING ---
 
-    useEffect(() => {
-        setScale(1);
-    }, [file]);
 
     const printDims = {
         x: parseFloat((modelStats.dimensions.x * scale).toFixed(2)),
@@ -176,13 +169,7 @@ export default function CustomPrinting() {
         return `${weight.toFixed(1)} g`;
     };
 
-    const calculatePrice = () => {
-        if (!modelStats.volume) return 0;
-        const scaledVolume = modelStats.volume * Math.pow(scale, 3);
-        const baseRate = 8;
-        const infillFactor = 1 + (infill / 200);
-        return Math.round(scaledVolume * baseRate * quality.multiplier * infillFactor) + 150;
-    };
+    const calculatePrice = () => quotePrice(modelStats.volume * Math.pow(scale, 3), quality.multiplier, infill);
 
     const calculateTime = () => {
         if (!modelStats.volume) return "0h 0m";
@@ -194,15 +181,25 @@ export default function CustomPrinting() {
     };
 
     const onDrop = useCallback((files: File[]) => {
-        if(files.length) {
-            setFile(files[0]);
-            setRotation({ x: 0, y: 0, z: 0 }); // Reset rotation on new file
+        const [next] = files;
+        if (!next) return;
+        const problem = modelFileProblem(next);
+        if (problem) {
+            toast.error(problem);
+            return;
         }
+        setFile(next);
+        setRotation({ x: 0, y: 0, z: 0 });
+        setScale(1);
     }, []);
     const { getRootProps, getInputProps } = useDropzone({
         onDrop,
+        onDropRejected: ([rejection]) => {
+            if (rejection) toast.error(modelFileProblem(rejection.file) ?? "Choose one STL or OBJ file.");
+        },
         accept: {'model/stl':['.stl'], 'model/obj':['.obj']},
         maxFiles: 1,
+        maxSize: MAX_MODEL_MB * 1024 * 1024,
         disabled: !!file
     });
 
@@ -210,7 +207,7 @@ export default function CustomPrinting() {
         return (
             <div className="min-h-screen flex items-center justify-center pt-20">
                 <div className="text-center max-w-md p-8">
-                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <div className="w-20 h-20 bg-green-500/15 text-green-300 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Check className="w-10 h-10" />
                     </div>
                     <h2 className="text-3xl font-bold mb-4">Request Sent!</h2>
@@ -227,7 +224,7 @@ export default function CustomPrinting() {
     }
 
     return (
-        <div className="min-h-screen pt-24 pb-12 bg-gray-50">
+        <div className="min-h-screen pt-24 pb-12 bg-muted/30">
             <div className="container mx-auto px-4">
 
                 <div className="mb-10 flex items-baseline gap-4 border-b border-border pb-6">
@@ -247,9 +244,9 @@ export default function CustomPrinting() {
 
                             {/* File Header Bar */}
                             {file && (
-                                <div className="bg-white border-b p-3 flex justify-between items-center px-4">
+                                <div className="bg-card border-b p-3 flex justify-between items-center px-4">
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <div className="bg-blue-100 p-1.5 rounded text-blue-600">
+                                        <div className="bg-blue-500/15 p-1.5 rounded text-blue-300">
                                             <FileText className="w-4 h-4" />
                                         </div>
                                         <div className="truncate">
@@ -273,7 +270,7 @@ export default function CustomPrinting() {
                                     file={file}
                                     scale={scale} // Pass dynamic scale
                                     rotation={rotation} // Pass dynamic rotation object
-                                    color={getColorHex(color)} // Pass dynamic color
+                                    color={colorHex(color)} // Pass dynamic color
                                     onStatsCalculated={setModelStats}
                                 />
                                 {!file && (
@@ -290,7 +287,7 @@ export default function CustomPrinting() {
 
                         {/* Rotation Inputs (Merged from custom.tsx) */}
                         {file && (
-                            <div className="flex flex-col gap-3 p-4 bg-white rounded-lg border shadow-sm">
+                            <div className="flex flex-col gap-3 p-4 bg-card rounded-lg border shadow-sm">
                                 <div className="flex items-center gap-2 text-sm font-medium">
                                     <RotateCw className="w-4 h-4 text-muted-foreground" />
                                     Model Orientation (Degrees)
@@ -429,7 +426,7 @@ export default function CustomPrinting() {
                                         max="500" // Goes up to 500% now
                                         value={scale * 100}
                                         onChange={(e) => setScale(Number(e.target.value) / 100)}
-                                        className="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2"
+                                        className="w-full accent-primary h-2 bg-muted rounded-lg appearance-none cursor-pointer mt-2"
                                     />
                                 </div>
                             </CardContent>
@@ -480,7 +477,7 @@ export default function CustomPrinting() {
                                                     <div className="flex items-center gap-2">
                                                         <div
                                                             className={`w-3 h-3 rounded-full border shadow-sm`}
-                                                            style={{ backgroundColor: getColorHex(c) }}
+                                                            style={{ backgroundColor: colorHex(c) }}
                                                         />
                                                         {c}
                                                     </div>

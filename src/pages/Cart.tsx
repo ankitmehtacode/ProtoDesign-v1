@@ -57,7 +57,7 @@ const Cart = () => {
     }
 
     return (
-        <div className="min-h-screen pt-20 pb-10 bg-slate-50/30">
+        <div className="min-h-screen pt-20 pb-10 bg-muted/30">
             <section className="py-16 gradient-subtle mb-12">
                 <div className="container mx-auto px-4 text-center max-w-3xl">
                     <h1 className="font-display text-5xl md:text-6xl mb-6">Your Shopping Cart</h1>
@@ -75,7 +75,7 @@ const Cart = () => {
                                 <CardContent className="p-6">
                                     <div className="flex flex-col sm:flex-row gap-6">
                                         {item.product.image_url && (
-                                            <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden bg-white flex-shrink-0 border">
+                                            <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden bg-card flex-shrink-0 border">
                                                 <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-contain" />
                                             </div>
                                         )}
@@ -112,9 +112,9 @@ const Cart = () => {
                                     </div>
                                     <div className="flex justify-between text-sm items-center">
                                         <span className="text-muted-foreground flex items-center gap-1.5">
-                                            Shipping {hasPrinter && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                                            Shipping {hasPrinter && <CheckCircle2 className="w-4 h-4 text-green-300" />}
                                         </span>
-                                        <span className={shipping === 0 ? "text-green-600 font-bold" : ""}>
+                                        <span className={shipping === 0 ? "text-green-300 font-bold" : ""}>
                                             {shipping === 0 ? "FREE" : formatINR(shipping)}
                                         </span>
                                     </div>
@@ -130,7 +130,7 @@ const Cart = () => {
                                 </div>
                                 <Button className="w-full h-12 text-lg shadow-md" onClick={() => navigate('/checkout')}>Proceed to Checkout</Button>
                                 {hasPrinter && (
-                                    <p className="text-[10px] text-center text-green-600 font-medium">✨ You've unlocked FREE Shipping by purchasing a 3D Printer!</p>
+                                    <p className="text-[10px] text-center text-green-300 font-medium">✨ You've unlocked FREE Shipping by purchasing a 3D Printer!</p>
                                 )}
                                 <Button variant="outline" className="w-full" onClick={() => navigate('/shop')}>Continue Shopping</Button>
                             </CardContent>

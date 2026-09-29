@@ -112,7 +112,7 @@ export default function Auth() {
     return (
         // pt-24 clears the fixed h-20 nav; the card is top-aligned on phones so the
         // form sits above the keyboard, and centred once there is room.
-        <div className="flex flex-col items-center min-h-[100svh] px-4 pt-24 pb-8 sm:justify-center bg-gray-50">
+        <div className="flex flex-col items-center min-h-[100svh] px-4 pt-24 pb-8 sm:justify-center bg-muted/30">
             <Card className="w-full max-w-md shadow-lg">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <CardHeader className="p-5 sm:p-6">
@@ -165,7 +165,7 @@ export default function Auth() {
                                             value={loginData.password}
                                             onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                                         />
-                                        <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} aria-label={showLoginPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500">
+                                        <button type="button" onClick={() => setShowLoginPassword(!showLoginPassword)} aria-label={showLoginPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground">
                                             {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
@@ -212,7 +212,7 @@ export default function Auth() {
                                             value={signupData.password}
                                             onChange={(e) => setSignupData({...signupData, password: e.target.value})}
                                         />
-                                        <button type="button" onClick={() => setShowSignupPassword(!showSignupPassword)} aria-label={showSignupPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500">
+                                        <button type="button" onClick={() => setShowSignupPassword(!showSignupPassword)} aria-label={showSignupPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground">
                                             {showSignupPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
@@ -229,7 +229,7 @@ export default function Auth() {
                                             value={signupData.confirmPassword}
                                             onChange={(e) => setSignupData({...signupData, confirmPassword: e.target.value})}
                                         />
-                                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500">
+                                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground">
                                             {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     </div>
@@ -246,7 +246,7 @@ export default function Auth() {
                 <div className="px-5 pb-5 sm:px-6 sm:pb-6">
                     <div className="relative my-4">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground">Or continue with</span></div>
+                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or continue with</span></div>
                     </div>
 
                     <div ref={googleSlotRef} className="flex justify-center min-h-[44px]">
@@ -254,7 +254,7 @@ export default function Auth() {
                             onSuccess={handleGoogleSuccess}
                             onError={() => toast.error('Google login failed')}
                             useOneTap={false}
-                            theme="outline"
+                            theme="filled_black"
                             size="large"
                             width={String(googleWidth)}
                         />}

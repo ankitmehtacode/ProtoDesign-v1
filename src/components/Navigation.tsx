@@ -111,8 +111,6 @@ export const Navigation = () => {
         setIsOpen(false);
     };
 
-    if (authLoading) return null;
-
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
             <div className="container mx-auto px-4">
@@ -125,25 +123,27 @@ export const Navigation = () => {
 
                     {/* Desktop Nav */}
                     <div className="hidden md:flex items-center space-x-6 xl:space-x-8">
-                        <Link to="/" className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
+                        <Link to="/" className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors">
                             Home
                         </Link>
 
                         <div className="relative group h-20 flex items-center">
-                            <button className="flex items-center gap-1 text-sm font-medium text-foreground/80 group-hover:text-primary transition-colors focus:outline-none">
+                            {/* Opens on hover and on keyboard focus (focus-within), so every
+                                category is reachable without a mouse. */}
+                            <button aria-haspopup="true" className="flex items-center gap-1 rounded-sm text-sm font-medium text-foreground/80 group-hover:text-foreground group-focus-within:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4">
                                 Products
-                                <ChevronDown size={14} className="transition-transform duration-200 group-hover:rotate-180" />
+                                <ChevronDown size={14} className="transition-transform duration-200 group-hover:rotate-180 group-focus-within:rotate-180" />
                             </button>
 
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-56 bg-background rounded-xl shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform group-hover:translate-y-0 translate-y-2 p-2">
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-56 bg-background rounded-xl shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 transform group-hover:translate-y-0 group-focus-within:translate-y-0 translate-y-2 p-2">
                                 {CATEGORIES.map((cat) => (
                                     <Link
                                         key={cat.name}
                                         to={cat.path}
-                                        className="flex items-center justify-between px-3 py-2 hover:bg-accent rounded-lg group/item transition-colors"
+                                        className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded-lg group/item transition-colors"
                                     >
-                                        <span className="text-sm text-foreground group-hover/item:text-primary">{cat.name}</span>
-                                        {cat.path === '/shop' ? <Search size={14} /> : <ChevronRight size={14} className="text-muted-foreground group-hover/item:text-primary" />}
+                                        <span className="text-sm text-foreground group-hover/item:text-foreground">{cat.name}</span>
+                                        {cat.path === '/shop' ? <Search size={14} /> : <ChevronRight size={14} className="text-muted-foreground group-hover/item:text-foreground" />}
                                     </Link>
                                 ))}
                             </div>
@@ -155,19 +155,19 @@ export const Navigation = () => {
                             <Link
                                 key={cat.path}
                                 to={cat.path}
-                                className={`hidden lg:block text-sm font-medium transition-colors hover:text-primary ${location.pathname === cat.path ? 'text-primary' : 'text-foreground/80'}`}
+                                className={`hidden lg:block text-sm font-medium transition-colors hover:text-foreground ${location.pathname === cat.path ? 'text-foreground' : 'text-foreground/80'}`}
                             >
                                 {cat.name}
                             </Link>
                         ))}
 
-                        <Link to="/custom" className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors">
+                        <Link to="/custom" className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors">
                             Custom Printing
                         </Link>
 
                         {/* Admin Button (Desktop) */}
                         {isAdmin && (
-                            <Link to="/admin" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
+                            <Link to="/admin" className="text-sm font-medium text-accent hover:text-foreground transition-colors flex items-center gap-1">
                                 Admin Dashboard
                             </Link>
                         )}
@@ -179,7 +179,7 @@ export const Navigation = () => {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="hidden sm:flex text-muted-foreground hover:text-primary"
+                                className="hidden sm:flex text-muted-foreground hover:text-foreground"
                                 aria-label="Search products" // <--- ADD THIS
                             >
                                 <Search size={20} />
@@ -187,7 +187,7 @@ export const Navigation = () => {
                         </Link>
 
                         <Link to="/cart">
-                            <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary" aria-label="View cart">
+                            <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground" aria-label="View cart">
                                 <ShoppingCart size={20} />
                                 {itemCount > 0 && (
                                     <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
@@ -197,12 +197,14 @@ export const Navigation = () => {
                             </Button>
                         </Link>
 
-                        <div className="hidden md:flex items-center gap-2 ml-2 pl-2 border-l">
-                            {user ? (
+                        {/* Until the session check answers, hold the space instead of flashing
+                            "Sign In" at someone who is signed in. The rest of the bar renders now. */}
+                        <div className="hidden md:flex items-center gap-2 ml-2 pl-2 border-l min-w-[6.5rem]">
+                            {authLoading ? null : user ? (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-accent/50">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{user.name.charAt(0)}</div>
+                                        <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-muted">
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-accent font-bold">{user.name.charAt(0)}</div>
                                             <span className="text-sm font-medium hidden lg:block">{user.name}</span>
                                             <ChevronDown size={14} className="text-muted-foreground" />
                                         </Button>
@@ -242,7 +244,7 @@ export const Navigation = () => {
                                 <Link to="/auth">
                                     <Button
                                         size="sm"
-                                        className="rounded-full px-6 text-foreground font-semibold" // Added text-foreground (or text-black) and font-semibold
+                                        className="rounded-full px-6 text-primary-foreground font-semibold"
                                     >
                                         Sign In
                                     </Button>
@@ -272,19 +274,19 @@ export const Navigation = () => {
                             className="md:hidden overflow-hidden border-t bg-background"
                         >
                             <div className="py-4 space-y-1 px-4">
-                                <Link to="/" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg">Home</Link>
+                                <Link to="/" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-muted rounded-lg">Home</Link>
 
                                 <div>
                                     <button
                                         onClick={() => setIsProductMenuOpen(!isProductMenuOpen)}
-                                        className="flex w-full items-center justify-between py-3 px-3 font-medium hover:bg-accent rounded-lg"
+                                        className="flex w-full items-center justify-between py-3 px-3 font-medium hover:bg-muted rounded-lg"
                                     >
                                         Products
                                         <ChevronDown size={16} className={`transition-transform ${isProductMenuOpen ? 'rotate-180' : ''}`} />
                                     </button>
                                     <div className={`pl-6 space-y-1 overflow-hidden transition-all duration-300 ${isProductMenuOpen ? 'max-h-96 pb-2' : 'max-h-0'}`}>
                                         {CATEGORIES.map(cat => (
-                                            <Link key={cat.name} to={cat.path} onClick={() => setIsOpen(false)} className="block py-2 text-sm text-muted-foreground hover:text-primary">
+                                            <Link key={cat.name} to={cat.path} onClick={() => setIsOpen(false)} className="block py-2 text-sm text-muted-foreground hover:text-foreground">
                                                 {cat.name}
                                             </Link>
                                         ))}
@@ -296,35 +298,35 @@ export const Navigation = () => {
                                         key={cat.path}
                                         to={cat.path}
                                         onClick={() => setIsOpen(false)}
-                                        className={`block py-3 px-3 font-medium hover:bg-accent rounded-lg ${location.pathname === cat.path ? 'text-primary bg-primary/10' : ''}`}
+                                        className={`block py-3 px-3 font-medium hover:bg-muted rounded-lg ${location.pathname === cat.path ? 'bg-primary/15' : ''}`}
                                     >
                                         {cat.name}
                                     </Link>
                                 ))}
 
-                                <Link to="/custom" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg">Custom Printing</Link>
+                                <Link to="/custom" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-muted rounded-lg">Custom Printing</Link>
 
                                 {user && (
                                     <>
-                                        <Link to="/profile" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg">My Profile</Link>
-                                        <Link to="/orders" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg">My Orders</Link>
+                                        <Link to="/profile" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-muted rounded-lg">My Profile</Link>
+                                        <Link to="/orders" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-muted rounded-lg">My Orders</Link>
                                     </>
                                 )}
 
                                 {/* ✅ ADDED: Mobile Bulk Upload & Admin Links */}
                                 {isAdmin && (
                                     <>
-                                        <Link to="/bulk-upload" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg flex items-center gap-2">
+                                        <Link to="/bulk-upload" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-muted rounded-lg flex items-center gap-2">
                                             <Upload className="w-4 h-4"/> Bulk Upload
                                         </Link>
-                                        <Link to="/admin" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-accent rounded-lg text-primary flex items-center gap-2">
+                                        <Link to="/admin" onClick={() => setIsOpen(false)} className="block py-3 px-3 font-medium hover:bg-muted rounded-lg text-accent flex items-center gap-2">
                                             <Settings className="w-4 h-4"/> Admin Dashboard
                                         </Link>
                                     </>
                                 )}
 
                                 <div className="pt-4 mt-2 border-t">
-                                    {user ? (
+                                    {authLoading ? null : user ? (
                                         <Button variant="outline" className="w-full justify-start" onClick={handleSignOut}>
                                             <LogOut className="w-4 h-4 mr-2" /> Sign Out ({user.name})
                                         </Button>

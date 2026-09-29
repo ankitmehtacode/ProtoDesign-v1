@@ -38,3 +38,6 @@ infra/parameters.sh
 
 # Local dev overrides (Vite loads this automatically, never commit it)
 .env.local
+
+# Browser-test screenshots and logs from local tooling
+.playwright-mcp/

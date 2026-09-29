@@ -233,7 +233,7 @@ const Checkout = () => {
     };
 
     return (
-        <div className="min-h-screen pt-24 pb-16 bg-slate-50/50">
+        <div className="min-h-screen pt-24 pb-16 bg-muted/30">
             <div className="container mx-auto px-4">
                 <h1 className="text-4xl font-bold mb-8 font-display">Checkout</h1>
 
@@ -248,7 +248,7 @@ const Checkout = () => {
                                 {savedAddresses.length > 0 && (
                                     <div className="w-full sm:w-[240px]">
                                         <Select value={selectedAddressId} onValueChange={handleAddressSelect}>
-                                            <SelectTrigger className="bg-white">
+                                            <SelectTrigger className="bg-card">
                                                 <SelectValue placeholder="Use Saved Address" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -297,7 +297,7 @@ const Checkout = () => {
                                 <div className="space-y-2">
                                     <Label htmlFor="state">State *</Label>
                                     <Select onValueChange={(val) => setFormData(p => ({...p, state: val}))} value={formData.state} disabled={fetchingPincode}>
-                                        <SelectTrigger className="bg-white">
+                                        <SelectTrigger className="bg-card">
                                             <SelectValue placeholder="Select State" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -321,7 +321,7 @@ const Checkout = () => {
 
                     {/* Order Summary Sidebar */}
                     <div className="lg:col-span-1">
-                        <Card className="p-6 sticky top-24 shadow-lg border-2 border-slate-100">
+                        <Card className="p-6 sticky top-24 shadow-lg border-2 border-border">
                             <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
                             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 mb-4">
                                 {items.map((item) => (
@@ -343,9 +343,9 @@ const Checkout = () => {
                                 </div>
                                 <div className="flex justify-between text-sm items-center">
                                     <span className="flex items-center gap-1.5">
-                                        Shipping {hasPrinter && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                                        Shipping {hasPrinter && <CheckCircle2 className="w-4 h-4 text-green-300" />}
                                     </span>
-                                    <span className={shipping === 0 ? "text-green-600 font-bold" : "font-medium"}>
+                                    <span className={shipping === 0 ? "text-green-300 font-bold" : "font-medium"}>
                                         {shipping === 0 ? "FREE" : formatINR(shipping)}
                                     </span>
                                 </div>
@@ -354,7 +354,7 @@ const Checkout = () => {
                                     <span className="font-medium">{formatINR(gst)}</span>
                                 </div>
                                 <Separator className="my-2" />
-                                <div className="flex justify-between text-xl font-bold text-slate-900 pt-2">
+                                <div className="flex justify-between text-xl font-bold text-foreground pt-2">
                                     <span>Total Payable</span>
                                     <span className="text-primary">{formatINR(finalTotal)}</span>
                                 </div>
@@ -373,7 +373,7 @@ const Checkout = () => {
                                 )}
                             </Button>
 
-                            <div className="mt-6 p-4 bg-slate-50 rounded-lg text-[11px] text-muted-foreground space-y-2">
+                            <div className="mt-6 p-4 bg-muted/30 rounded-lg text-[11px] text-muted-foreground space-y-2">
                                 <p className="flex items-start gap-2">
                                     <span className="text-primary font-bold">•</span>
                                     {/* ✅ Dynamic informative text based on eligibility and admin override */}

@@ -146,7 +146,7 @@ export const STLViewer = ({
     }, [file]);
 
     return (
-        <div className="w-full h-full rounded-lg overflow-hidden bg-gradient-to-b from-gray-100 to-gray-200 relative shadow-inner border border-gray-300">
+        <div className="w-full h-full rounded-lg overflow-hidden bg-gradient-to-b from-muted to-secondary relative shadow-inner border border-border">
             {loading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white z-10 backdrop-blur-sm">
                     <div className="text-center">

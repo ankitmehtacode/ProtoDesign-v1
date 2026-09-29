@@ -62,6 +62,10 @@ All colors MUST be HSL.
         --shadow-soft: 0 4px 20px -2px hsl(152 55% 58% / 0.15);
         --shadow-glow: 0 0 40px hsl(152 65% 68% / 0.3);
 
+        /* Heat accent: used only for temperature (hotend glow, hot end of the
+           thermometer, molten metal). Mint stays the brand and action colour. */
+        --ember: 22 95% 55%;
+
         /* Transitions */
         --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -104,6 +108,8 @@ All colors MUST be HSL.
 
         --shadow-soft: 0 4px 20px -2px hsl(152 55% 62% / 0.2);
         --shadow-glow: 0 0 40px hsl(152 65% 70% / 0.4);
+
+        --ember: 22 95% 57%;
     }
 }
 
@@ -157,6 +163,74 @@ All colors MUST be HSL.
         transition: var(--transition-smooth);
     }
 }
+/* ── Printed-in-place: the home page's signature ───────────────────────────
+   Things appear the way a printer makes them: bottom up, one layer at a time,
+   with visible layer lines. --layers sets how many steps the reveal takes and
+   --print-delay staggers pieces. The resting state is fully printed, so no-JS,
+   reduced motion and screenshots all get the finished page. */
+@layer components {
+    .layer-lines {
+        /* Real text, painted with horizontal layer lines. */
+        background-image: repeating-linear-gradient(
+            to bottom,
+            hsl(var(--foreground)) 0 0.036em,
+            hsl(160 22% 27%) 0.036em 0.044em
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+
+    .print-up {
+        animation: print-up var(--print-duration, 1.3s) steps(var(--layers, 22), end) var(--print-delay, 0s) both;
+    }
+
+    .nozzle-rise {
+        animation: nozzle-rise var(--print-duration, 1.3s) steps(var(--layers, 22), end) var(--print-delay, 0s) both;
+    }
+
+    /* Full-width track whose left edge carries the nozzle: translating by its own
+       width crosses the headline on the compositor, one pass per layer, then stops. */
+    .nozzle-sweep {
+        animation: nozzle-sweep calc(var(--print-duration, 1.3s) / var(--layers, 22)) linear var(--print-delay, 0s) var(--layers, 22) alternate both;
+    }
+
+    .marquee {
+        animation: marquee var(--marquee-duration, 40s) linear infinite;
+    }
+}
+
+@keyframes print-up {
+    from { clip-path: inset(100% -5% 0 -5%); }
+    to { clip-path: inset(-10% -5% 0 -5%); }
+}
+
+@keyframes nozzle-rise {
+    0% { bottom: 0; opacity: 1; }
+    99% { opacity: 1; }
+    100% { bottom: 100%; opacity: 0; }
+}
+
+@keyframes nozzle-sweep {
+    from { transform: translateX(0); }
+    to { transform: translateX(100%); }
+}
+
+@keyframes marquee {
+    to { transform: translateX(-50%); }
+}
+
+/* The hero's scroll cue: a light running down a hairline. */
+@keyframes cue {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(200%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .print-up, .nozzle-rise, .nozzle-sweep, .marquee { animation: none !important; }
+    .nozzle-rise { display: none; }
+}
+
 /* Respects the OS-level reduced-motion preference. Was entirely absent despite
    the project using tailwindcss-animate, GSAP, and Framer Motion -- someone
    with motion sensitivity had no way to opt out of any animation on this site. */

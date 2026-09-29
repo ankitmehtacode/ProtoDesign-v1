@@ -64,7 +64,7 @@ export const PAGES = {
         title: "3D Printing Service & 3D Printers in India | ProtoDesign",
         description:
             "Instant 3D printing quotes: upload an STL or OBJ file, printed in PLA, PETG or ABS and delivered across India. Shop 3D printers and filament too.",
-        h1: "3D printing service and 3D printers, delivered across India",
+        h1: "Make it real: 3D printing service and 3D printers in India",
         intro: "Upload a model for an instant quote, or shop the printers, filament and resin we print with. Based in Indore, shipping across India: metro cities in 3–5 working days, the rest of India in 5–7.",
     },
     "/custom": {

@@ -26,6 +26,7 @@ router.get('/admin/all', authMiddleware, isAdmin, async (req, res, next) => {
                 o.id, o.created_at, o.status,
                 o.total_amount, o.subtotal_amount, o.tax_amount, o.shipping_amount,
                 o.shipping_address, o.user_id,
+                o.payment_gateway, o.payment_status,
                 u.email as user_email, u.full_name as user_name,
                 COALESCE(json_agg(
                                  json_build_object(

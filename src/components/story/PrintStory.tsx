@@ -1,18 +1,20 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Volume2, VolumeX } from "lucide-react";
 import { gsap, refreshInPageOrder } from "@/lib/gsap";
-import logoMark from "@/assets/logo-mark-dark.webp";
+import { MAX_MODEL_MB } from "@/lib/quote";
+import { PRIMARY_CTA, SECTION_TITLE } from "@/components/home/cta";
 import { PrintAudio } from "./printAudio";
 import { Smoke } from "./smoke";
 
 /*
- * The print job, told as a race. The section is a printer's textured build
- * plate; scrolling runs a two-filament job that prints an F1 car layer by
- * layer (each layer a lap), styled like F1 broadcast graphics. When the print
- * is done the part is cleaned up into the finished car, which does a burnout
- * and launches off the bed with tyre smoke and, if the visitor turns it on,
- * engine sound.
+ * What happens to a customer's file, told on a printer's build plate. Scrolling
+ * runs a two-filament job that prints a model car layer by layer while a status
+ * line and a four-step rail (upload, print, finish, ship) narrate the order.
+ * When the print is done the part is cleaned up into the finished car, which
+ * launches off the bed ("shipped") with tyre smoke and, if the visitor turns it
+ * on, engine sound.
  *
  * Precision: the nozzle follows a real toolpath. The car is rasterised once
  * to find where each layer has material; the nozzle traces each layer edge to
@@ -72,8 +74,8 @@ function bar(x1: number, y1: number, x2: number, y2: number, w: number): Shape {
  */
 const PARTS: Part[] = [
     {
-        id: "body", name: "Matte red", letter: "R", ring: "hsl(352 80% 50%)",
-        base: "hsl(352 68% 34%)", hi: "hsl(352 52% 46%)", lo: "hsl(354 72% 17%)",
+        id: "body", name: "Mint", letter: "G", ring: "hsl(152 55% 58%)",
+        base: "hsl(152 45% 40%)", hi: "hsl(152 50% 56%)", lo: "hsl(158 55% 18%)",
         shapes: [
             // Nose, monocoque, cockpit rim, headrest, airbox, engine cover, coke bottle.
             { kind: "path", d: "M 958 251 C 905 238 830 214 762 204 C 715 198 668 191 634 188 L 510 189 C 507 172 501 153 494 145 Q 489 140 480 141 L 468 142 C 428 150 332 184 252 209 C 214 220 182 227 160 231 L 152 250 L 236 262 C 262 270 290 280 320 284 L 660 284 C 690 272 720 258 762 250 C 840 253 918 262 956 262 C 966 262 968 254 958 251 Z" },
@@ -86,7 +88,7 @@ const PARTS: Part[] = [
         ],
     },
     {
-        id: "carbon", name: "Satin black", letter: "B", ring: "hsl(0 0% 92%)",
+        id: "carbon", name: "Satin black", letter: "B", ring: "hsl(220 7% 22%)",
         base: "hsl(220 7% 11%)", hi: "hsl(220 6% 26%)", lo: "hsl(220 10% 4%)",
         shapes: [
             // Floor, curled leading edge, plank.
@@ -249,24 +251,32 @@ function rasterise() {
     return { partAt, extents };
 }
 
-// --- Race control ------------------------------------------------------------
+// --- Narration -----------------------------------------------------------------
 
 type Phase = "intro" | "print" | "done" | "finished" | "launched";
 
-function raceControl(phase: Phase, layer: number, homed: boolean): string {
+const STEPS = ["You upload", "We print", "We finish", "It ships"];
+
+const stepOf = (phase: Phase) =>
+    phase === "intro" ? 0 : phase === "print" ? 1 : phase === "launched" ? 3 : 2;
+
+function statusLine(phase: Phase, layer: number, homed: boolean): string {
     switch (phase) {
-        case "intro": return homed ? "On the grid" : "Formation lap";
-        case "print": return layer < 20 ? "Sector 1 · tyres, floor" : layer < 60 ? "Sector 2 · chassis, sidepods" : "Sector 3 · halo, airbox, wing";
-        case "done": return "Chequered flag";
-        case "finished": return "Parc fermé";
-        case "launched": return "Lights out";
+        case "intro": return homed ? "Nozzle at 220°. First layer going down." : "File checked and sliced into 100 layers. Heating up.";
+        case "print": return layer < 20 ? "Layer by layer: wheels and floor" : layer < 60 ? "Layer by layer: chassis and sidepods" : "Layer by layer: halo, airbox and wing";
+        case "done": return "Printed. Now it gets cleaned up.";
+        case "finished": return "Cleaned, checked and packed.";
+        case "launched": return "Shipped. On its way to you.";
     }
 }
 
-// Textured PEI build plate: fine gold speckle over warm black.
-const PLATE_NOISE = `url("data:image/svg+xml,${encodeURIComponent(
-    "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.85  0 0 0 0 0.66  0 0 0 0 0.35  0 0 0 1.6 -0.9'/></filter><rect width='100%' height='100%' filter='url(#n)' opacity='0.55'/></svg>",
+// Build plate speckle: dark flecks on the light smooth sheet, gold flecks on the
+// dark textured sheet the dark theme uses.
+const speckle = (r: number, g: number, b: number, opacity: number) => `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 ${r}  0 0 0 0 ${g}  0 0 0 0 ${b}  0 0 0 1.6 -0.9'/></filter><rect width='100%' height='100%' filter='url(#n)' opacity='${opacity}'/></svg>`,
 )}")`;
+const PLATE_LIGHT = `radial-gradient(ellipse 70% 50% at 50% 55%, hsl(0 0% 100% / 0.75), transparent 70%), ${speckle(0.45, 0.38, 0.26, 0.35)}`;
+const PLATE_DARK = `radial-gradient(ellipse 70% 45% at 50% 52%, hsl(152 40% 45% / 0.16), transparent 72%), ${speckle(0.55, 0.78, 0.66, 0.4)}`;
 
 // Timeline positions (timeline seconds, mapped onto scroll).
 const T_HEAT = 1.0;
@@ -285,12 +295,12 @@ const heatColour = (f: number) => `hsl(${Math.round(210 - 210 * f)} 85% 55%)`;
 
 // --- Component --------------------------------------------------------------
 
-/** Temperature readout, styled like a tyre-temperature box. */
+/** Temperature readout with a heat bar. */
 const Temp = ({ label, hud, value }: { label: string; hud: string; value: number }) => (
     <div className="min-w-[4.5rem]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">{label}</p>
-        <p className="text-lg font-bold italic leading-tight tabular-nums text-white"><span data-hud={hud}>{value}°</span></p>
-        <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-lg font-semibold leading-tight tabular-nums"><span data-hud={hud}>{value}°</span></p>
+        <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-foreground/10">
             <div data-bar={hud} className="h-full w-full origin-left rounded-full" style={{ backgroundColor: heatColour(1) }} />
         </div>
     </div>
@@ -362,6 +372,7 @@ export const PrintStory = () => {
                     bedBar: one<HTMLElement>("[data-bar=bed]"),
                     status: one<HTMLElement>("[data-hud=status]"),
                 };
+                const steps = q<HTMLElement>("[data-step]");
 
                 const smoke = new Smoke(smokeCanvas);
                 const resize = new ResizeObserver(() => smoke.resize());
@@ -383,7 +394,7 @@ export const PrintStory = () => {
                     bead.style.fill = PARTS[i].hi;
                     slots.forEach((el, k) => el.toggleAttribute("data-active", k === i));
                     // Thin black parts (suspension, halo) swap filament several times a
-                    // layer; one pit stop call-out and click at a time, not a burst.
+                    // layer; one call-out and click at a time, not a burst.
                     if (printing && performance.now() >= pitStopUntil) {
                         pitStopUntil = performance.now() + 700;
                         audio()?.click();
@@ -462,7 +473,7 @@ export const PrintStory = () => {
                         gsap.set(pan, { x: -Math.min(overflow, Math.max(0, centred)) });
                     }
 
-                    // Broadcast graphics.
+                    // Readouts.
                     const nozzleF = job.heat * (1 - 0.35 * job.park);
                     hud.lap.textContent = String(tip.l + (job.p >= 1 ? 1 : job.p > 0 ? 1 : 0)).padStart(3, "0");
                     hud.nozzle.textContent = `${Math.round(ROOM_C + (NOZZLE_C - ROOM_C) * nozzleF)}°`;
@@ -470,9 +481,12 @@ export const PrintStory = () => {
                     gsap.set(hud.nozzleBar, { scaleX: nozzleF, backgroundColor: heatColour(nozzleF) });
                     gsap.set(hud.bedBar, { scaleX: job.heat, backgroundColor: heatColour(job.heat) });
 
+                    const phase = phaseNow();
+                    const step = stepOf(phase);
+                    steps.forEach((el, k) => el.toggleAttribute("data-active", k <= step));
                     const status = performance.now() < pitStopUntil && printing
-                        ? `Pit stop · ${PARTS[activePart].name.toLowerCase()}`
-                        : raceControl(phaseNow(), tip.l, job.home >= 1);
+                        ? `Switching filament: ${PARTS[activePart].name.toLowerCase()}`
+                        : statusLine(phase, tip.l, job.home >= 1);
                     if (status !== lastStatus) {
                         lastStatus = status;
                         hud.status.textContent = status;
@@ -573,7 +587,7 @@ export const PrintStory = () => {
                     scrollTrigger: {
                         trigger: section,
                         start: "top top",
-                        end: phone ? "+=460%" : "+=420%",
+                        end: phone ? "+=260%" : "+=240%",
                         pin: true,
                         scrub: phone ? 0.4 : 0.7,
                         anticipatePin: 1,
@@ -627,6 +641,7 @@ export const PrintStory = () => {
                     audio()?.setFan(0);
                     delete section.dataset.motion;
                     slots.forEach((el) => el.removeAttribute("data-active"));
+                    steps.forEach((el) => el.setAttribute("data-active", ""));
                 };
             },
         );
@@ -639,52 +654,43 @@ export const PrintStory = () => {
         <section
             ref={sectionRef}
             aria-labelledby="job-heading"
-            className="group relative overflow-hidden text-[hsl(40_20%_92%)]"
-            style={{
-                backgroundColor: "hsl(28 12% 11%)",
-                backgroundImage: `radial-gradient(ellipse 70% 45% at 50% 52%, hsl(34 48% 58% / 0.30), transparent 72%), ${PLATE_NOISE}`,
-            }}
+            className="group relative overflow-hidden border-y border-border bg-[hsl(40_16%_93%)] text-foreground [background-image:var(--plate-light)] dark:bg-[hsl(160_28%_8%)] dark:[background-image:var(--plate-dark)]"
+            style={{ "--plate-light": PLATE_LIGHT, "--plate-dark": PLATE_DARK } as CSSProperties}
         >
             {/* Exactly one screen tall: a pinned section taller than the viewport hides its own ending */}
             <div className="relative flex h-[100svh] flex-col px-4 pb-6 pt-24 md:px-10 md:pt-28">
-                <h2 id="job-heading" className="sr-only">An F1 car, 3D printed layer by layer</h2>
+                <header className="relative z-10 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="max-w-2xl">
+                        <h2 id="job-heading" className={SECTION_TITLE}>Watch a file become a thing.</h2>
+                        {/* The narrator: one line, in the customer's terms */}
+                        <p className="mt-2 min-h-[1.5em] text-muted-foreground md:text-lg">
+                            <span data-hud="status">{statusLine("finished", LAYERS, true)}</span>
+                        </p>
+                    </div>
 
-                {/* Broadcast graphics: the print job as a race */}
-                <header className="relative z-10 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-3 md:flex md:items-center md:justify-between">
-                    {/* Timing tower: one layer is one lap */}
-                    <div className="flex items-center gap-3">
-                        <img src={logoMark} alt="ProtoDesign" width={247} height={256} loading="lazy" className="h-9 w-auto" />
-                        <div className="leading-none">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">Lap</p>
-                            <p className="text-3xl font-bold italic tabular-nums tracking-tight">
+                    <div className="flex items-end gap-4 md:gap-5">
+                        <div className="min-w-[4.5rem]">
+                            <p className="text-xs font-medium text-muted-foreground">Layer</p>
+                            <p className="text-lg font-semibold leading-tight tabular-nums">
                                 <span data-hud="lap">{LAYERS}</span>
-                                <span className="text-base text-white/40">/{LAYERS}</span>
+                                <span className="text-sm font-normal text-muted-foreground">/{LAYERS}</span>
                             </p>
+                            <div className="mt-1 h-[3px]" />
                         </div>
-                    </div>
-
-                    {/* Race control: the only narrator */}
-                    <div className="justify-self-end border-l-[3px] border-[hsl(48_100%_55%)] bg-black/35 px-3 py-1.5 backdrop-blur-sm md:order-last md:min-w-[15rem]">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[hsl(48_100%_60%)]">Race control</p>
-                        <p data-hud="status" className="text-sm font-bold uppercase italic tracking-wide text-white">Parc fermé</p>
-                    </div>
-
-                    {/* Temperatures read like tyre temps; filaments are the compounds */}
-                    <div className="col-span-2 flex items-end gap-4 md:col-span-1 md:gap-5">
                         <Temp label="Nozzle" hud="nozzle" value={NOZZLE_C} />
                         <Temp label="Bed" hud="bed" value={BED_C} />
                         <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">Compound</p>
+                            <p className="text-xs font-medium text-muted-foreground">Filament</p>
                             <div className="mt-1 flex gap-1.5">
                                 {PARTS.map((p) => (
                                     <span
                                         key={p.id}
                                         data-slot
                                         title={p.name}
-                                        className="flex h-7 w-7 items-center justify-center rounded-full border-[3px] bg-black/60 text-[11px] font-bold italic opacity-40 transition-all duration-200 data-[active]:scale-110 data-[active]:opacity-100"
-                                        style={{ borderColor: p.ring }}
+                                        className="h-6 w-6 rounded-full border-[3px] opacity-35 transition-all duration-200 data-[active]:scale-110 data-[active]:opacity-100"
+                                        style={{ borderColor: p.ring, backgroundColor: p.base }}
                                     >
-                                        {p.letter}
+                                        <span className="sr-only">{p.name}</span>
                                     </span>
                                 ))}
                             </div>
@@ -693,20 +699,19 @@ export const PrintStory = () => {
                             type="button"
                             onClick={toggleSound}
                             aria-pressed={soundOn}
-                            className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/15 px-3 text-[11px] font-semibold uppercase tracking-[0.15em] text-white/70 transition-colors hover:text-white md:ml-2"
+                            aria-label={soundOn ? "Turn sound off" : "Turn sound on"}
+                            className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card/70 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:ml-2"
                         >
                             {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                            <span className="sr-only sm:not-sr-only">Sound</span>
                         </button>
                     </div>
                 </header>
-
 
                 {/* The bed. Phones clip here for the tracking shot; wider screens clip only
                     vertically, so the car can run to the viewport edge. */}
                 <div data-bed className="relative flex min-h-0 flex-1 items-center overflow-hidden md:justify-center md:overflow-x-visible md:overflow-y-clip">
                     <div data-pan className="w-[190vw] shrink-0 will-change-transform md:flex md:h-full md:w-full md:max-w-[1200px] md:items-center md:justify-center">
-                        <svg data-svg viewBox={`0 ${VB_Y} ${VB_W} ${VB_H}`} className="block h-auto w-full overflow-visible md:max-h-full" role="img" aria-label="A matte red and black F1 car being 3D printed layer by layer, then driving away">
+                        <svg data-svg viewBox={`0 ${VB_Y} ${VB_W} ${VB_H}`} className="block h-auto w-full overflow-visible md:max-h-full" role="img" aria-label="A green and black model race car being 3D printed layer by layer, finished, then driving off to be shipped">
                             <defs>
                                 <clipPath id="job-car">{PARTS.map((p) => <Shapes key={p.id} part={p} />)}</clipPath>
                                 {PARTS.map((p) => (
@@ -801,27 +806,27 @@ export const PrintStory = () => {
                             </defs>
 
                             {/* Bed edge; skid marks stay behind after the launch */}
-                            <rect x="-40" y={GROUND} width={VB_W + 80} height="3" fill="white" fillOpacity="0.08" />
+                            <rect x="-40" y={GROUND} width={VB_W + 80} height="3" className="fill-foreground" fillOpacity="0.08" />
                             <g data-skid opacity="0">
                                 {WHEELS.map((w) => (
-                                    <rect key={w.cx} x={w.cx - 20} y={GROUND - 3} width="260" height="5" rx="2.5" fill="black" fillOpacity="0.7" />
+                                    <rect key={w.cx} x={w.cx - 20} y={GROUND - 3} width="260" height="5" rx="2.5" fill="black" fillOpacity="0.35" />
                                 ))}
                             </g>
 
                             {/* Slicer preview: a ghost of the part before it exists */}
                             <g data-preview clipPath="url(#job-car)" opacity="0">
-                                <rect x="0" y={TOP - 10} width={VB_W} height={GROUND - TOP + 30} fill="white" fillOpacity="0.07" />
+                                <rect x="0" y={TOP - 10} width={VB_W} height={GROUND - TOP + 30} className="fill-foreground" fillOpacity="0.07" />
                             </g>
 
                             {/* Speed lines the car leaves behind */}
                             <g aria-hidden>
                                 {[150, 178, 206, 232, 258, 284].map((y, i) => (
-                                    <rect key={y} data-speedline x={-200 + i * 40} y={y} width={1000 - i * 60} height="3" rx="1.5" fill="hsl(40 40% 96%)" opacity="0" />
+                                    <rect key={y} data-speedline x={-200 + i * 40} y={y} width={1000 - i * 60} height="3" rx="1.5" fill="hsl(160 15% 45%)" opacity="0" />
                                 ))}
                             </g>
 
                             <g data-drive>
-                                <ellipse data-shadow cx="500" cy={GROUND + 14} rx="470" ry="9" fill="black" fillOpacity="0.55" />
+                                <ellipse data-shadow cx="500" cy={GROUND + 14} rx="470" ry="9" fill="black" fillOpacity="0.22" />
                                 <g data-car>
                                     <g data-squat>
                                         {/* Raw print */}
@@ -1001,24 +1006,28 @@ export const PrintStory = () => {
                 {/* Tyre smoke, over the bed, under the copy */}
                 <canvas data-smoke aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" />
 
+                {/* Where the order is: all four done in the static render */}
+                <ol aria-label="Order steps" className="relative z-10 grid grid-cols-4 gap-2 md:gap-4">
+                    {STEPS.map((label) => (
+                        <li key={label} data-step data-active="" className="group/step text-xs text-muted-foreground transition-colors duration-300 data-[active]:text-foreground md:text-sm">
+                            <span className="mb-2 block h-1 rounded-full bg-foreground/10 transition-colors duration-300 group-data-[active]/step:bg-primary" />
+                            {label}
+                        </li>
+                    ))}
+                </ol>
+
                 {/* Payoff. Static (no-JS, reduced motion): below the parked car. Animated:
-                    the car has driven off, so it takes the car's place on the empty bed. On
-                    phones the parked gantry crosses mid-screen, so it sits in the empty
-                    lower half instead. The wrapper positions; GSAP owns the inner transform. */}
-                <div className="pointer-events-none relative z-10 flex justify-center group-data-[motion=on]:absolute group-data-[motion=on]:inset-0 group-data-[motion=on]:items-end group-data-[motion=on]:px-4 group-data-[motion=on]:pb-12 md:group-data-[motion=on]:items-center md:group-data-[motion=on]:pb-0 md:group-data-[motion=on]:pt-16">
+                    the car has driven off, so it takes the car's place on the empty bed. The
+                    wrapper positions; GSAP owns the inner transform. */}
+                <div className="pointer-events-none relative z-10 flex justify-center pt-6 group-data-[motion=on]:absolute group-data-[motion=on]:inset-0 group-data-[motion=on]:items-center group-data-[motion=on]:px-4 group-data-[motion=on]:pt-24">
                     <div data-cta className="pointer-events-auto flex max-w-xl flex-col items-center text-center">
-                        <p className="text-balance font-display text-4xl leading-[1.05] md:text-6xl">That car started as a&nbsp;file.</p>
-                        <p className="mt-4 max-w-[26rem] text-pretty text-sm leading-relaxed text-white/65 md:text-base">
-                            Send us yours: STL or OBJ, up to 200&nbsp;MB. We quote, print and ship&nbsp;it.
+                        <p className="text-balance font-display text-4xl leading-[1.05] md:text-6xl">Your file is&nbsp;next.</p>
+                        <p className="mt-4 max-w-[26rem] text-pretty text-muted-foreground md:text-lg">
+                            STL or OBJ, up to {MAX_MODEL_MB}&nbsp;MB. You see the price before you send&nbsp;anything.
                         </p>
-                        <div className="mt-6 flex flex-wrap justify-center gap-3">
-                            <Link to="/custom" className="group/cta inline-flex min-h-11 items-center gap-2 rounded-full bg-[hsl(352_68%_40%)] px-5 font-medium text-white transition-transform active:scale-95">
-                                Upload your file <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-1" />
-                            </Link>
-                            <Link to="/printers" className="inline-flex min-h-11 items-center rounded-full border border-white/20 px-5 font-medium text-white/85 transition-colors hover:border-white/40">
-                                Shop printers
-                            </Link>
-                        </div>
+                        <Link to="/custom" className={`mt-6 ${PRIMARY_CTA}`}>
+                            Get my price <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-1" />
+                        </Link>
                     </div>
                 </div>
             </div>

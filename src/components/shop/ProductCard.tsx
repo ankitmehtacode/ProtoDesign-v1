@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, Heart, Loader2, Plus, Star } from 'lucide-react';
 import { formatINR } from '@/lib/currency';
-import { CATEGORY_LABELS, Product, isMadeToOrder, productImageUrls as imageUrls } from './product';
+import { CATEGORY_LABELS, Product, isMadeToOrder, productImageUrls as imageUrls, sizedImage, sizedSrcSet } from './product';
 
 // Only genuinely scarce stock earns the badge; flagging most of the catalog would make it noise.
 const LOW_STOCK_THRESHOLD = 3;
@@ -28,8 +28,8 @@ function statusBadge(product: Product): { label: string; tone: 'alert' | 'brand'
 }
 
 const BADGE_TONES = {
-    alert: 'bg-amber-100 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200',
-    brand: 'bg-accent text-accent-foreground',
+    alert: 'bg-amber-500/15 text-amber-300 dark:bg-amber-400/15 dark:text-amber-200',
+    brand: 'bg-primary text-primary-foreground', // 9.5:1; accent was 3.7:1 in dark
     muted: 'bg-foreground/80 text-background',
 } as const;
 
@@ -80,7 +80,8 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                 {images.length > 0 ? (
                     <>
                         <img
-                            src={images[0]}
+                            src={sizedImage(images[0], 600)}
+                            srcSet={sizedSrcSet(images[0], 600)}
                             alt={product.name}
                             loading={index < 4 ? 'eager' : 'lazy'}
                             className={`absolute inset-0 h-full w-full object-contain p-5 mix-blend-multiply transition duration-500 ease-out group-hover:scale-105 dark:mix-blend-normal ${images.length > 1 ? 'group-hover:opacity-0' : ''} ${soldOut ? 'opacity-50 grayscale' : ''}`}
@@ -89,7 +90,8 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                         {images.length > 1 && (
                             // Second angle on hover: a faster "look closer" than carousel arrows.
                             <img
-                                src={images[1]}
+                                src={sizedImage(images[1], 600)}
+                                srcSet={sizedSrcSet(images[1], 600)}
                                 alt=""
                                 aria-hidden
                                 loading="lazy"
@@ -158,7 +160,7 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                         aria-label={soldOut ? `${product.name} is sold out` : `Add ${product.name} to cart`}
                         className={`relative z-10 flex h-10 items-center justify-center gap-1.5 overflow-hidden rounded-full px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
                             cartState === 'added'
-                                ? 'bg-accent text-accent-foreground'
+                                ? 'bg-secondary text-primary'
                                 : soldOut
                                     ? 'bg-muted text-muted-foreground'
                                     : 'bg-primary text-primary-foreground hover:bg-primary/85'

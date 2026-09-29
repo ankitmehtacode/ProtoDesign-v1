@@ -301,7 +301,7 @@ export default function Profile() {
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline">{addr.label}</Badge>
-                                                {(addr.is_default || addr.isDefault) && <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Default</Badge>}
+                                                {(addr.is_default || addr.isDefault) && <Badge className="bg-green-500/15 text-green-300 hover:bg-green-500/20">Default</Badge>}
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditAddress(addr)}><Edit2 className="w-3.5 h-3.5" /></Button>
@@ -443,11 +443,11 @@ export default function Profile() {
 
                                             {/* Admin Notes */}
                                             {selectedQuote.admin_notes && (
-                                                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2">
+                                                <div className="bg-blue-500/15 dark:bg-blue-950 border border-blue-500/30 dark:border-blue-800 p-4 rounded-lg">
+                                                    <h4 className="font-semibold text-blue-300 dark:text-blue-300 mb-2 flex items-center gap-2">
                                                         <Shield className="w-4 h-4"/> Admin Response
                                                     </h4>
-                                                    <p className="text-sm text-blue-900 dark:text-blue-100">{selectedQuote.admin_notes}</p>
+                                                    <p className="text-sm text-blue-300 dark:text-blue-100">{selectedQuote.admin_notes}</p>
                                                 </div>
                                             )}
 

@@ -66,7 +66,7 @@ const ForgotPassword = () => {
                         </form>
                     ) : (
                         <div className="text-center space-y-4">
-                            <div className="bg-green-50 text-green-700 p-4 rounded-lg text-sm">
+                            <div className="bg-green-500/15 text-green-300 p-4 rounded-lg text-sm">
                                 If an account exists for <strong>{email}</strong>, we have sent a password reset link.
                             </div>
                             <Button

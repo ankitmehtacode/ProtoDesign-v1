@@ -41,10 +41,10 @@ const short = (id: string) => id.slice(0, 8).toUpperCase();
 const when = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 const STATUS_STYLE: Record<string, string> = {
-    failed: "text-red-600",
-    skipped: "text-amber-600",
-    read: "text-green-600",
-    delivered: "text-green-600",
+    failed: "text-red-300",
+    skipped: "text-amber-300",
+    read: "text-green-300",
+    delivered: "text-green-300",
 };
 
 /**
@@ -125,7 +125,7 @@ export function WhatsAppPanel() {
                                     <div className="min-w-0">
                                         <div className="font-medium flex items-center gap-2">
                                             {c.profile_name || `+${c.wa_id}`}
-                                            {c.window_open && <Badge variant="outline" className="text-green-700 border-green-300">Can reply</Badge>}
+                                            {c.window_open && <Badge variant="outline" className="text-green-300 border-green-500/30">Can reply</Badge>}
                                             {c.opted_out_at && <Badge variant="secondary">Opted out</Badge>}
                                         </div>
                                         <div className="text-sm text-muted-foreground truncate">
@@ -155,7 +155,7 @@ export function WhatsAppPanel() {
                                     <span>+{f.wa_id}</span>
                                     {f.order_id && <span>Order #{short(f.order_id)}</span>}
                                     {f.quote_id && <span>Quote #{short(f.quote_id)}</span>}
-                                    <span className="text-red-600">{f.error_code}: {f.error_message}</span>
+                                    <span className="text-red-300">{f.error_code}: {f.error_message}</span>
                                 </li>
                             ))}
                         </ul>

@@ -28,10 +28,10 @@ function makeSprite(seed: number): HTMLCanvasElement {
         const x = SPRITE_PX / 2 + (rand() - 0.5) * SPRITE_PX * 0.35;
         const y = SPRITE_PX / 2 + (rand() - 0.5) * SPRITE_PX * 0.35;
         const grad = g.createRadialGradient(x, y, 0, x, y, r);
-        // Warm-grey: the bed light tints the smoke slightly.
-        grad.addColorStop(0, "rgba(232,228,220,0.32)");
-        grad.addColorStop(0.55, "rgba(214,210,202,0.12)");
-        grad.addColorStop(1, "rgba(200,196,188,0)");
+        // Mid warm-grey: reads as smoke against the light build plate.
+        grad.addColorStop(0, "rgba(120,116,108,0.30)");
+        grad.addColorStop(0.55, "rgba(140,136,128,0.12)");
+        grad.addColorStop(1, "rgba(150,146,138,0)");
         g.fillStyle = grad;
         g.beginPath();
         g.arc(x, y, r, 0, Math.PI * 2);

@@ -52,7 +52,7 @@ export const PaymentGatewaySelector = ({
             id: 'phonepe',
             name: 'PhonePe (Online)',
             description: 'UPI, Cards, Net Banking',
-            icon: <CreditCard className="w-6 h-6 text-purple-600" />,
+            icon: <CreditCard className="w-6 h-6 text-purple-300" />,
         }
     ];
 
@@ -62,13 +62,13 @@ export const PaymentGatewaySelector = ({
             id: 'cod',
             name: 'Cash on Delivery',
             description: 'Pay when your order arrives',
-            icon: <Banknote className="w-6 h-6 text-green-600" />,
+            icon: <Banknote className="w-6 h-6 text-green-300" />,
         });
     }
 
     return (
         <div className="space-y-6">
-            <div className="text-center bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">
+            <div className="text-center bg-muted/30 p-4 rounded-xl border border-dashed border-border">
                 <h3 className="text-xl font-bold flex items-center justify-center gap-2">
                     <ShieldCheck className="text-primary w-5 h-5" /> Select Payment Method
                 </h3>
@@ -85,7 +85,7 @@ export const PaymentGatewaySelector = ({
                             className={`p-5 cursor-pointer transition-all border-2 ${
                                 selectedGateway === gateway.id
                                     ? 'border-primary bg-primary/[0.02] shadow-sm'
-                                    : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                                    : 'border-border hover:border-border hover:bg-muted/30'
                             }`}
                             onClick={() => handleSelect(gateway.id)}
                         >
@@ -97,7 +97,7 @@ export const PaymentGatewaySelector = ({
                                 />
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-1">
-                                        <div className="p-2 bg-white rounded-lg shadow-sm">{gateway.icon}</div>
+                                        <div className="p-2 bg-card rounded-lg shadow-sm">{gateway.icon}</div>
                                         <Label
                                             htmlFor={gateway.id}
                                             className="text-lg font-bold cursor-pointer"

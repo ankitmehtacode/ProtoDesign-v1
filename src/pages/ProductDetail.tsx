@@ -126,7 +126,7 @@ const StarRating = ({ rating, interactive = false, onRate, size = 16 }: { rating
                     key={star}
                     size={size}
                     className={`transition-colors duration-200 ${interactive ? 'cursor-pointer' : ''} 
-            ${star <= (hover || rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+            ${star <= (hover || rating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/60'}`}
                     onClick={() => interactive && onRate && onRate(star)}
                     onMouseEnter={() => interactive && setHover(star)}
                     onMouseLeave={() => interactive && setHover(0)}
@@ -151,7 +151,7 @@ const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
 
     return (
         <div
-            className="relative w-full h-full overflow-hidden bg-white rounded-2xl border border-border/50 cursor-crosshair flex items-center justify-center group"
+            className="relative w-full h-full overflow-hidden bg-card rounded-2xl border border-border/50 cursor-crosshair flex items-center justify-center group"
             onMouseEnter={() => setShowZoom(true)}
             onMouseLeave={() => setShowZoom(false)}
             onMouseMove={handleMouseMove}
@@ -163,7 +163,7 @@ const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
                 className={`w-full h-full object-contain p-4 transition-opacity duration-200 ${showZoom ? 'opacity-0' : 'opacity-100'}`}
             />
             {showZoom && (
-                <div className="absolute inset-0 overflow-hidden bg-white pointer-events-none">
+                <div className="absolute inset-0 overflow-hidden bg-card pointer-events-none">
                     <img
                         src={src}
                         alt={`${alt} zoomed`}
@@ -608,20 +608,20 @@ const ProductDetail = () => {
         <div className="min-h-screen bg-background pt-24 pb-16 font-sans relative">
 
             {isAdmin && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground/90 text-background backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-white/20 flex items-center gap-4 transition-all">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground/90 text-background backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-background/20 flex items-center gap-4 transition-all">
                     {!isEditing ? (
                         <Button onClick={startEditing} variant="secondary" className="rounded-full gap-2 font-bold shadow-lg">
                             <PenLine size={16} /> Edit Page
                         </Button>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <Button size="icon" variant="ghost" className="text-white hover:bg-white/20 rounded-full" onClick={handleUndo} disabled={historyIndex <= 0}>
+                            <Button size="icon" variant="ghost" className="text-background hover:bg-background/20 hover:text-background rounded-full" onClick={handleUndo} disabled={historyIndex <= 0}>
                                 <Undo size={18} />
                             </Button>
-                            <Button size="icon" variant="ghost" className="text-white hover:bg-white/20 rounded-full" onClick={handleRedo} disabled={historyIndex >= history.length - 1}>
+                            <Button size="icon" variant="ghost" className="text-background hover:bg-background/20 hover:text-background rounded-full" onClick={handleRedo} disabled={historyIndex >= history.length - 1}>
                                 <Redo size={18} />
                             </Button>
-                            <div className="w-px h-6 bg-white/20 mx-2" />
+                            <div className="w-px h-6 bg-background/20 mx-2" />
                             <Button variant="destructive" size="sm" onClick={cancelEditing} className="rounded-full">
                                 <X size={16} className="mr-1" /> Cancel
                             </Button>
@@ -646,7 +646,7 @@ const ProductDetail = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24">
                     <div className="space-y-6 top-24 h-fit">
-                        <div className="w-[85%] mx-auto aspect-[4/5] bg-white rounded-2xl shadow-sm border border-border/50 relative z-10 flex items-center justify-center overflow-hidden">
+                        <div className="w-[85%] mx-auto aspect-[4/5] bg-card rounded-2xl shadow-sm border border-border/50 relative z-10 flex items-center justify-center overflow-hidden">
                             {activeImage && isVideo(activeImage) ? (
                                 <video src={activeImage} controls autoPlay muted loop className="w-full h-full object-contain" />
                             ) : (
@@ -664,7 +664,7 @@ const ProductDetail = () => {
                                             </div>
                                             <div className="text-sm">
                                                 {editState.videoPreview ? (
-                                                    <span className="font-medium text-green-600">New video selected</span>
+                                                    <span className="font-medium text-green-300">New video selected</span>
                                                 ) : editState.deleteVideo ? (
                                                     <span className="font-medium text-red-500 line-through">Video deleted</span>
                                                 ) : product.video_url ? (
@@ -681,7 +681,7 @@ const ProductDetail = () => {
                                                 </Button>
                                             )}
                                             {!editState.deleteVideo && (product.video_url || editState.videoFile) && (
-                                                <Button size="icon" variant="ghost" onClick={handleRemoveVideo} className="h-8 w-8 text-red-500 hover:bg-red-50">
+                                                <Button size="icon" variant="ghost" onClick={handleRemoveVideo} className="h-8 w-8 text-red-500 hover:bg-red-500/20">
                                                     <Trash2 size={16} />
                                                 </Button>
                                             )}
@@ -717,12 +717,12 @@ const ProductDetail = () => {
                                     <button
                                         key={idx}
                                         onClick={() => setActiveImage(img)}
-                                        className={`w-16 h-16 rounded-lg border-2 overflow-hidden relative bg-white
+                                        className={`w-16 h-16 rounded-lg border-2 overflow-hidden relative bg-card
                                             ${activeImage === img ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}
                                     >
                                         {isVideo(img) ? (
                                             <div className="w-full h-full flex items-center justify-center bg-black/10">
-                                                <Play size={20} className="text-gray-800" />
+                                                <Play size={20} className="text-foreground" />
                                             </div>
                                         ) : (
                                             <img src={img} className="w-full h-full object-contain" alt={`${product.name} gallery image ${idx}`} />
@@ -761,12 +761,12 @@ const ProductDetail = () => {
                                             value={editState.allowCodOverride ? "true" : "false"} 
                                             onValueChange={val => updateEditState({ allowCodOverride: val === "true" })}
                                         >
-                                            <SelectTrigger className={`w-[150px] h-8 text-xs font-bold ${editState.allowCodOverride ? "border-green-500 bg-green-100 text-green-800" : ""}`}>
+                                            <SelectTrigger className={`w-[150px] h-8 text-xs font-bold ${editState.allowCodOverride ? "border-green-500 bg-green-500/15 text-green-300" : ""}`}>
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="false">Standard Rules</SelectItem>
-                                                <SelectItem value="true" className="text-green-700 font-bold">Force Enable COD</SelectItem>
+                                                <SelectItem value="true" className="text-green-300 font-bold">Force Enable COD</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -840,7 +840,7 @@ const ProductDetail = () => {
                             ) : (
                                 <>
                                     <p className="text-5xl font-bold text-foreground">{formatINR(product.price)}</p>
-                                    <p className={`mt-3 text-sm font-medium flex items-center gap-2 ${inStock ? 'text-green-600' : 'text-red-600'}`}>
+                                    <p className={`mt-3 text-sm font-medium flex items-center gap-2 ${inStock ? 'text-green-300' : 'text-red-300'}`}>
                                         {inStock ? <Check className="w-4 h-4"/> : null}
                                         {!inStock ? 'Out of Stock' : madeToOrder ? 'Made to order: printed after you order' : `${product.stock} In Stock & Ready to Ship`}
                                     </p>
@@ -890,7 +890,7 @@ const ProductDetail = () => {
                                                         className="h-8 font-medium text-foreground border-none bg-transparent focus-visible:ring-0 px-0"
                                                         placeholder="Value"
                                                     />
-                                                    <button onClick={() => handleRemoveSpec(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded shrink-0">
+                                                    <button onClick={() => handleRemoveSpec(item.id)} className="text-red-500 hover:bg-red-500/20 p-1 rounded shrink-0">
                                                         <X size={14}/>
                                                     </button>
                                                 </div>
@@ -978,7 +978,7 @@ const ProductDetail = () => {
                                                 <span className="font-bold text-sm block">{r.user}</span>
                                                 <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
                                                 {r.verified_purchase && (
-                                                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400"><BadgeCheck size={12} /> Verified purchase</span>
+                                                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-green-300 dark:text-green-400"><BadgeCheck size={12} /> Verified purchase</span>
                                                 )}
                                             </div>
                                             <StarRating rating={r.rating} size={14} />
@@ -1035,7 +1035,7 @@ const ProductDetail = () => {
                                             <CardContent className="p-4 flex-1 flex flex-col">
                                                 <div className="flex justify-between items-start mb-2 gap-2">
                                                     <h3 className="font-bold text-sm line-clamp-1 flex-1 leading-snug" title={related.name}>{related.name}</h3>
-                                                    {rating > 0 && (<div className="flex items-center gap-1 bg-yellow-50 px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-700 shrink-0"><Star size={10} className="fill-current" /> {rating.toFixed(1)}</div>)}
+                                                    {rating > 0 && (<div className="flex items-center gap-1 bg-yellow-500/15 px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-300 shrink-0"><Star size={10} className="fill-current" /> {rating.toFixed(1)}</div>)}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground mb-4 line-clamp-2 min-h-[2.5em]">{related.short_description || related.description}</p>
                                                 <div className="mt-auto flex items-center justify-between"><span className="font-bold text-lg text-primary">{formatINR(related.price)}</span><Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-sm"><ShoppingCart size={14} /></Button></div>

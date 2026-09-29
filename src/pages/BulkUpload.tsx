@@ -72,15 +72,15 @@ Ender 3 V3,18000,10,3d_printer,FDM,Starter Printer,Reliable FDM printer.,Build V
                 <CardContent className="space-y-6">
 
                     {/* ✅ UPDATED: Comprehensive Formatting Guide */}
-                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900 text-sm space-y-4">
-                        <div className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-400">
+                    <div className="bg-blue-500/15 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-500/30 dark:border-blue-900 text-sm space-y-4">
+                        <div className="flex items-center gap-2 font-semibold text-blue-300 dark:text-blue-400">
                             <Info size={16} /> CSV Formatting Guide
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Left Column: Essential */}
                             <div>
-                                <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-2">Required Columns</h4>
+                                <h4 className="font-bold text-blue-300 dark:text-blue-300 mb-2">Required Columns</h4>
                                 <ul className="list-disc pl-4 text-muted-foreground space-y-1">
                                     <li><b>name:</b> Product title.</li>
                                     <li><b>price:</b> Numbers only (e.g. <code>1200</code>). Symbols removed automatically.</li>
@@ -90,7 +90,7 @@ Ender 3 V3,18000,10,3d_printer,FDM,Starter Printer,Reliable FDM printer.,Build V
 
                             {/* Right Column: Special Formats */}
                             <div>
-                                <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-2">Special Formats</h4>
+                                <h4 className="font-bold text-blue-300 dark:text-blue-300 mb-2">Special Formats</h4>
                                 <ul className="list-disc pl-4 text-muted-foreground space-y-1">
                                     <li><b>New Lines:</b> Type <code>\n</code> in description for line breaks.</li>
                                     <li><b>Specs:</b> Format as <code>Key : Value;</code> (Use semicolon to separate).</li>
@@ -99,13 +99,13 @@ Ender 3 V3,18000,10,3d_printer,FDM,Starter Printer,Reliable FDM printer.,Build V
                             </div>
                         </div>
 
-                        <div className="pt-3 border-t border-blue-200 dark:border-blue-800">
-                            <h4 className="font-bold text-blue-900 dark:text-blue-300 mb-2">Optional Columns Reference</h4>
+                        <div className="pt-3 border-t border-blue-500/30 dark:border-blue-800">
+                            <h4 className="font-bold text-blue-300 dark:text-blue-300 mb-2">Optional Columns Reference</h4>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                                <p><code className="font-semibold text-blue-700">category</code>: Main ID (e.g. <i>3d_printer, filament</i>).</p>
-                                <p><code className="font-semibold text-blue-700">sub_category</code>: Filter tag (e.g. <i>PLA, FDM</i>).</p>
-                                <p><code className="font-semibold text-blue-700">short_description</code>: 1-2 sentence summary.</p>
-                                <p><code className="font-semibold text-blue-700">description</code>: Full details. Supports <code>\n</code>.</p>
+                                <p><code className="font-semibold text-blue-300">category</code>: Main ID (e.g. <i>3d_printer, filament</i>).</p>
+                                <p><code className="font-semibold text-blue-300">sub_category</code>: Filter tag (e.g. <i>PLA, FDM</i>).</p>
+                                <p><code className="font-semibold text-blue-300">short_description</code>: 1-2 sentence summary.</p>
+                                <p><code className="font-semibold text-blue-300">description</code>: Full details. Supports <code>\n</code>.</p>
                             </div>
                         </div>
                     </div>
@@ -124,7 +124,7 @@ Ender 3 V3,18000,10,3d_printer,FDM,Starter Printer,Reliable FDM printer.,Build V
 
                         {file && (
                             <div className="bg-muted/30 p-3 rounded-lg flex items-center gap-3 border mb-4">
-                                <FileSpreadsheet className="w-6 h-6 text-green-600" />
+                                <FileSpreadsheet className="w-6 h-6 text-green-300" />
                                 <div>
                                     <p className="font-medium text-sm">{file.name}</p>
                                     <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
@@ -141,15 +141,15 @@ Ender 3 V3,18000,10,3d_printer,FDM,Starter Printer,Reliable FDM printer.,Build V
                         <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 border-t pt-6">
                             <h3 className="font-medium">Upload Results</h3>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
-                                    <div className="flex justify-center mb-2"><CheckCircle2 className="text-green-600 w-6 h-6" /></div>
-                                    <p className="text-2xl font-bold text-green-700">{lastResult.success}</p>
-                                    <p className="text-xs font-medium text-green-800 uppercase">Successful</p>
+                                <div className="p-4 bg-green-500/15 border border-green-500/30 rounded-lg text-center">
+                                    <div className="flex justify-center mb-2"><CheckCircle2 className="text-green-300 w-6 h-6" /></div>
+                                    <p className="text-2xl font-bold text-green-300">{lastResult.success}</p>
+                                    <p className="text-xs font-medium text-green-300 uppercase">Successful</p>
                                 </div>
-                                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
-                                    <div className="flex justify-center mb-2"><AlertCircle className="text-red-600 w-6 h-6" /></div>
-                                    <p className="text-2xl font-bold text-red-700">{lastResult.failed}</p>
-                                    <p className="text-xs font-medium text-red-800 uppercase">Failed</p>
+                                <div className="p-4 bg-red-500/15 border border-red-500/30 rounded-lg text-center">
+                                    <div className="flex justify-center mb-2"><AlertCircle className="text-red-300 w-6 h-6" /></div>
+                                    <p className="text-2xl font-bold text-red-300">{lastResult.failed}</p>
+                                    <p className="text-xs font-medium text-red-300 uppercase">Failed</p>
                                 </div>
                             </div>
 

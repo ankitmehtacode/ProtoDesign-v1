@@ -14,6 +14,18 @@
 
 import { ORG, SITE_NAME, SITE_URL } from "./site.js";
 
+/** Numbers quoted by the FAQ and the home page. */
+export const FACTS = {
+    shippingOnlineInr: 199,
+    shippingCodInr: 300,
+    codLimitInr: 999,
+    dispatchDays: "2–3",
+    deliveryMetroDays: "3–5",
+    deliveryRestDays: "5–7",
+    deliveryRemoteDays: "7–10",
+    returnWindowDays: 7,
+};
+
 /** @type {{ q: string, a: string }[]} */
 export const FAQ = [
     {
@@ -30,11 +42,11 @@ export const FAQ = [
     },
     {
         q: "How long does delivery take?",
-        a: "In-stock items are dispatched within 2–3 business days. Delivery then takes 3–5 working days to metro cities, 5–7 to the rest of India and 7–10 to remote areas and the North East. Custom prints need extra production time, which we confirm when we send the payment link.",
+        a: `In-stock items are dispatched within ${FACTS.dispatchDays} business days. Delivery then takes ${FACTS.deliveryMetroDays} working days to metro cities, ${FACTS.deliveryRestDays} to the rest of India and ${FACTS.deliveryRemoteDays} to remote areas and the North East. Custom prints need extra production time, which we confirm when we send the payment link.`,
     },
     {
         q: "How much is shipping?",
-        a: "₹199 per order when you pay online, or ₹300 with cash on delivery. Any order that includes a 3D printer ships free.",
+        a: `₹${FACTS.shippingOnlineInr} per order when you pay online, or ₹${FACTS.shippingCodInr} with cash on delivery. Any order that includes a 3D printer ships free.`,
     },
     {
         q: "Do prices include GST?",
@@ -42,11 +54,11 @@ export const FAQ = [
     },
     {
         q: "How can I pay?",
-        a: "Online through PhonePe, or cash on delivery for orders under ₹999 that do not include a 3D printer.",
+        a: `Online through PhonePe, or cash on delivery for orders under ₹${FACTS.codLimitInr} that do not include a 3D printer.`,
     },
     {
         q: "Can I return an item?",
-        a: "Yes, if it arrives defective, damaged in transit or different from its description, reported within 7 days of delivery with photos. We replace it or refund you. Custom prints are made to your file, so they can only be returned if they arrive broken or differ significantly from the file.",
+        a: `Yes, if it arrives defective, damaged in transit or different from its description, reported within ${FACTS.returnWindowDays} days of delivery with photos. We replace it or refund you. Custom prints are made to your file, so they can only be returned if they arrive broken or differ significantly from the file.`,
     },
     {
         q: "Where is ProtoDesign based, and do you ship across India?",
