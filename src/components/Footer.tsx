@@ -25,48 +25,48 @@ export const Footer = () => {
                     {/* Column 2: Quick Links */}
                     <div>
                         <h3 className="font-semibold mb-4">Shop</h3>
-                        <ul className="space-y-2 text-sm text-foreground/80">
-                            <li><Link to="/printers" className="hover:text-primary transition-colors">3D Printers</Link></li>
-                            <li><Link to="/filaments" className="hover:text-primary transition-colors">Filaments</Link></li>
-                            <li><Link to="/resins" className="hover:text-primary transition-colors">Resins</Link></li>
-                            <li><Link to="/custom" className="hover:text-primary transition-colors">Custom Printing</Link></li>
+                        <ul className="text-sm text-foreground/80 md:space-y-2">
+                            <li><Link to="/printers" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">3D Printers</Link></li>
+                            <li><Link to="/filaments" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Filaments</Link></li>
+                            <li><Link to="/resins" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Resins</Link></li>
+                            <li><Link to="/custom" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Custom Printing</Link></li>
                         </ul>
                     </div>
 
                     {/* Column 3: Legal & Support */}
                     <div>
                         <h3 className="font-semibold mb-4">Support</h3>
-                        <ul className="space-y-2 text-sm text-foreground/80">
-                            <li><Link to="/orders" className="hover:text-primary transition-colors">Track Order</Link></li>
-                            <li><Link to="/terms-and-conditions" className="hover:text-primary transition-colors">Terms & Conditions</Link></li>
-                            <li><Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
-                            <li><Link to="/return-policy" className="hover:text-primary transition-colors">Return Policy</Link></li>
-                            <li><Link to="/refund-policy" className="hover:text-primary transition-colors">Refund Policy</Link></li>
-                            <li><Link to="/shipping-policy" className="hover:text-primary transition-colors">Shipping Policy</Link></li>
-                            <li><Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link></li>
-                            <li><Link to="/contact" className="hover:text-primary transition-colors">Grievance Officer</Link></li>
+                        <ul className="text-sm text-foreground/80 md:space-y-2">
+                            <li><Link to="/orders" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Track Order</Link></li>
+                            <li><Link to="/terms-and-conditions" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Terms & Conditions</Link></li>
+                            <li><Link to="/privacy-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Privacy Policy</Link></li>
+                            <li><Link to="/return-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Return Policy</Link></li>
+                            <li><Link to="/refund-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Refund Policy</Link></li>
+                            <li><Link to="/shipping-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Shipping Policy</Link></li>
+                            <li><Link to="/contact" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Contact Us</Link></li>
+                            <li><Link to="/contact" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Grievance Officer</Link></li>
                         </ul>
                     </div>
 
                     {/* Column 4: Contact */}
                     <div>
                         <h3 className="font-semibold mb-4">Contact Us</h3>
-                        <ul className="space-y-3 text-sm text-foreground/80">
+                        <ul className="text-sm text-foreground/80 md:space-y-3">
                             <li className="flex items-center gap-2">
                                 <Mail className="w-4 h-4 text-primary" />
-                                <a href="mailto:help@protodesignstudio.com" className="hover:text-primary">help@protodesignstudio.com</a>
+                                <a href="mailto:help@protodesignstudio.com" className="inline-block py-2.5 hover:text-primary md:py-0">help@protodesignstudio.com</a>
                             </li>
                             <li className="flex items-center gap-2">
                                 <Phone className="w-4 h-4 text-primary" />
-                                <a href="tel:+918249581682" className="hover:text-primary">+91 8249581682</a>
+                                <a href="tel:+918249581682" className="inline-block py-2.5 hover:text-primary md:py-0">+91 8249581682</a>
                             </li>
                             {whatsapp?.enabled && whatsapp.chatUrl && (
                                 <li className="flex items-center gap-2">
                                     <FaWhatsapp className="w-4 h-4 text-primary" />
-                                    <a href={whatsapp.chatUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary">Chat with ProtoDesign</a>
+                                    <a href={whatsapp.chatUrl} target="_blank" rel="noopener noreferrer" className="inline-block py-2.5 hover:text-primary md:py-0">Chat with ProtoDesign</a>
                                 </li>
                             )}
-                            <li className="flex items-start gap-2">
+                            <li className="flex items-start gap-2 py-2.5 md:py-0">
                                 <MapPin className="w-4 h-4 text-primary mt-0.5" />
                                 <span>01, Marg, Jawahar Tekri, Sinhasa, Indore, Madhya Pradesh 452009</span>
                             </li>
@@ -77,7 +77,7 @@ export const Footer = () => {
                                 href="https://www.instagram.com/protodesignstudio.3d/"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 bg-background rounded-full border hover:border-primary/50 transition-colors"
+                                className="flex h-11 w-11 items-center justify-center rounded-full border bg-background transition-colors hover:border-primary/50"
                                 aria-label="Follow us on Instagram"
                             >
                                 <Instagram className="w-4 h-4" />
@@ -86,7 +86,7 @@ export const Footer = () => {
                                 href="https://www.youtube.com/@ProtoDesignStudio3d"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 bg-background rounded-full border hover:border-primary/50 transition-colors"
+                                className="flex h-11 w-11 items-center justify-center rounded-full border bg-background transition-colors hover:border-primary/50"
                                 aria-label="Subscribe to our YouTube channel"
                             >
                                 <Youtube className="w-4 h-4" />
@@ -95,7 +95,7 @@ export const Footer = () => {
                                 href="https://www.facebook.com/profile.php?id=61586266060055"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 bg-background rounded-full border hover:border-primary/50 transition-colors"
+                                className="flex h-11 w-11 items-center justify-center rounded-full border bg-background transition-colors hover:border-primary/50"
                                 aria-label="Follow us on Facebook"
                             >
                                 <Facebook className="w-4 h-4" />
@@ -106,16 +106,15 @@ export const Footer = () => {
 
                 <Separator className="my-8" />
 
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-foreground/80">
+                <div className="flex flex-col gap-4 text-xs text-foreground/80 md:flex-row md:items-center md:justify-between">
                     <p>© {new Date().getFullYear()} Zon Robotics and AI Pvt. Ltd. (CIN U72100MP2025PTC077687, GSTIN 23AACCZ6818Q1ZO). ProtoDesign is a brand of Zon Robotics and AI Pvt. Ltd.</p>
                     {/* Each claim here must match the shipping policy and checkout. */}
-                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-                        <span>Pay via PhonePe or cash on delivery</span>
-                        <span>•</span>
-                        <span>Dispatched in 2–3 business days</span>
-                        <span>•</span>
-                        <span>Email replies within 24 hours</span>
-                    </div>
+                    {/* Stacked on phones; one line with dot separators from md, drawn by CSS so a wrap never leaves one dangling. */}
+                    <ul className="flex flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-4 md:[&>li+li]:before:mr-4 md:[&>li+li]:before:content-['•']">
+                        <li>Pay via PhonePe or cash on delivery</li>
+                        <li>Dispatched in 2–3 business days</li>
+                        <li>Email replies within 24 hours</li>
+                    </ul>
                 </div>
             </div>
         </footer>

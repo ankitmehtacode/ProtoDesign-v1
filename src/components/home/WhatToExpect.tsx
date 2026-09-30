@@ -117,7 +117,7 @@ export const WhatToExpect = () => (
                         ))}
                     </dl>
 
-                    <Link to="/custom#faq" className="group mt-10 inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline">
+                    <Link to="/custom#faq" className="group mt-7 inline-flex items-center gap-1.5 py-2.5 font-medium underline-offset-4 hover:underline">
                         More questions
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </Link>

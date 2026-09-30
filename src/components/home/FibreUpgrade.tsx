@@ -93,7 +93,7 @@ export const FibreUpgrade = () => {
 
                     <p className="mt-6 flex flex-wrap items-center gap-x-2 text-sm text-foreground/60">
                         Fibre wears through brass: print it with a hardened steel nozzle.
-                        <Link to="/accessories" className="font-semibold text-foreground underline-offset-4 hover:underline">
+                        <Link to="/accessories" className="-my-3 inline-block py-3 font-semibold text-foreground underline-offset-4 hover:underline">
                             Shop nozzles and accessories
                         </Link>
                     </p>

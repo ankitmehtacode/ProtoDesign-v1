@@ -128,7 +128,8 @@ export const MaterialsHero = () => {
                 {/* Film grain over the scene */}
                 <div className="absolute inset-0 opacity-[0.07] mix-blend-overlay [background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22 stitchTiles=%22stitch%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/></svg>')]" />
                 {/* Dark on the left for the words, the hero left lit on the right */}
-                <div data-shade className="absolute inset-0 [background:linear-gradient(90deg,hsl(var(--background))_0%,hsl(var(--background)/0.85)_30%,hsl(var(--background)/0.1)_65%,transparent_100%)]" />
+                {/* Desktop: the copy sits on the left, so shade left to right. Phones: the copy spans the width, so shade down the column it fills. */}
+                <div data-shade className="absolute inset-0 [background:linear-gradient(90deg,hsl(var(--background))_0%,hsl(var(--background)/0.85)_30%,hsl(var(--background)/0.1)_65%,transparent_100%)] max-md:[background:linear-gradient(180deg,hsl(var(--background)/0.35)_0%,hsl(var(--background)/0.82)_22%,hsl(var(--background)/0.82)_72%,hsl(var(--background)/0.2)_100%)]" />
                 <div className="absolute inset-x-0 bottom-0 h-40 [background:linear-gradient(to_top,hsl(var(--background)),transparent)]" />
             </div>
 
@@ -171,23 +172,23 @@ export const MaterialsHero = () => {
                                 </span>
                             </SpecularButton>
                         )}
-                        <Link to="/filaments" className="group/link inline-flex items-center gap-1 font-semibold underline-offset-4 hover:underline">
+                        <Link to="/filaments" className="group/link -my-2.5 inline-flex items-center gap-1 py-2.5 font-semibold underline-offset-4 hover:underline">
                             Shop all filament
                             <ArrowRight className="h-4 w-4 transition-transform group-hover/link:translate-x-0.5" />
                         </Link>
                     </div>
-                    <dl className="mt-14 grid max-w-md grid-cols-3 divide-x divide-foreground/10 border-t border-foreground/10 pt-5 [&>div]:px-5 [&>div:first-child]:pl-0">
+                    <dl className="mt-14 grid max-w-md grid-cols-3 divide-x divide-foreground/10 border-t border-foreground/10 pt-5 [&>div]:px-3 sm:[&>div]:px-5 [&>div:first-child]:pl-0">
                         <div>
                             <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Heat, typical</dt>
-                            <dd className="mt-2 text-lg font-extralight tracking-[-0.02em] tabular-nums">to 250&thinsp;°C</dd>
+                            <dd className="mt-2 whitespace-nowrap text-base font-extralight sm:text-lg tracking-[-0.02em] tabular-nums">to 250&thinsp;°C</dd>
                         </div>
                         <div>
                             <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Materials</dt>
-                            <dd className="mt-2 text-lg font-extralight tracking-[-0.02em]">PLA → PEEK</dd>
+                            <dd className="mt-2 whitespace-nowrap text-base font-extralight sm:text-lg tracking-[-0.02em]">PLA → PEEK</dd>
                         </div>
                         <div>
                             <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Composites</dt>
-                            <dd className="mt-2 text-lg font-extralight tracking-[-0.02em]">CF &amp; GF</dd>
+                            <dd className="mt-2 whitespace-nowrap text-base font-extralight sm:text-lg tracking-[-0.02em]">CF &amp; GF</dd>
                         </div>
                     </dl>
                 </div>

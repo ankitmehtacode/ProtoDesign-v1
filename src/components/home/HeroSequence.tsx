@@ -56,6 +56,7 @@ function loadOrder(n: number) {
  * object-position); the portrait render is framed for its screen and crops centred.
  */
 const WIDE_FOCUS = 0.68; // MaterialsHero's poster uses the same object-position
+const FINALE_FOCUS = 0.82; // the finale's payoff sits further right in the wide frame
 function cover(ctx: CanvasRenderingContext2D, img: ImageBitmap, w: number, h: number, fx: number) {
     const s = Math.max(w / img.width, h / img.height);
     const dw = img.width * s, dh = img.height * s;
@@ -91,7 +92,17 @@ export default function HeroSequence({ progress, onSpool }: Props) {
         if (!el || !ctx) return;
         const set = pickSet();
         const { urls } = set;
-        const fx = set === SETS.tall ? 0.5 : WIDE_FOCUS;
+        // Where a narrow screen's crop of the frame centres. The wide film keeps the hero near
+        // WIDE_FOCUS until the finale, whose payoff (PEEK, the hero, the ladder) sits further
+        // right, so the crop drifts there as the camera pulls back. Portrait frames are framed
+        // for the screen and crop centred.
+        const focusAt = (fi: number) => {
+            if (set === SETS.tall) return 0.5;
+            const k = (fi - LABELS.first) / (climb.frames - 1 - LABELS.first);
+            const t = Math.min(1, Math.max(0, k));
+            return WIDE_FOCUS + (FINALE_FOCUS - WIDE_FOCUS) * t * t * (3 - 2 * t);
+        };
+        let fx = focusAt(0);
         const n = urls.length;
         let alive = true;
         let dirty = true;
@@ -228,8 +239,10 @@ export default function HeroSequence({ progress, onSpool }: Props) {
             const show = nearest(want);
             if (show >= 0 && (show !== drawn || dirty)) {
                 const bmp = cache.get(show)!;
+                const fi = Math.round(p * (climb.frames - 1));
+                fx = focusAt(fi);
                 cover(ctx, bmp, el.width, el.height, fx);
-                placeLabels(Math.round(p * (climb.frames - 1)), bmp);
+                placeLabels(fi, bmp);
                 drawn = show;
                 dirty = false;
             }

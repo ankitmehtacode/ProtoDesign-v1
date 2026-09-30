@@ -57,7 +57,7 @@ export const ShopPaths = () => {
                     <h2 id="shop-heading" className={SECTION_TITLE}>
                         Rather print it yourself?
                     </h2>
-                    <Link to="/shop" className="group inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline">
+                    <Link to="/shop" className="group -my-2.5 inline-flex items-center gap-1 py-2.5 font-medium underline-offset-4 hover:underline">
                         Browse the whole shop
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </Link>

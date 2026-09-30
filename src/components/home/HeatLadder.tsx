@@ -175,7 +175,7 @@ export const HeatLadder = () => {
             ref={sectionRef}
             id="heat-ladder"
             aria-labelledby="ladder-heading"
-            className="group relative isolate overflow-hidden bg-background data-[motion=on]:h-[100svh]"
+            className="group relative isolate overflow-clip bg-background data-[motion=on]:h-[100svh]"
         >
             {/* Molten metal on the right, heating up with the rung; faded out under the copy */}
             <div
@@ -198,12 +198,13 @@ export const HeatLadder = () => {
             </div>
 
             <div className="container mx-auto flex h-full flex-col px-4 pb-10 pt-24 md:pt-28">
+                {/* Phones, while pinned: the heading alone (no intro, no strength tags) so the tallest card still fits under it */}
                 <header>
                     <div className="max-w-3xl">
                         <h2 id="ladder-heading" className={SECTION_TITLE}>
                             How hot does your part get?
                         </h2>
-                        <p className="mt-5 max-w-xl text-pretty font-light leading-[1.7] text-foreground/60">
+                        <p className="mt-5 max-w-xl text-pretty font-light leading-[1.7] text-foreground/60 max-md:group-data-[motion=on]:hidden">
                             Climb the ladder to the material that survives it. Temperatures are typical for each material and vary by grade and print settings.
                         </p>
                     </div>
@@ -295,7 +296,7 @@ export const HeatLadder = () => {
                                     id={`rung-${r.key}`}
                                     data-card
                                     aria-label={r.name}
-                                    className="group-data-[motion=on]:absolute group-data-[motion=on]:inset-0 group-data-[motion=on]:flex group-data-[motion=on]:items-center"
+                                    className="group-data-[motion=on]:absolute group-data-[motion=on]:inset-0 group-data-[motion=on]:flex group-data-[motion=on]:items-center max-md:group-data-[motion=on]:items-start"
                                 >
                                     <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
                                         <div className="max-w-2xl">
@@ -313,7 +314,7 @@ export const HeatLadder = () => {
                                                 {r.name} <span className="text-foreground/55">· {r.title}</span>
                                             </h3>
                                             <p className="mt-4 max-w-xl text-pretty font-light leading-[1.7] text-foreground/60">{r.body}</p>
-                                            <ul className="mt-5 flex flex-wrap gap-2">
+                                            <ul className="mt-5 flex flex-wrap gap-2 max-md:group-data-[motion=on]:hidden">
                                                 {r.strengths.map((s) => (
                                                     <li key={s} className="rounded-full border border-foreground/10 px-3 py-1 text-xs font-light tracking-[0.01em] text-foreground/70">{s}</li>
                                                 ))}

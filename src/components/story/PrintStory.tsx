@@ -626,6 +626,8 @@ export const PrintStory = () => {
                     .to(q("[data-layered]"), { opacity: 0, duration: 0.5 }, T_FINISH + 0.45)
                     .to(job, { finish: 1, duration: 0.01 }, T_FINISH + 0.5)
                     .to(job, { launch: 1, duration: 0.01 }, T_LAUNCH)
+                    // The job's done: the printer steps back so the invitation has the stage (on phones its rail crossed the copy).
+                    .to(q("[data-gantry], [data-head]"), { autoAlpha: 0, duration: 0.4 }, T_LAUNCH + 0.1)
                     .to(q("[data-cta]"), { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, T_LAUNCH + 0.3)
                     .to({}, { duration: 0.9 }); // hold before the pin releases
 
@@ -700,7 +702,7 @@ export const PrintStory = () => {
                             onClick={toggleSound}
                             aria-pressed={soundOn}
                             aria-label={soundOn ? "Turn sound off" : "Turn sound on"}
-                            className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card/70 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:ml-2"
+                            className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-card/70 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:ml-2"
                         >
                             {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                         </button>
