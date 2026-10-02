@@ -1,0 +1,151 @@
+"name","category","sub_category","price","stock","short_description","description","specifications","images"
+"ASA Filament","filament","ASA","2069","10","ASA Filament: ABS-level strength with UV and weather resistance, for outdoor parts that should not yellow or turn brittle in the sun.","ProtoDesign ASA 3D Printing Filament
+
+ProtoDesign ASA is an engineering filament for functional parts that live outdoors. It matches ABS for strength and heat resistance (around 100 °C) while resisting UV light and weather, so parts keep their colour and toughness in the sun.
+
+Key Features
+UV Stable: resists yellowing and embrittlement outdoors.
+Weatherproof: holds up to rain, heat and temperature swings.
+Heat Resistant: softens at around 100 °C, well above PLA and PETG.
+Matte Finish: a clean, low-gloss surface straight off the printer.
+
+Recommended Applications
+Outdoor mounts, exterior trim, signage, garden and automotive exterior parts, enclosures used outside.
+
+Printing Profile
+Material: ASA
+Filament Diameter: 1.75 mm
+Net Weight: 1 kg
+Recommended Nozzle Temperature: approximately 240–260 °C
+Recommended Bed Temperature: approximately 90–110 °C
+Printer Requirements: Enclosure and heated bed
+
+Actual temperatures vary with the printer, nozzle, build surface, enclosure, print speed and part geometry. Keep the spool dry and sealed when not in use.
+
+ProtoDesign: Additive Manufacturing.
+Precision materials. Reliable prints. Built for real-world applications.","Material Type: ASA (Acrylonitrile Styrene Acrylate); Filament Diameter: 1.75 mm; Net Weight: 1 kg spool; Nozzle Temperature: 240–260 °C; Bed Temperature: 90–110 °C","https://www.protodesignstudio.com/assets/material-asa-DlC9Fmms.webp"
+"Polycarbonate (PC) Filament","filament","PC","2829","10","Polycarbonate Filament: extremely tough and rigid, holding its shape at 110–135 °C. Where printed parts start replacing machined ones.","ProtoDesign Polycarbonate (PC) 3D Printing Filament
+
+ProtoDesign Polycarbonate is one of the toughest materials an FDM printer can run. It is rigid, takes heavy impacts and holds its shape well past boiling point, which makes it the first step from printed prototypes to printed end-use parts.
+
+Key Features
+Very High Toughness: absorbs impacts that crack most filaments.
+Rigid: holds dimensions under load.
+High Heat Resistance: typically 110–135 °C, depending on grade and print settings.
+Strong Layer Bonding when printed hot in an enclosure.
+
+Recommended Applications
+Machine guards, load-bearing brackets, light metal part replacements, electrical housings, jigs and fixtures.
+
+Printing Profile
+Material: Polycarbonate (PC)
+Filament Diameter: 1.75 mm
+Net Weight: 1 kg
+Recommended Nozzle Temperature: approximately 260–300 °C
+Recommended Bed Temperature: approximately 100–120 °C
+Printer Requirements: All-metal hotend (260–300 °C) and an enclosure
+
+Actual temperatures vary with the printer, nozzle, build surface, enclosure, print speed and part geometry. Keep the spool dry and sealed when not in use.
+
+ProtoDesign: Additive Manufacturing.
+Precision materials. Reliable prints. Built for real-world applications.","Material Type: PC (Polycarbonate); Filament Diameter: 1.75 mm; Net Weight: 1 kg spool; Nozzle Temperature: 260–300 °C; Bed Temperature: 100–120 °C",""
+"Nylon Filament","filament","Nylon","2449","10","Nylon Filament: wear, oil and fuel resistant with low friction. For gears, bushings and clips that keep running.","ProtoDesign Nylon 3D Printing Filament
+
+ProtoDesign Nylon is an engineering filament for moving and wearing parts. It is tough, slightly flexible and slippery, and resists oil, fuel and abrasion, so gears, bushings and clips keep working long after other plastics have worn out.
+
+Key Features
+Wear Resistant: built for parts that rub and slide.
+Oil and Fuel Resistant: suitable for machinery and automotive use.
+Low Friction: runs smoothly against itself and metal.
+Tough and Fatigue Resistant: flexes instead of snapping.
+
+Recommended Applications
+Gears, bushings, clips and snap fits, living hinges, machine and automotive components.
+
+Printing Profile
+Material: Nylon
+Filament Diameter: 1.75 mm
+Net Weight: 1 kg
+Recommended Nozzle Temperature: approximately 250–270 °C
+Recommended Bed Temperature: approximately 70–90 °C
+Printer Requirements: All-metal hotend and dry storage (nylon absorbs moisture; dry before printing)
+
+Actual temperatures vary with the printer, nozzle, build surface, enclosure, print speed and part geometry. Keep the spool dry and sealed when not in use.
+
+ProtoDesign: Additive Manufacturing.
+Precision materials. Reliable prints. Built for real-world applications.","Material Type: Nylon (Polyamide); Filament Diameter: 1.75 mm; Net Weight: 1 kg spool; Nozzle Temperature: 250–270 °C; Bed Temperature: 70–90 °C","https://www.protodesignstudio.com/assets/material-nylon-BJ6A1KRR.webp"
+"PETG-CF Carbon Fibre Filament","filament","PETG-CF","1089","10","PETG-CF Filament: carbon-fibre reinforced PETG for stiff, dimensionally stable parts with a clean matte finish.","ProtoDesign PETG-CF 3D Printing Filament
+
+ProtoDesign PETG-CF is PETG reinforced with chopped carbon fibre. The fibre makes parts noticeably stiffer and more dimensionally stable than plain PETG and gives a clean, matte finish that hides layer lines, while staying as easy to print as PETG.
+
+Key Features
+High Stiffness: carbon fibre keeps parts from flexing.
+Dimensional Stability: low warp and shrink.
+Matte Finish: hides layer lines for a professional look.
+Easy to Print: PETG temperatures, no enclosure required.
+
+Recommended Applications
+Drone frames, brackets, jigs that must not flex, camera and sensor mounts, functional prototypes.
+
+Printing Profile
+Material: PETG-CF
+Filament Diameter: 1.75 mm
+Net Weight: 1 kg
+Recommended Nozzle Temperature: approximately 240–260 °C
+Recommended Bed Temperature: approximately 70–80 °C
+Printer Requirements: Heated bed and a hardened steel nozzle (carbon fibre wears brass nozzles)
+
+Actual temperatures vary with the printer, nozzle, build surface, enclosure, print speed and part geometry. Keep the spool dry and sealed when not in use.
+
+ProtoDesign: Additive Manufacturing.
+Precision materials. Reliable prints. Built for real-world applications.","Material Type: PETG-CF (Carbon Fibre Reinforced PETG); Filament Diameter: 1.75 mm; Net Weight: 1 kg spool; Nozzle Temperature: 240–260 °C; Bed Temperature: 70–80 °C; Nozzle: Hardened steel required",""
+"PEI (Polyetherimide) Filament","filament","PEI","22449","10","PEI Filament: inherently flame-retardant, heat- and chemical-stable to around 200 °C. For aerospace, electrical and sterilisable parts.","ProtoDesign PEI (Polyetherimide) 3D Printing Filament
+
+ProtoDesign PEI (polyetherimide) is a high-performance polymer for industrial printers. It is inherently flame-retardant, stays stable at around 200 °C and resists chemicals and repeated sterilisation, which is why PEI is used in aircraft cabins, electrical housings and medical tooling.
+
+Key Features
+Flame Retardant: inherently self-extinguishing.
+High Heat Resistance: stable at around 200 °C.
+Chemical Stable: resists fuels, oils and cleaning agents.
+Sterilisable: suited to repeated sterilisation cycles.
+
+Recommended Applications
+Cabin components, electrical housings, medical fixtures, high-temperature jigs and tooling.
+
+Printing Profile
+Material: PEI (Polyetherimide)
+Filament Diameter: 1.75 mm
+Net Weight: 1 kg
+Recommended Nozzle Temperature: approximately 350–400 °C
+Recommended Bed Temperature: approximately 140–160 °C
+Printer Requirements: 350–400 °C hotend and a heated chamber
+
+Actual temperatures vary with the printer, nozzle, build surface, enclosure, print speed and part geometry. Keep the spool dry and sealed when not in use.
+
+ProtoDesign: Additive Manufacturing.
+Precision materials. Reliable prints. Built for real-world applications.","Material Type: PEI (Polyetherimide); Filament Diameter: 1.75 mm; Net Weight: 1 kg spool; Nozzle Temperature: 350–400 °C; Bed Temperature: 140–160 °C","https://www.protodesignstudio.com/assets/material-ultem-BKv1M7Bk.webp"
+"PEEK Filament","filament","PEEK","65699","10","PEEK Filament: a super-polymer for continuous use at around 250 °C, resisting almost every chemical. For aerospace and medical engineering.","ProtoDesign PEEK 3D Printing Filament
+
+ProtoDesign PEEK (polyether ether ketone) sits at the top of the printable plastics. It works continuously at around 250 °C, resists almost every chemical and is strong enough to replace metal in demanding parts, which is why it is used in aerospace and medical engineering.
+
+Key Features
+Extreme Heat Resistance: continuous use at around 250 °C.
+Near-Universal Chemical Resistance.
+Very Strong and Stiff: a metal replacement for many parts.
+Low Wear: holds up in sliding and bearing applications.
+
+Recommended Applications
+High-temperature metal part replacements, aerospace components, medical engineering parts, chemical processing parts.
+
+Printing Profile
+Material: PEEK
+Filament Diameter: 1.75 mm
+Net Weight: 1 kg
+Recommended Nozzle Temperature: approximately 380–420 °C
+Recommended Bed Temperature: approximately 120–150 °C
+Printer Requirements: Industrial printer: 400 °C+ hotend and a heated chamber
+
+Actual temperatures vary with the printer, nozzle, build surface, enclosure, print speed and part geometry. Keep the spool dry and sealed when not in use.
+
+ProtoDesign: Additive Manufacturing.
+Precision materials. Reliable prints. Built for real-world applications.","Material Type: PEEK (Polyether Ether Ketone); Filament Diameter: 1.75 mm; Net Weight: 1 kg spool; Nozzle Temperature: 380–420 °C; Bed Temperature: 120–150 °C","https://www.protodesignstudio.com/assets/material-peek-CaJ7TYZt.webp"

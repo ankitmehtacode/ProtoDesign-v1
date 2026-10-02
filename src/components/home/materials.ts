@@ -33,7 +33,7 @@ export type Rung = {
     photo?: string; // studio shot of our spool (src/assets/home/CREDITS.md)
 };
 
-const COMPOSITE = /\b(cf|gf)\b|carbon|glass[- ]?fib/i;
+const COMPOSITE = /\b(cf|gf)\b|\bcarbon|glass[- ]?fib/i;
 
 export const LADDER: Rung[] = [
     {
@@ -112,7 +112,7 @@ export const LADDER: Rung[] = [
 
 export const FIBRES = [
     {
-        key: "cf", name: "Carbon fibre", match: /\bcf\b|carbon/i,
+        key: "cf", name: "Carbon fibre", match: /\bcf\b|\bcarbon/i,
         gain: "The stiffest option, with a clean matte finish.",
         bestFor: "Drone frames, brackets, jigs that must not flex",
     },
