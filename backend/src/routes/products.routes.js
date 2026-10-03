@@ -14,6 +14,15 @@ const VERIFIED_PURCHASE_SQL = `EXISTS (
      WHERE o.user_id = r.user_id AND oi.product_id = r.product_id
        AND o.status IN ('delivered', 'completed'))`;
 
+// Recomputes the denormalised rating summary on products after any change to
+// its reviews. Call inside a transaction that holds the product row lock, so
+// concurrent review changes cannot overwrite each other's counts.
+const refreshReviewStats = (t, productId) => t.none(
+    `UPDATE products p SET average_rating = s.avg, review_count = s.count
+       FROM (SELECT COALESCE(ROUND(AVG(rating)::numeric, 2), 0) AS avg, COUNT(*) AS count
+               FROM reviews WHERE product_id = $1) s
+      WHERE p.id = $1`, [productId]);
+
 const router = express.Router();
 
 // Multer now serves the CSV bulk import only. Product images and video are
@@ -277,32 +286,68 @@ router.post('/:id/reviews', authMiddleware, async (req, res) => {
         }
 
         // 2. Any signed-in user may review, once per product. Buyers are marked
-        //    verified on read (VERIFIED_PURCHASE_SQL).
-        const reviewed = await db.oneOrNone(
-            'SELECT 1 FROM reviews WHERE product_id = $1 AND user_id = $2', [product.id, req.userId]);
-        if (reviewed) {
+        //    verified on read (VERIFIED_PURCHASE_SQL). Locking the product row
+        //    serialises review changes per product, so the duplicate check and
+        //    the stats refresh both see every committed review.
+        const posted = await db.tx(async t => {
+            await t.one('SELECT id FROM products WHERE id = $1 FOR UPDATE', [product.id]);
+            const reviewed = await t.oneOrNone(
+                'SELECT 1 FROM reviews WHERE product_id = $1 AND user_id = $2', [product.id, req.userId]);
+            if (reviewed) return false;
+
+            await t.none(
+                'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4)',
+                [product.id, req.userId, rating, comment]
+            );
+            await refreshReviewStats(t, product.id);
+            return true;
+        });
+        if (!posted) {
             return res.status(409).json({ error: 'You have already reviewed this product' });
         }
-
-        await db.none(
-            'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4)',
-            [product.id, req.userId, rating, comment]
-        );
-
-        // 3. Update Product Stats
-        const stats = await db.one(
-            'SELECT AVG(rating) as avg, COUNT(id) as count FROM reviews WHERE product_id = $1',
-            [product.id]
-        );
-        await db.none(
-            'UPDATE products SET average_rating = $1, review_count = $2 WHERE id = $3',
-            [stats.avg || 0, stats.count, product.id]
-        );
 
         res.json({ success: true });
     } catch (error) {
         console.error("Post Review Error:", error);
         res.status(500).json({ error: 'Failed to post review' });
+    }
+});
+
+// The author may delete their own review; an admin may delete any review
+// (moderation, and clearing out seeded placeholders).
+router.delete('/:id/reviews/:reviewId', authMiddleware, async (req, res) => {
+    const { reviewId } = req.params;
+    if (!isUuid(reviewId)) return res.status(404).json({ error: 'Review not found' });
+
+    try {
+        const deleted = await db.tx(async t => {
+            const review = await t.oneOrNone(
+                `SELECT r.id, r.user_id, r.product_id FROM reviews r
+                   JOIN products p ON p.id = r.product_id
+                  WHERE r.id = $1 AND (p.id::text = $2 OR p.slug = $2)
+                  FOR UPDATE OF r, p`,
+                [reviewId, req.params.id]);
+            if (!review) return { status: 404, error: 'Review not found' };
+
+            if (review.user_id !== req.userId) {
+                const admin = await t.oneOrNone(
+                    'SELECT 1 FROM user_roles WHERE user_id = $1 AND role = $2', [req.userId, 'admin']);
+                if (!admin) return { status: 403, error: 'You can only delete your own review' };
+            }
+
+            await t.none('DELETE FROM reviews WHERE id = $1', [review.id]);
+            await refreshReviewStats(t, review.product_id);
+            return { status: 200, byAdmin: review.user_id !== req.userId };
+        });
+
+        if (deleted.error) return res.status(deleted.status).json({ error: deleted.error });
+        console.log(JSON.stringify({
+            event: 'review_deleted', reviewId, userId: req.userId, byAdmin: deleted.byAdmin
+        }));
+        res.json({ success: true });
+    } catch (error) {
+        console.error(JSON.stringify({ event: 'review_delete_failed', reviewId, error: error.message }));
+        res.status(500).json({ error: 'Failed to delete review' });
     }
 });
 

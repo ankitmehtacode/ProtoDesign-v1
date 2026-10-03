@@ -75,6 +75,7 @@ interface Product {
 
 interface Review {
     id: string;
+    user_id: string;
     user: string;
     rating: number;
     comment: string;
@@ -198,6 +199,8 @@ const ProductDetail = () => {
     const [activeImage, setActiveImage] = useState<string>("");
 
     const [isAdmin, setIsAdmin] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
 
     const [editState, setEditState] = useState<EditableProductState | null>(null);
@@ -226,6 +229,7 @@ const ProductDetail = () => {
             try {
                 if (apiService.isAuthenticated()) {
                     const user = await apiService.getCurrentUser();
+                    setCurrentUserId(user.user?.id ?? null);
                     if (user.role === 'admin' || user.user?.role === 'admin') {
                         setIsAdmin(true);
                         return true;
@@ -575,6 +579,25 @@ const ProductDetail = () => {
         }
     };
 
+    const handleDeleteReview = async (review: Review) => {
+        if (!product) return;
+        const own = review.user_id === currentUserId;
+        if (!window.confirm(own ? "Delete your review?" : `Delete ${review.user}'s review? This cannot be undone.`)) return;
+
+        setDeletingReviewId(review.id);
+        try {
+            await apiService.deleteProductReview(product.id, review.id);
+            const remaining = reviews.filter(r => r.id !== review.id);
+            setReviews(remaining);
+            setReviewPage(page => Math.min(page, Math.max(1, Math.ceil(remaining.length / REVIEWS_PER_PAGE))));
+            toast.success("Review deleted");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to delete review");
+        } finally {
+            setDeletingReviewId(null);
+        }
+    };
+
     const handleExploreCategory = () => {
         if (!product) return;
         const route = CATEGORY_ROUTES[product.category] || `/shop?category=${product.category}`;
@@ -592,7 +615,8 @@ const ProductDetail = () => {
 
     const inStock = isEditing ? (editState?.stock ?? 0) > 0 : product.stock > 0;
     const madeToOrder = isMadeToOrder(product);
-    const averageRating = product.average_rating ? Number(product.average_rating) : 0;
+    // Derived from the loaded reviews so it stays in step with the count after a post or delete.
+    const averageRating = reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
     const displaySpecs = normalizeSpecs(product.specifications).filter(s => s.key !== 'allow_cod_override');
 
     return (
@@ -981,7 +1005,20 @@ const ProductDetail = () => {
                                                     <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-green-300 dark:text-green-400"><BadgeCheck size={12} /> Verified purchase</span>
                                                 )}
                                             </div>
-                                            <StarRating rating={r.rating} size={14} />
+                                            <div className="flex items-center gap-3">
+                                                <StarRating rating={r.rating} size={14} />
+                                                {(isAdmin || (currentUserId !== null && r.user_id === currentUserId)) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteReview(r)}
+                                                        disabled={deletingReviewId === r.id}
+                                                        aria-label={`Delete review by ${r.user}`}
+                                                        className="text-muted-foreground hover:text-destructive disabled:opacity-50 transition-colors"
+                                                    >
+                                                        {deletingReviewId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         <p className="text-muted-foreground text-sm leading-relaxed">{r.comment}</p>
                                     </div>

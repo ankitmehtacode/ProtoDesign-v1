@@ -340,6 +340,10 @@ class ApiService {
         });
     }
 
+    async deleteProductReview(productId: string, reviewId: string) {
+        return this.request(`/products/${productId}/reviews/${reviewId}`, { method: "DELETE" });
+    }
+
     async isProductLiked(productId: string) {
         return this.request(`/products/${productId}/likes`);
     }
