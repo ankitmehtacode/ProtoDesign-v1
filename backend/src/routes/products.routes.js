@@ -313,37 +313,29 @@ router.post('/:id/reviews', authMiddleware, async (req, res) => {
     }
 });
 
-// The author may delete their own review; an admin may delete any review
-// (moderation, and clearing out seeded placeholders).
-router.delete('/:id/reviews/:reviewId', authMiddleware, async (req, res) => {
+// Admin-only: moderation, and clearing out seeded placeholders. Customers
+// cannot delete reviews, including their own.
+router.delete('/:id/reviews/:reviewId', authMiddleware, isAdmin, async (req, res) => {
     const { reviewId } = req.params;
     if (!isUuid(reviewId)) return res.status(404).json({ error: 'Review not found' });
 
     try {
         const deleted = await db.tx(async t => {
             const review = await t.oneOrNone(
-                `SELECT r.id, r.user_id, r.product_id FROM reviews r
+                `SELECT r.id, r.product_id FROM reviews r
                    JOIN products p ON p.id = r.product_id
                   WHERE r.id = $1 AND (p.id::text = $2 OR p.slug = $2)
                   FOR UPDATE OF r, p`,
                 [reviewId, req.params.id]);
-            if (!review) return { status: 404, error: 'Review not found' };
-
-            if (review.user_id !== req.userId) {
-                const admin = await t.oneOrNone(
-                    'SELECT 1 FROM user_roles WHERE user_id = $1 AND role = $2', [req.userId, 'admin']);
-                if (!admin) return { status: 403, error: 'You can only delete your own review' };
-            }
+            if (!review) return false;
 
             await t.none('DELETE FROM reviews WHERE id = $1', [review.id]);
             await refreshReviewStats(t, review.product_id);
-            return { status: 200, byAdmin: review.user_id !== req.userId };
+            return true;
         });
 
-        if (deleted.error) return res.status(deleted.status).json({ error: deleted.error });
-        console.log(JSON.stringify({
-            event: 'review_deleted', reviewId, userId: req.userId, byAdmin: deleted.byAdmin
-        }));
+        if (!deleted) return res.status(404).json({ error: 'Review not found' });
+        console.log(JSON.stringify({ event: 'review_deleted', reviewId, adminId: req.userId }));
         res.json({ success: true });
     } catch (error) {
         console.error(JSON.stringify({ event: 'review_delete_failed', reviewId, error: error.message }));

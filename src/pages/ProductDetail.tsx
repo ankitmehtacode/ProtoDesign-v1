@@ -75,7 +75,6 @@ interface Product {
 
 interface Review {
     id: string;
-    user_id: string;
     user: string;
     rating: number;
     comment: string;
@@ -199,7 +198,6 @@ const ProductDetail = () => {
     const [activeImage, setActiveImage] = useState<string>("");
 
     const [isAdmin, setIsAdmin] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
 
@@ -229,7 +227,6 @@ const ProductDetail = () => {
             try {
                 if (apiService.isAuthenticated()) {
                     const user = await apiService.getCurrentUser();
-                    setCurrentUserId(user.user?.id ?? null);
                     if (user.role === 'admin' || user.user?.role === 'admin') {
                         setIsAdmin(true);
                         return true;
@@ -581,8 +578,7 @@ const ProductDetail = () => {
 
     const handleDeleteReview = async (review: Review) => {
         if (!product) return;
-        const own = review.user_id === currentUserId;
-        if (!window.confirm(own ? "Delete your review?" : `Delete ${review.user}'s review? This cannot be undone.`)) return;
+        if (!window.confirm(`Delete ${review.user}'s review? This cannot be undone.`)) return;
 
         setDeletingReviewId(review.id);
         try {
@@ -1007,7 +1003,7 @@ const ProductDetail = () => {
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <StarRating rating={r.rating} size={14} />
-                                                {(isAdmin || (currentUserId !== null && r.user_id === currentUserId)) && (
+                                                {isAdmin && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDeleteReview(r)}

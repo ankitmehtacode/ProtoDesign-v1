@@ -114,6 +114,11 @@ describe('POST /api/products/:id/reviews', () => {
 });
 
 describe('DELETE /api/products/:id/reviews/:reviewId', () => {
+    const seedAdmin = async () => {
+        const id = await seedUser();
+        await db.none(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin')`, [id]);
+        return id;
+    };
     const post = async (user, product, rating = 5) => {
         await call('POST', `/api/products/${product}/reviews`, { userId: user, body: { rating, comment: 'ok' } });
         return (await db.one('SELECT id FROM reviews WHERE product_id = $1 AND user_id = $2', [product, user])).id;
@@ -123,47 +128,42 @@ describe('DELETE /api/products/:id/reviews/:reviewId', () => {
         return [Number(s.average_rating), Number(s.review_count)];
     };
 
-    it('lets the author delete their own review and recomputes the product stats', async () => {
-        const [a, b, product] = [await seedUser(), await seedUser(), await seedProduct()];
-        const mine = await post(a, product, 5);
+    it('lets an admin delete a review and recomputes the product stats', async () => {
+        const [a, b, admin, product] = [await seedUser(), await seedUser(), await seedAdmin(), await seedProduct()];
+        const first = await post(a, product, 5);
         await post(b, product, 2);
         assert.deepEqual(await stats(product), [3.5, 2]);
 
-        const res = await call('DELETE', `/api/products/${product}/reviews/${mine}`, { userId: a });
+        const res = await call('DELETE', `/api/products/${product}/reviews/${first}`, { userId: admin });
         assert.equal(res.status, 200);
         assert.deepEqual(await stats(product), [2, 1]);
-
-        // The author may then review the product again.
-        const again = await call('POST', `/api/products/${product}/reviews`, { userId: a, body: review });
-        assert.equal(again.status, 200);
     });
 
-    it('forbids deleting another customer\'s review', async () => {
+    it('forbids a customer from deleting any review, including their own', async () => {
         const [a, b, product] = [await seedUser(), await seedUser(), await seedProduct()];
-        const theirs = await post(a, product);
-        const res = await call('DELETE', `/api/products/${product}/reviews/${theirs}`, { userId: b });
-        assert.equal(res.status, 403);
+        const own = await post(a, product);
+        assert.equal((await call('DELETE', `/api/products/${product}/reviews/${own}`, { userId: a })).status, 403);
+        assert.equal((await call('DELETE', `/api/products/${product}/reviews/${own}`, { userId: b })).status, 403);
         assert.deepEqual(await stats(product), [5, 1]);
     });
 
-    it('lets an admin delete any review, addressed by slug, and resets stats to zero', async () => {
-        const [a, admin, product] = [await seedUser(), await seedUser(), await seedProduct()];
-        await db.none(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin')`, [admin]);
+    it('accepts the product slug and resets stats to zero when the last review goes', async () => {
+        const [a, admin, product] = [await seedUser(), await seedAdmin(), await seedProduct()];
         await db.none(`UPDATE products SET slug = 'widget-del' WHERE id = $1`, [product]);
-        const theirs = await post(a, product);
+        const id = await post(a, product);
 
-        const res = await call('DELETE', `/api/products/widget-del/reviews/${theirs}`, { userId: admin });
+        const res = await call('DELETE', `/api/products/widget-del/reviews/${id}`, { userId: admin });
         assert.equal(res.status, 200);
         assert.deepEqual(await stats(product), [0, 0]);
     });
 
     it('returns 404 for a review of a different product, a malformed id, or a repeat delete', async () => {
-        const [a, p1, p2] = [await seedUser(), await seedProduct(), await seedProduct()];
+        const [a, admin, p1, p2] = [await seedUser(), await seedAdmin(), await seedProduct(), await seedProduct()];
         const id = await post(a, p1);
-        assert.equal((await call('DELETE', `/api/products/${p2}/reviews/${id}`, { userId: a })).status, 404);
-        assert.equal((await call('DELETE', `/api/products/${p1}/reviews/not-a-uuid`, { userId: a })).status, 404);
-        assert.equal((await call('DELETE', `/api/products/${p1}/reviews/${id}`, { userId: a })).status, 200);
-        assert.equal((await call('DELETE', `/api/products/${p1}/reviews/${id}`, { userId: a })).status, 404);
+        assert.equal((await call('DELETE', `/api/products/${p2}/reviews/${id}`, { userId: admin })).status, 404);
+        assert.equal((await call('DELETE', `/api/products/${p1}/reviews/not-a-uuid`, { userId: admin })).status, 404);
+        assert.equal((await call('DELETE', `/api/products/${p1}/reviews/${id}`, { userId: admin })).status, 200);
+        assert.equal((await call('DELETE', `/api/products/${p1}/reviews/${id}`, { userId: admin })).status, 404);
     });
 
     it('requires sign-in', async () => {
