@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { phonePeService } from './phonepe.service.js';
 import { notifyOrder } from './whatsapp.service.js';
+import { clock, festivalPrice } from './festival.js';
 
 /**
  * Order lifecycle: creation, payment settlement, cancellation.
@@ -332,6 +333,7 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
             [productIds]
         );
         const byId = new Map(products.map((p) => [p.id, p]));
+        const now = clock.now();
 
         let subtotalPaise = 0;
         const lines = [];
@@ -339,7 +341,8 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
             const product = byId.get(productId);
             if (!product) throw httpError(404, 'One or more products no longer exist');
             const quantity = wanted.get(productId);
-            const unitPaise = toPaise(product.price);
+            // The price the customer was shown: festival discount included.
+            const unitPaise = toPaise(festivalPrice(product, now).price);
             subtotalPaise += unitPaise * quantity;
             lines.push({
                 productId, name: product.name, quantity, unitPaise,

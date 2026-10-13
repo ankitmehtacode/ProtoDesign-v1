@@ -218,7 +218,7 @@ export const quoteServiceLd = () => ({
 /**
  * @param {{ name: string, slug?: string, id: string, description?: string, short_description?: string,
  *           price: number | string, stock: number, image_url?: string | null, images?: string[], category?: string,
- *           specifications?: unknown }} p
+ *           specifications?: unknown, festival?: { ends_at: string } | null }} p
  * @param {string} categoryName
  * @param {string} categoryPath
  */
@@ -254,6 +254,10 @@ export const productLd = (p, categoryName, categoryPath) => {
                 url,
                 priceCurrency: "INR",
                 price: Number(p.price).toFixed(2),
+                // A festival price lapses at its sale's end; its last day, in IST.
+                priceValidUntil: p.festival?.ends_at
+                    ? new Date(new Date(p.festival.ends_at).getTime() - 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
+                    : undefined,
                 availability: p.stock <= 0 ? "https://schema.org/OutOfStock"
                     : madeToOrder ? "https://schema.org/MadeToOrder" : "https://schema.org/InStock",
                 itemCondition: "https://schema.org/NewCondition",

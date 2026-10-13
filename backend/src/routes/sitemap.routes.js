@@ -1,5 +1,11 @@
 import express from 'express';
 import db from '../config/database.js';
+import { FESTIVAL_SALES, festivalPrice } from '../services/festival.js';
+
+const festivalWindow = (id) => {
+    const s = FESTIVAL_SALES.find((x) => x.id === id);
+    return `${s.startsAt}/${s.endsAt}`;
+};
 
 const router = express.Router();
 
@@ -121,6 +127,9 @@ router.get('/feeds/google-products.xml', async (req, res) => {
             if (!title || !description) continue;
 
             const grams = parseFloat(specs['Approx. weight'] ?? '');
+            // g:price is our regular price; a festival price goes in g:sale_price with
+            // its window, so Google reverts on time even before the next fetch.
+            const sale = festivalPrice(p);
             items.push('<item>' + [
                 tag('g:id', p.id),
                 tag('title', title),
@@ -129,6 +138,8 @@ router.get('/feeds/google-products.xml', async (req, res) => {
                 tag('g:image_link', images[0]),
                 ...images.slice(1, 11).map(u => tag('g:additional_image_link', u)),
                 tag('g:price', `${Number(p.price).toFixed(2)} INR`),
+                sale.festival ? tag('g:sale_price', `${Number(sale.price).toFixed(2)} INR`) : '',
+                sale.festival ? tag('g:sale_price_effective_date', `${festivalWindow(sale.festival.id)}`) : '',
                 tag('g:availability', p.stock > 0 ? 'in_stock' : 'out_of_stock'),
                 tag('g:condition', 'new'),
                 tag('g:brand', specs.Brand || 'ProtoDesign'),

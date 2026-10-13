@@ -6,6 +6,7 @@ import { isUuid } from '../services/order.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 import { requestSiteRebuild } from '../services/site.rebuild.js';
+import { festivalPrice } from '../services/festival.js';
 
 // True when the reviewer has a delivered or completed order containing the
 // product. Computed on read, so it stays correct as order statuses change.
@@ -206,7 +207,7 @@ router.get('/', async (req, res) => {
             }
         }
 
-        res.json(products);
+        res.json(products.map((p) => festivalPrice(p)));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -238,7 +239,7 @@ router.get('/:id', async (req, res) => {
         `, [product.id]);
         product.reviews = reviews;
 
-        res.json(product);
+        res.json(festivalPrice(product));
     } catch (error) {
         console.error("Fetch Product Error:", error);
         res.status(500).json({ error: error.message });

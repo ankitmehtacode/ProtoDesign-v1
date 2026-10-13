@@ -29,6 +29,12 @@ const EMPTY: FormState = {
     category: "filament", sub_category: "", specs: [], allow_cod_override: false,
 };
 
+/** The stored "was" price. During a sale the API raises compare_at_price for display; a null stored value must stay null. */
+const storedCompareAt = (p: AdminProduct): string => {
+    const v = "list_compare_at_price" in p ? p.list_compare_at_price : p.compare_at_price;
+    return v == null ? "" : String(v);
+};
+
 /** Specs arrive as an object or a key/value list; COD override lives among them. */
 function specsFrom(p: AdminProduct): { specs: Spec[]; cod: boolean } {
     const raw = p.specifications;
@@ -52,7 +58,7 @@ export function ProductsSection({ products, initialFilter, onChanged }: {
     const live = products.filter((p) => !p.is_archived);
     const stats = {
         live: live.length,
-        value: live.reduce((s, p) => s + Number(p.price) * Math.max(0, p.stock), 0),
+        value: live.reduce((s, p) => s + Number(p.list_price ?? p.price) * Math.max(0, p.stock), 0),
         out: live.filter((p) => stockState(p) === "out").length,
         low: live.filter((p) => stockState(p) === "low").length,
     };
@@ -89,8 +95,8 @@ export function ProductsSection({ products, initialFilter, onChanged }: {
 
     const exportCsv = () => downloadCsv(`products-${new Date().toISOString().slice(0, 10)}.csv`,
         ["ID", "Name", "Category", "Sub-category", "Price", "Stock", "Stock value", "Status"],
-        rows.map((p) => [p.id, p.name, p.category, p.sub_category ?? "", Number(p.price), p.stock,
-            Number(p.price) * Math.max(0, p.stock), p.is_archived ? "Archived" : "Live"]));
+        rows.map((p) => [p.id, p.name, p.category, p.sub_category ?? "", Number(p.list_price ?? p.price), p.stock,
+            Number(p.list_price ?? p.price) * Math.max(0, p.stock), p.is_archived ? "Archived" : "Live"]));
 
     return (
         <>
@@ -174,7 +180,7 @@ export function ProductsSection({ products, initialFilter, onChanged }: {
                                                 <div>{MAIN_CATEGORIES.find((c) => c.value === p.category)?.label ?? p.category}</div>
                                                 {p.sub_category && <div className="text-xs text-muted-foreground">{p.sub_category}</div>}
                                             </td>
-                                            <td className="px-4 py-3 text-right tabular-nums">{formatINR(Number(p.price))}</td>
+                                            <td className="px-4 py-3 text-right tabular-nums">{formatINR(Number(p.list_price ?? p.price))}</td>
                                             <td className={`px-4 py-3 text-right font-medium tabular-nums ${st === "out" ? "text-rose-300" : st === "low" ? "text-amber-300" : ""}`}>{p.stock}</td>
                                             <td className="px-4 py-3">
                                                 {st === "archived" ? <StatusBadge label="Archived" tone="neutral" />
@@ -228,7 +234,8 @@ function ProductSheet({ product, onClose, onSaved }: { product: AdminProduct | "
         const { specs, cod } = specsFrom(product);
         setForm({
             name: product.name, description: product.description ?? "", short_description: product.short_description ?? "",
-            price: String(product.price), compare_at_price: product.compare_at_price == null ? "" : String(product.compare_at_price),
+            // The stored price, not the festival-discounted one the API shows shoppers.
+            price: String(product.list_price ?? product.price), compare_at_price: storedCompareAt(product),
             stock: String(product.stock), category: product.category,
             sub_category: product.sub_category ?? "", specs, allow_cod_override: cod,
         });

@@ -229,6 +229,19 @@ Resources:
             Schedule: cron(30 3 * * ? *)
             State: !Ref CatalogSyncState
             Input: '{"source":"protodesign.catalog-sync"}'
+        # Rebuild the prerendered site when a festival sale changes printer
+        # prices (backend/src/services/festival.js). One-off: the year field
+        # pins each to 2026. 18:31 UTC is 00:01 IST the next day.
+        NavratriEndsRebuild:
+          Type: Schedule
+          Properties:
+            Schedule: cron(31 18 20 10 ? 2026)
+            Input: '{"source":"protodesign.festival-rebuild"}'
+        DiwaliEndsRebuild:
+          Type: Schedule
+          Properties:
+            Schedule: cron(31 18 11 11 ? 2026)
+            Input: '{"source":"protodesign.festival-rebuild"}'
       FunctionUrlConfig:
         AuthType: NONE
         # No Cors block here on purpose: Express's own `cors` middleware

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { apiService } from '@/services/api.service';
 import { useCart } from '@/hooks/use-cart';
 import { ProductCard, ProductCardSkeleton } from './ProductCard';
+import { FestivalBanner } from './FestivalBanner';
 import { Product } from './product';
 
 export interface CategoryOption {
@@ -335,6 +336,8 @@ export function ProductCatalog({ eyebrow, title, subtitle, category, categories,
                         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">{subtitle}</p>
                     </div>
                 </header>
+
+                <FestivalBanner showShopLink={category !== '3d_printer'} />
 
                 {/* Stays under the fixed 80px nav so filters are one thumb-reach away while scrolling. */}
                 <div className="sticky top-20 z-30 -mx-4 space-y-4 bg-background/85 px-4 pb-3 pt-3 backdrop-blur-md">

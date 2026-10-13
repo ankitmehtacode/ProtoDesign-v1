@@ -231,6 +231,11 @@ class ApiService {
         return this.request(`/products${query}`, { method: "GET" });
     }
 
+    /** Festival sale schedule (backend/src/services/festival.js). */
+    async getFestival() {
+        return this.request("/festival", { method: "GET", skipAuth: true });
+    }
+
     async getProduct(id: string) {
         return this.request(`/products/${id}`, { method: "GET" });
     }

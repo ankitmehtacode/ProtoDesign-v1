@@ -28,6 +28,9 @@ export interface AdminProduct {
     description: string;
     price: number;
     compare_at_price?: number | string | null;
+    /** Stored price; price is festival-discounted while a sale runs. */
+    list_price?: number | string;
+    list_compare_at_price?: number | string | null;
     stock: number;
     image_url: string | null;
     category: string;
