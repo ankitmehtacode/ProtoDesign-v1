@@ -54,7 +54,8 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
     const images = imageUrls(product);
     const badge = statusBadge(product);
     const soldOut = product.stock <= 0;
-    const was = dealPrice(product);
+    // A sold-out deal is not one: hide both the ribbon and the struck price.
+    const was = soldOut ? null : dealPrice(product);
     const href = `/product/${product.slug || product.id}`;
     const reviewCount = product.review_count || 0;
 
@@ -110,8 +111,8 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                     </span>
                 )}
 
-                {/* Separate from the status badge: a deal and "Only 2 left" are both true at once. A sold-out deal is not one. */}
-                {was !== null && !soldOut && (
+                {/* Separate from the status badge: a deal and "Only 2 left" are both true at once. */}
+                {was !== null && (
                     <span className="absolute bottom-3 left-3 rounded-full bg-[hsl(var(--ember))] px-2.5 py-1 text-[11px] font-semibold text-neutral-950">
                         Festive Deal
                     </span>
