@@ -5,6 +5,8 @@ export interface CartItem {
     product: {
         id: string;
         name: string;
+        // Missing until the backend that returns it is deployed; links fall back to the id.
+        slug?: string;
         price: number;
         image_url?: string;
         category: string;
