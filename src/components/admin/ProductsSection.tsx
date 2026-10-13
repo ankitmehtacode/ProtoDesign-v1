@@ -19,13 +19,13 @@ const COD_KEY = "allow_cod_override";
 
 type Spec = { key: string; value: string };
 type FormState = {
-    name: string; description: string; short_description: string; price: string; stock: string;
+    name: string; description: string; short_description: string; price: string; compare_at_price: string; stock: string;
     category: string; sub_category: string; specs: Spec[]; allow_cod_override: boolean;
 };
 type ImageItem = { id: string; url: string; file?: File };
 
 const EMPTY: FormState = {
-    name: "", description: "", short_description: "", price: "", stock: "",
+    name: "", description: "", short_description: "", price: "", compare_at_price: "", stock: "",
     category: "filament", sub_category: "", specs: [], allow_cod_override: false,
 };
 
@@ -228,7 +228,8 @@ function ProductSheet({ product, onClose, onSaved }: { product: AdminProduct | "
         const { specs, cod } = specsFrom(product);
         setForm({
             name: product.name, description: product.description ?? "", short_description: product.short_description ?? "",
-            price: String(product.price), stock: String(product.stock), category: product.category,
+            price: String(product.price), compare_at_price: product.compare_at_price == null ? "" : String(product.compare_at_price),
+            stock: String(product.stock), category: product.category,
             sub_category: product.sub_category ?? "", specs, allow_cod_override: cod,
         });
         setImages((product.product_images ?? []).slice().sort((a, b) => a.display_order - b.display_order)
@@ -270,7 +271,7 @@ function ProductSheet({ product, onClose, onSaved }: { product: AdminProduct | "
 
             const payload: Record<string, unknown> = {
                 name: form.name, description: form.description, short_description: form.short_description,
-                price: form.price, stock: form.stock, category: form.category, sub_category: form.sub_category,
+                price: form.price, compare_at_price: form.compare_at_price, stock: form.stock, category: form.category, sub_category: form.sub_category,
                 specifications: JSON.stringify(specsObject), images: uploaded, videoUrl,
             };
 
@@ -307,6 +308,7 @@ function ProductSheet({ product, onClose, onSaved }: { product: AdminProduct | "
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="Price (₹, GST included)"><Input type="number" min="0" step="0.01" value={form.price} onChange={(e) => set("price", e.target.value)} required /></Field>
+                        <Field label="Was price (₹, struck through; blank ends the deal)"><Input type="number" min="0" step="0.01" value={form.compare_at_price} onChange={(e) => set("compare_at_price", e.target.value)} /></Field>
                         <Field label="Stock"><Input type="number" min="0" value={form.stock} onChange={(e) => set("stock", e.target.value)} required /></Field>
                         <Field label="Category">
                             <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v, sub_category: "" }))}>

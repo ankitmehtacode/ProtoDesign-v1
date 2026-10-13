@@ -27,6 +27,7 @@ export interface AdminProduct {
     name: string;
     description: string;
     price: number;
+    compare_at_price?: number | string | null;
     stock: number;
     image_url: string | null;
     category: string;

@@ -130,4 +130,21 @@ describe('PUT /api/products/:id', () => {
         const res = await put('00000000-0000-0000-0000-000000000000', base);
         assert.equal(res.status, 404);
     });
+
+    it('sets, keeps and ends the struck-through compare_at_price', async () => {
+        const p = await seedProduct();
+        const wasPrice = async () => (await db.one('SELECT compare_at_price FROM products WHERE id = $1', [p.id])).compare_at_price;
+
+        assert.equal((await put(p.id, { ...base, compare_at_price: '15' })).status, 200);
+        assert.equal(await wasPrice(), '15.00');
+
+        // A client that does not know the field (the inline editor) leaves it alone.
+        assert.equal((await put(p.id, base)).status, 200);
+        assert.equal(await wasPrice(), '15.00');
+
+        assert.equal((await put(p.id, { ...base, compare_at_price: '' })).status, 200);
+        assert.equal(await wasPrice(), null);
+
+        assert.equal((await put(p.id, { ...base, compare_at_price: -5 })).status, 400);
+    });
 });

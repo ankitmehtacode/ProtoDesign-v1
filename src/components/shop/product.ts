@@ -12,6 +12,8 @@ export interface Product {
     description: string;
     short_description?: string;
     price: number;
+    /** Struck-through reference price; pg returns DECIMAL as a string. */
+    compare_at_price?: number | string | null;
     stock: number;
     likes_count: number;
     average_rating?: number;
@@ -60,6 +62,16 @@ export const CATEGORY_LABELS: Record<string, string> = {
     accessory: 'Accessory',
     spare_part: 'Spare part',
 };
+
+/**
+ * The struck-through price, when the product is on a deal. A reference price
+ * at or below the selling price is not a deal and shows nothing, so an admin
+ * ends a deal just by changing the price.
+ */
+export function dealPrice(product: Pick<Product, 'price' | 'compare_at_price'>): number | null {
+    const was = Number(product.compare_at_price);
+    return Number.isFinite(was) && was > Number(product.price) ? was : null;
+}
 
 /**
  * Printed after it is ordered, so there is no shelf stock to report. Set by the

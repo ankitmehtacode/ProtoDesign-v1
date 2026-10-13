@@ -43,7 +43,7 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
 import { Seo } from "@/seo/Seo";
 import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, productUrl } from "@/seo/site.js";
-import { CATEGORY_LABELS, isMadeToOrder } from '@/components/shop/product';
+import { CATEGORY_LABELS, dealPrice, isMadeToOrder } from '@/components/shop/product';
 
 // --- INTERFACES ---
 interface ProductImage {
@@ -60,6 +60,7 @@ interface Product {
     description: string;
     short_description?: string;
     price: number;
+    compare_at_price?: number | string | null;
     stock: number;
     category: string;
     sub_category?: string;
@@ -859,6 +860,14 @@ const ProductDetail = () => {
                                 </div>
                             ) : (
                                 <>
+                                    {dealPrice(product) !== null && inStock && (
+                                        <div className="mb-2 flex items-center gap-3">
+                                            <span className="rounded-full bg-[hsl(var(--ember))] px-3 py-1 text-xs font-semibold text-neutral-950">Festive Deal</span>
+                                            <s className="text-lg tabular-nums text-muted-foreground">
+                                                <span className="sr-only">Was </span>{formatINR(dealPrice(product)!)}
+                                            </s>
+                                        </div>
+                                    )}
                                     <p className="text-5xl font-bold text-foreground">{formatINR(product.price)}</p>
                                     <p className={`mt-3 text-sm font-medium flex items-center gap-2 ${inStock ? 'text-green-300' : 'text-red-300'}`}>
                                         {inStock ? <Check className="w-4 h-4"/> : null}
