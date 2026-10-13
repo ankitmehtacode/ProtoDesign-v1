@@ -135,7 +135,7 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
  */
 router.post('/', authMiddleware, async (req, res, next) => {
     try {
-        const { items, shippingAddress, paymentGateway } = req.body ?? {};
+        const { items, shippingAddress, paymentGateway, expectedSubtotal } = req.body ?? {};
 
         if (!items || !items.length) return res.status(400).json({ error: 'No items in order' });
         if (!shippingAddress || typeof shippingAddress !== 'object' || Array.isArray(shippingAddress)) {
@@ -146,7 +146,8 @@ router.post('/', authMiddleware, async (req, res, next) => {
             userId: req.userId,
             items,
             shippingAddress,
-            paymentGateway
+            paymentGateway,
+            expectedSubtotal
         });
 
         if (order.payment_gateway === 'phonepe') {

@@ -151,6 +151,16 @@ describe('createOrder: server-side pricing and stock reservation', () => {
             // Navratri: 5% off the printer only.
             assert.equal(order.subtotal_amount, '19100.00');
             assert.equal(order.total_amount, '19100.00');
+
+            // A checkout tab opened in Navratri and submitted in Diwali must not be charged silently.
+            const stale = (expectedSubtotal) => orders.createOrder({
+                userId: user, items: [{ product_id: printer, quantity: 1 }],
+                shippingAddress: { phone: '9000000000', city: 'Pune' }, paymentGateway: 'phonepe', expectedSubtotal,
+            });
+            festival.clock.now = () => new Date('2026-10-21T00:00:30+05:30').getTime();
+            await rejectsWith(stale('19000.00'), 409);
+            assert.equal(await stockOf(printer), 4, 'a refused order reserves nothing');
+            assert.equal((await stale('19400.00')).order.subtotal_amount, '19400.00');
         } finally {
             festival.clock.now = () => OFF_SEASON;
         }

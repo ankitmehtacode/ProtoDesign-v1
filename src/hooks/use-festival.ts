@@ -11,17 +11,42 @@ export interface FestivalSale {
 }
 
 export interface FestivalStatus {
+    now: string;
     active: FestivalSale | null;
     next: FestivalSale | null;
 }
 
+// Server time minus this device's time. Deadlines are the server's, so a phone
+// with a wrong clock must still count down to the moment prices really change.
+let clockOffsetMs = 0;
+export const serverNow = () => Date.now() + clockOffsetMs;
+
 // One request per page load, shared by every banner and product page.
 let pending: Promise<FestivalStatus | null> | null = null;
-const load = () => (pending ??= apiService.getFestival().catch((error: unknown) => {
+const load = () => (pending ??= apiService.getFestival().then((status: FestivalStatus) => {
+    const server = Date.parse(status.now);
+    if (Number.isFinite(server)) clockOffsetMs = server - Date.now();
+    scheduleReloadAt(status.active?.ends_at);
+    return status;
+}).catch((error: unknown) => {
     console.error('Failed to load festival sale', error);
     pending = null; // let the next mount retry
     return null;
 }));
+
+/**
+ * When the running sale ends, every price on the page is out of date: the
+ * server already charges the new one. Reload rather than keep advertising a
+ * sale that is over. Checkout does not rely on this; the server refuses an
+ * order whose total the shopper was not shown.
+ */
+let reloadTimer: number | undefined;
+function scheduleReloadAt(endsAt: string | undefined) {
+    if (!endsAt || reloadTimer !== undefined) return;
+    const wait = Date.parse(endsAt) - serverNow() + 1500;
+    // setTimeout overflows past ~24.8 days; a tab open that long reloads on its next navigation anyway.
+    if (wait > 0 && wait < 2 ** 31 - 1) reloadTimer = window.setTimeout(() => window.location.reload(), wait);
+}
 
 /** The running and upcoming festival sale, from the server's schedule. */
 export function useFestival(): FestivalStatus | null {
@@ -39,10 +64,10 @@ export function useFestival(): FestivalStatus | null {
  * deadline is the server's: when it passes, prices really change.
  */
 export function useCountdown(endsAt: string | undefined): { d: number; h: number; m: number; s: number } | null {
-    const [now, setNow] = useState(() => Date.now());
+    const [now, setNow] = useState(serverNow);
     useEffect(() => {
         if (!endsAt) return;
-        const id = window.setInterval(() => setNow(Date.now()), 1000);
+        const id = window.setInterval(() => setNow(serverNow()), 1000);
         return () => window.clearInterval(id);
     }, [endsAt]);
     if (!endsAt) return null;

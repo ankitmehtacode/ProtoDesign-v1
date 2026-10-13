@@ -1,10 +1,10 @@
 import { formatINR } from '@/lib/currency';
-import { saleDay, useCountdown, useFestival } from '@/hooks/use-festival';
+import { saleDay, serverNow, useCountdown, useFestival } from '@/hooks/use-festival';
 
 interface PricedProduct {
     category: string;
     list_price?: number | string;
-    festival?: { name: string; ends_at: string } | null;
+    festival?: { id: string; name: string; ends_at: string } | null;
 }
 
 /**
@@ -19,7 +19,9 @@ export function FestivalPriceNote({ product }: { product: PricedProduct }) {
 
     const next = status?.next;
     const list = Number(product.list_price);
+    // Only a sale still to come: a status fetched before a boundary can name one that has already started.
     const nextPrice = next && next.category === product.category && list > 0
+        && Date.parse(next.starts_at) > serverNow() && next.id !== product.festival.id
         ? Math.round(list * (100 - next.percent_off) / 100)
         : null;
     const ends = left.d > 0 ? `${left.d}d ${left.h}h` : `${left.h}h ${left.m}m ${left.s}s`;

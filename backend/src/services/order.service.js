@@ -322,7 +322,7 @@ function shippingPaiseFor({ products, subtotalPaise, gateway }) {
     return COD_SHIPPING_PAISE;
 }
 
-async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway }) {
+async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway, expectedSubtotalPaise }) {
     // Ascending id order: concurrent orders lock shared products in the same
     // order, so they queue instead of deadlocking.
     const productIds = [...wanted.keys()].sort();
@@ -349,6 +349,12 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
                 // Shape consumed by emailService.sendOrderConfirmation.
                 product_name: product.name, price: fromPaise(unitPaise)
             });
+        }
+        // A price can change under an open checkout (a festival sale ending at
+        // midnight). Charge only what the shopper was shown; otherwise make them
+        // look again. Older clients send no expectation and are not checked.
+        if (expectedSubtotalPaise != null && expectedSubtotalPaise !== subtotalPaise) {
+            throw Object.assign(httpError(409, 'Prices have changed since you opened checkout. Please review your order.'), { code: 'PRICE_CHANGED' });
         }
         const shippingPaise = shippingPaiseFor({ products, subtotalPaise, gateway });
         const gstPaise = gstIncludedPaise(subtotalPaise);
@@ -392,13 +398,19 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
  *
  * @returns {Promise<{order: object, totalPaise: number, lines: object[]}>}
  */
-export async function createOrder({ userId, items, shippingAddress, paymentGateway }) {
+export async function createOrder({ userId, items, shippingAddress, paymentGateway, expectedSubtotal }) {
     const wanted = normalizeItems(items);
 
     const gateway = String(paymentGateway || 'phonepe').toLowerCase();
     if (!ALLOWED_GATEWAYS.includes(gateway)) throw httpError(400, 'Unsupported payment gateway');
 
-    const attempt = () => insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway });
+    let expectedSubtotalPaise = null;
+    if (expectedSubtotal != null) {
+        const n = Number(expectedSubtotal);
+        if (!Number.isFinite(n) || n < 0) throw httpError(400, 'expectedSubtotal must be a non-negative amount');
+        expectedSubtotalPaise = toPaise(n);
+    }
+    const attempt = () => insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway, expectedSubtotalPaise });
     try {
         return await attempt();
     } catch (err) {

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { saleDay, useCountdown, useFestival } from '@/hooks/use-festival';
+import { saleDay, serverNow, useCountdown, useFestival } from '@/hooks/use-festival';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 // The last day of a sale whose end is exclusive midnight.
@@ -17,7 +17,8 @@ export function FestivalBanner({ showShopLink }: { showShopLink?: boolean }) {
     if (!sale || !left) return null;
 
     const next = status?.next;
-    const priceRises = next && next.category === sale.category && next.percent_off < sale.percent_off;
+    const priceRises = next && next.category === sale.category && next.percent_off < sale.percent_off
+        && Date.parse(next.starts_at) > serverNow();
 
     return (
         <section

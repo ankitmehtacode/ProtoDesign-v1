@@ -32,7 +32,11 @@ const INDIAN_STATES = [
 
 const Checkout = () => {
     const navigate = useNavigate();
-    const { items, total, clearCart } = useCart();
+    const { items, total, clearCart, loadCart } = useCart();
+
+    // Prices can change while a cart sits in a tab (a festival sale ending), so
+    // checkout always starts from the server's current prices.
+    useEffect(() => { loadCart(true); }, [loadCart]);
     const [loading, setLoading] = useState(false);
     const [fetchingPincode, setFetchingPincode] = useState(false);
 
@@ -211,7 +215,7 @@ const Checkout = () => {
                 quantity: item.quantity,
             }));
 
-            const response = await apiService.createOrder(orderItems, formData, selectedGateway);
+            const response = await apiService.createOrder(orderItems, formData, selectedGateway, subtotal);
 
             if (response && response.redirectUrl) {
                 toast.loading('Redirecting to Payment Gateway...');
@@ -226,6 +230,12 @@ const Checkout = () => {
 
         } catch (error: any) {
             console.error('Order error:', error);
+            if (error?.status === 409) {
+                // The server refused to charge a price the shopper was not shown.
+                await loadCart(true);
+                toast.error('Prices have changed since you opened checkout. Please check the new total and place your order again.');
+                return;
+            }
             toast.error(error.message || 'Failed to place order');
         } finally {
             setLoading(false);
