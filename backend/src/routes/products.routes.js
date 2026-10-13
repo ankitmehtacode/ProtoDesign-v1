@@ -400,6 +400,18 @@ const parseSubCategory = (value) => {
     return value.trim() || null;
 };
 
+// The struck-through "was" price. undefined leaves it untouched (older clients
+// do not send it); null or '' ends the deal.
+const parseCompareAtPrice = (value) => {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) {
+        throw Object.assign(new Error('compare_at_price must be a positive number'), { status: 400 });
+    }
+    return n;
+};
+
 /**
  * Mint Cloudinary upload credentials for the browser. Scoped to a folder and
  * short-lived; admin-only because only admins add product media.
@@ -417,7 +429,7 @@ router.post('/upload-signature', authMiddleware, isAdmin, async (req, res, next)
 router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
     try {
         const { name, description, short_description, price, category, sub_category, stock,
-                specifications, is_archived, images, videoUrl } = req.body || {};
+                specifications, is_archived, images, videoUrl, compare_at_price } = req.body || {};
 
         if (typeof name !== 'string' || !name.trim()) {
             return res.status(400).json({ error: 'Product name is required' });
@@ -426,12 +438,13 @@ router.post('/', authMiddleware, isAdmin, async (req, res, next) => {
         const imageUrls = sanitizeMediaUrls(images, { max: 10 });
         const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
         const subCategory = parseSubCategory(sub_category);
+        const compareAtPrice = parseCompareAtPrice(compare_at_price) ?? null;
 
         const product = await db.one(
-            `INSERT INTO products (name, slug, description, short_description, price, category, sub_category, stock, specifications, video_url, is_archived)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+            `INSERT INTO products (name, slug, description, short_description, price, category, sub_category, stock, specifications, video_url, is_archived, compare_at_price)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
             [name, generateUniqueSlug(name), description, short_description, price, category, subCategory, stock, specifications,
-             video || null, is_archived === true || is_archived === 'true']
+             video || null, is_archived === true || is_archived === 'true', compareAtPrice]
         );
 
         for (let i = 0; i < imageUrls.length; i++) {
@@ -468,7 +481,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Product not found' });
 
         const { name, description, short_description, price, category, sub_category, stock,
-                specifications, imagesToDelete, is_archived, images, videoUrl, deleteVideo } = req.body || {};
+                specifications, imagesToDelete, is_archived, images, videoUrl, deleteVideo, compare_at_price } = req.body || {};
 
         // A multipart body parses to {} here, so this is also what an outdated
         // client that still posts raw files would hit.
@@ -480,8 +493,9 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         const [video] = sanitizeMediaUrls(videoUrl, { max: 1 });
         const idsToDelete = parseImageIds(imagesToDelete);
         const subCategory = parseSubCategory(sub_category);
+        const compareAtPrice = parseCompareAtPrice(compare_at_price);
 
-        const existing = await db.oneOrNone('SELECT slug FROM products WHERE id = $1', [req.params.id]);
+        const existing =await db.oneOrNone('SELECT slug FROM products WHERE id = $1', [req.params.id]);
         if (!existing) return res.status(404).json({ error: 'Product not found' });
 
         // A slug is the product's public URL, so it is minted once and kept
@@ -499,6 +513,10 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
                 [name, description, short_description, price, category, subCategory, stock, specifications,
                  is_archived === true || is_archived === 'true', slug, req.params.id]
             );
+
+            if (compareAtPrice !== undefined) {
+                await t.none('UPDATE products SET compare_at_price = $1 WHERE id = $2', [compareAtPrice, req.params.id]);
+            }
 
             if (video) {
                 await t.none('UPDATE products SET video_url = $1 WHERE id = $2', [video, req.params.id]);

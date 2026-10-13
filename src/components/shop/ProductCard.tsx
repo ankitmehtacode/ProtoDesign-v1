@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, Heart, Loader2, Plus, Star } from 'lucide-react';
 import { formatINR } from '@/lib/currency';
-import { CATEGORY_LABELS, Product, isMadeToOrder, productImageUrls as imageUrls, sizedImage, sizedSrcSet } from './product';
+import { CATEGORY_LABELS, Product, dealPrice, isMadeToOrder, productImageUrls as imageUrls, sizedImage, sizedSrcSet } from './product';
 
 // Only genuinely scarce stock earns the badge; flagging most of the catalog would make it noise.
 const LOW_STOCK_THRESHOLD = 3;
@@ -54,6 +54,7 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
     const images = imageUrls(product);
     const badge = statusBadge(product);
     const soldOut = product.stock <= 0;
+    const was = dealPrice(product);
     const href = `/product/${product.slug || product.id}`;
     const reviewCount = product.review_count || 0;
 
@@ -109,6 +110,13 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                     </span>
                 )}
 
+                {/* Separate from the status badge: a deal and "Only 2 left" are both true at once. */}
+                {was !== null && (
+                    <span className="absolute bottom-3 left-3 rounded-full bg-[hsl(var(--ember))] px-2.5 py-1 text-[11px] font-semibold text-neutral-950">
+                        Festive Deal
+                    </span>
+                )}
+
                 <motion.button
                     type="button"
                     onClick={() => onToggleLike(product)}
@@ -150,7 +158,16 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                 </h3>
 
                 <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-                    <span className="text-base font-bold tabular-nums text-foreground md:text-lg">{formatINR(product.price)}</span>
+                    <span className="flex flex-col leading-tight">
+                        {was !== null && (
+                            <s className="text-xs tabular-nums text-muted-foreground">
+                                <span className="sr-only">Was </span>{formatINR(was)}
+                            </s>
+                        )}
+                        <span className="text-base font-bold tabular-nums text-foreground md:text-lg">
+                            {was !== null && <span className="sr-only">Now </span>}{formatINR(product.price)}
+                        </span>
+                    </span>
 
                     <motion.button
                         type="button"
