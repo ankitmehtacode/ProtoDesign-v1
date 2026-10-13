@@ -69,7 +69,7 @@ class ApiService {
                 errBody?.error ||
                 errBody?.message ||
                 `HTTP ${res.status}`;
-            throw new Error(msg);
+            throw Object.assign(new Error(msg), { status: res.status });
         }
 
         if (contentType.includes("application/json")) {
@@ -231,6 +231,11 @@ class ApiService {
         return this.request(`/products${query}`, { method: "GET" });
     }
 
+    /** Festival sale schedule (backend/src/services/festival.js). */
+    async getFestival() {
+        return this.request("/festival", { method: "GET", skipAuth: true });
+    }
+
     async getProduct(id: string) {
         return this.request(`/products/${id}`, { method: "GET" });
     }
@@ -296,13 +301,15 @@ class ApiService {
     }
 
     // The server prices the order (subtotal, GST, shipping); it takes no amounts from here.
-    async createOrder(items: any[], shippingAddress: any, paymentGateway: string) {
+    /** expectedSubtotal: what checkout showed; the server refuses with 409 if prices moved. */
+    async createOrder(items: any[], shippingAddress: any, paymentGateway: string, expectedSubtotal?: number) {
         return this.request('/orders', {
             method: 'POST',
             body: JSON.stringify({
                 items,
                 shippingAddress,
-                paymentGateway
+                paymentGateway,
+                expectedSubtotal
             }),
         });
     }

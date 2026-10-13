@@ -3,6 +3,7 @@
 import express from 'express';
 import db from '../config/database.js';
 import authMiddleware from '../middleware/auth.js';
+import { festivalPrice } from '../services/festival.js';
 
 const router = express.Router();
 
@@ -50,6 +51,11 @@ router.get('/', authMiddleware, async (req, res, next) => {
             WHERE c.user_id = $1
             GROUP BY c.id, c.user_id, c.created_at, c.updated_at
         `, [userId]);
+
+        // Same price checkout will charge (order.service.js).
+        for (const item of cart?.items ?? []) {
+            if (item.product) item.product = festivalPrice(item.product);
+        }
 
         res.json({
             success: true,

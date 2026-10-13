@@ -18,6 +18,8 @@ import whatsappRoutes, { webhookRouter as whatsappWebhookRoutes } from './src/ro
 import { WORKER_EVENT_SOURCE } from './src/services/whatsapp.service.js';
 import { runWorker } from './src/services/whatsapp.worker.js';
 import { CATALOG_SYNC_EVENT_SOURCE, runCatalogSync } from './src/services/catalog.sync.js';
+import { FESTIVAL_REBUILD_EVENT_SOURCE, festivalStatus } from './src/services/festival.js';
+import { requestSiteRebuild } from './src/services/site.rebuild.js';
 
 const app = express();
 
@@ -136,6 +138,12 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Sale schedule for the storefront banner. Changes only at a sale boundary.
+app.get('/api/festival', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json(festivalStatus());
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/orders', ordersRoutes);
@@ -173,6 +181,11 @@ export const handler = async (event: any, context: any) => {
     }
     if (event?.source === CATALOG_SYNC_EVENT_SOURCE) {
         return runCatalogSync({ remainingMs: () => context.getRemainingTimeInMillis() });
+    }
+    // A sale starting or ending changes every printer's price; prerendered pages
+    // must follow or Merchant Center sees them disagree with the feed.
+    if (event?.source === FESTIVAL_REBUILD_EVENT_SOURCE) {
+        return requestSiteRebuild('festival_boundary');
     }
     return httpHandler(event, context);
 };

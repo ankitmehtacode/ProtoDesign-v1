@@ -131,6 +131,21 @@ describe('PUT /api/products/:id', () => {
         assert.equal(res.status, 404);
     });
 
+    it('refuses a save that would make the festival price permanent', async () => {
+        const festival = await import('../src/services/festival.js');
+        const realNow = festival.clock.now;
+        festival.clock.now = () => new Date('2026-10-15T12:00:00+05:30').getTime();
+        try {
+            const p = await db.one(`INSERT INTO products (name, price, category) VALUES ('Printer', 100, '3d_printer') RETURNING id`);
+            const body = { ...base, category: '3d_printer' };
+            assert.equal((await put(p.id, { ...body, price: 95 })).status, 409); // Navratri price of 100
+            assert.equal((await put(p.id, { ...body, price: 90 })).status, 200); // a real price change
+            assert.equal((await put(p.id, { ...body, price: 90 })).status, 200); // unchanged price
+        } finally {
+            festival.clock.now = realNow;
+        }
+    });
+
     it('sets, keeps and ends the struck-through compare_at_price', async () => {
         const p = await seedProduct();
         const wasPrice = async () => (await db.one('SELECT compare_at_price FROM products WHERE id = $1', [p.id])).compare_at_price;

@@ -14,6 +14,12 @@ export interface Product {
     price: number;
     /** Struck-through reference price; pg returns DECIMAL as a string. */
     compare_at_price?: number | string | null;
+    /** Stored price before any festival discount; what admin editors read and save. */
+    list_price?: number | string;
+    /** Stored struck price, before a festival sale raises it to the list price. */
+    list_compare_at_price?: number | string | null;
+    /** Set while a festival sale lowers this product's price. */
+    festival?: { id: string; name: string; percent_off: number; ends_at: string } | null;
     stock: number;
     likes_count: number;
     average_rating?: number;

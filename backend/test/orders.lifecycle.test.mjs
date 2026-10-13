@@ -24,6 +24,11 @@ const { default: db, pgp } = await import('../src/config/database.js');
 const orders = await import('../src/services/order.service.js');
 const { phonePeService } = await import('../src/services/phonepe.service.js');
 const { emailService } = await import('../src/services/email.service.js');
+const festival = await import('../src/services/festival.js');
+
+// Outside every festival sale, so list prices are what gets charged.
+const OFF_SEASON = new Date('2026-12-01T12:00:00+05:30').getTime();
+festival.clock.now = () => OFF_SEASON;
 const { default: ordersRouter } = await import('../src/routes/orders.routes.js');
 const { default: errorHandler } = await import('../src/middleware/errorHandler.js');
 
@@ -134,6 +139,31 @@ describe('createOrder: server-side pricing and stock reservation', () => {
 
         await rejectsWith(place(user, [[printer, 1]], 'cod'), 400);
         assert.equal(await stockOf(printer), 4);
+    });
+
+    it('charges the festival price for printers during a sale, and only for printers', async () => {
+        festival.clock.now = () => new Date('2026-10-15T12:00:00+05:30').getTime();
+        try {
+            const user = await seedUser();
+            const printer = await seedProduct({ price: '20000.00', category: '3d_printer', stock: 5 });
+            const filament = await seedProduct({ price: '100.00', category: 'filament' });
+            const order = await place(user, [[printer, 1], [filament, 1]]);
+            // Navratri: 5% off the printer only.
+            assert.equal(order.subtotal_amount, '19100.00');
+            assert.equal(order.total_amount, '19100.00');
+
+            // A checkout tab opened in Navratri and submitted in Diwali must not be charged silently.
+            const stale = (expectedSubtotal) => orders.createOrder({
+                userId: user, items: [{ product_id: printer, quantity: 1 }],
+                shippingAddress: { phone: '9000000000', city: 'Pune' }, paymentGateway: 'phonepe', expectedSubtotal,
+            });
+            festival.clock.now = () => new Date('2026-10-21T00:00:30+05:30').getTime();
+            await rejectsWith(stale('19000.00'), 409);
+            assert.equal(await stockOf(printer), 4, 'a refused order reserves nothing');
+            assert.equal((await stale('19400.00')).order.subtotal_amount, '19400.00');
+        } finally {
+            festival.clock.now = () => OFF_SEASON;
+        }
     });
 
     it('refuses cash on delivery at or above the subtotal limit unless a product overrides it', async () => {

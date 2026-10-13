@@ -48,8 +48,8 @@ const App = () => (
                     {/* Main Layout Wrapper */}
                     <div className="flex flex-col min-h-screen">
                         <Navigation />
-                        {/* Content Grows to fill space */}
-                        <div className="flex-1">
+                        {/* Content Grows to fill space; moves down while the sale bar sits above the navigation */}
+                        <div className="flex-1 pt-[var(--sale-bar-h,0px)]">
                             <Suspense fallback={<div className="min-h-screen" />}>
                             <Routes>
                                 <Route path="/" element={<Index />} />
