@@ -340,7 +340,7 @@ export function ProductCatalog({ eyebrow, title, subtitle, category, categories,
                 <FestivalBanner showShopLink={category !== '3d_printer'} />
 
                 {/* Stays under the fixed 80px nav so filters are one thumb-reach away while scrolling. */}
-                <div className="sticky top-20 z-30 -mx-4 space-y-4 bg-background/85 px-4 pb-3 pt-3 backdrop-blur-md">
+                <div className="sticky top-[calc(5rem+var(--sale-bar-h,0px))] z-30 -mx-4 space-y-4 bg-background/85 px-4 pb-3 pt-3 backdrop-blur-md">
                     <div className="flex items-center gap-2">
                         <label className="relative flex-1">
                             <span className="sr-only">Search products</span>

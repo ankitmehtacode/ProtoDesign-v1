@@ -105,7 +105,7 @@ const Cart = () => {
                     </div>
 
                     <div className="lg:col-span-1">
-                        <Card className="sticky top-24 shadow-lg border-2 border-primary/5">
+                        <Card className="sticky top-[calc(6rem+var(--sale-bar-h,0px))] shadow-lg border-2 border-primary/5">
                             <CardHeader><CardTitle>Order Summary</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-3">

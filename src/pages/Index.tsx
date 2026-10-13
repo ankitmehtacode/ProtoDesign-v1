@@ -1,4 +1,5 @@
 import { MaterialsHero } from "@/components/home/MaterialsHero";
+import { FestivalDeals } from "@/components/home/FestivalDeals";
 import { HeatLadder } from "@/components/home/HeatLadder";
 import { FibreUpgrade } from "@/components/home/FibreUpgrade";
 import { PrintMarquee } from "@/components/home/PrintMarquee";
@@ -11,10 +12,13 @@ import { ShopPaths } from "@/components/home/ShopPaths";
 // (HeatLadder), then that material at work: a file becoming a race car
 // (PrintStory), and what else people print and what it costs (PrintMarquee).
 // Then fibre composites (FibreUpgrade), the answers before paying
-// (WhatToExpect), and the rest of the shop (ShopPaths). The home page is dark; see ThemeScope in App.
+// (WhatToExpect), and the rest of the shop (ShopPaths). During a festival sale,
+// its printers sit right under the hero (FestivalDeals): the sale has a deadline,
+// the materials story does not. The home page is dark; see ThemeScope in App.
 const Index = () => (
     <div>
         <MaterialsHero />
+        <FestivalDeals />
         <HeatLadder />
         <PrintStory />
         <PrintMarquee />

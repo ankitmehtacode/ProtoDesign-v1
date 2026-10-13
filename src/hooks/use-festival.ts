@@ -76,6 +76,10 @@ export function useCountdown(endsAt: string | undefined): { d: number; h: number
     return { d: Math.floor(left / 86400), h: Math.floor(left / 3600) % 24, m: Math.floor(left / 60) % 60, s: left % 60 };
 }
 
+/** "6d 4h" while days remain, then "4h 3m 2s": precise only when it matters. */
+export const shortLeft = (left: { d: number; h: number; m: number; s: number }) =>
+    left.d > 0 ? `${left.d}d ${left.h}h` : `${left.h}h ${left.m}m ${left.s}s`;
+
 /** "21 Oct" in IST, the timezone the sale dates are set in. */
 export const saleDay = (iso: string) =>
     new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });

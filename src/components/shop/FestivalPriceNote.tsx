@@ -1,5 +1,5 @@
 import { formatINR } from '@/lib/currency';
-import { saleDay, serverNow, useCountdown, useFestival } from '@/hooks/use-festival';
+import { saleDay, serverNow, shortLeft, useCountdown, useFestival } from '@/hooks/use-festival';
 
 interface PricedProduct {
     category: string;
@@ -24,11 +24,10 @@ export function FestivalPriceNote({ product }: { product: PricedProduct }) {
         && Date.parse(next.starts_at) > serverNow() && next.id !== product.festival.id
         ? Math.round(list * (100 - next.percent_off) / 100)
         : null;
-    const ends = left.d > 0 ? `${left.d}d ${left.h}h` : `${left.h}h ${left.m}m ${left.s}s`;
 
     return (
         <p className="mt-2 text-sm font-medium text-[hsl(var(--ember))]">
-            {product.festival.name.replace(/ Sale$/, '')} price ends in {ends}.
+            {product.festival.name.replace(/ Sale$/, '')} price ends in {shortLeft(left)}.
             {nextPrice !== null && <> From {saleDay(next!.starts_at)}: {formatINR(nextPrice)}.</>}
         </p>
     );
