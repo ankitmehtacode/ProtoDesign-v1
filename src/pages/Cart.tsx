@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from "@/hooks/use-cart";
 import { apiService } from '@/services/api.service';
 import { Button } from '@/components/ui/button';
@@ -70,17 +70,19 @@ const Cart = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-4">
-                        {items.map((item) => (
+                        {items.map((item) => {
+                            const href = `/product/${item.product.slug || item.product_id}`;
+                            return (
                             <Card key={item.product_id} className="overflow-hidden border-none shadow-sm">
                                 <CardContent className="p-6">
                                     <div className="flex flex-col sm:flex-row gap-6">
                                         {item.product.image_url && (
-                                            <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden bg-card flex-shrink-0 border">
-                                                <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-contain" />
-                                            </div>
+                                            <Link to={href} tabIndex={-1} aria-hidden="true" className="block w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden bg-card flex-shrink-0 border">
+                                                <img src={item.product.image_url} alt="" className="w-full h-full object-contain" />
+                                            </Link>
                                         )}
                                         <div className="flex-1">
-                                            <h3 className="font-semibold text-lg mb-1">{item.product.name}</h3>
+                                            <h3 className="font-semibold text-lg mb-1"><Link to={href} className="hover:text-primary hover:underline underline-offset-2">{item.product.name}</Link></h3>
                                             <p className="text-sm text-muted-foreground mb-2">{CATEGORY_LABELS[item.product.category] ?? 'Product'}</p>
                                             <p className="text-primary font-bold text-lg">{formatINR(item.product.price)} each</p>
                                         </div>
@@ -98,7 +100,8 @@ const Cart = () => {
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     <div className="lg:col-span-1">
