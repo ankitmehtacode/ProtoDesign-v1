@@ -215,10 +215,20 @@ export const quoteServiceLd = () => ({
     description: PAGES["/custom"].description,
 });
 
+// Mirrors backend/src/services/order.service.js: an order containing a 3D
+// printer ships free; any other order pays ONLINE_SHIPPING_PAISE when paid online.
+export const PRINTER_CATEGORY = "3d_printer";
+const ONLINE_SHIPPING_INR = 199;
+
 /**
- * @param {{ name: string, slug?: string, id: string, description?: string, short_description?: string,
- *           price: number | string, stock: number, image_url?: string | null, images?: string[], category?: string,
- *           specifications?: unknown, festival?: { ends_at: string } | null }} p
+ * @typedef {{ name: string, slug?: string, id: string, description?: string, short_description?: string,
+ *             price: number | string, list_price?: number | string, stock: number, image_url?: string | null,
+ *             images?: string[], category?: string, specifications?: unknown,
+ *             festival?: { name: string, ends_at: string } | null }} SeoProduct
+ */
+
+/**
+ * @param {SeoProduct} p
  * @param {string} categoryName
  * @param {string} categoryPath
  */
@@ -227,6 +237,9 @@ export const productLd = (p, categoryName, categoryPath) => {
     const specs = specMap(p.specifications);
     const madeToOrder = specs.Fulfilment === "Made to order";
     const grams = parseFloat(specs["Approx. weight"] ?? "");
+    const brand = productBrand(p);
+    const regular = festivalRegularPrice(p);
+    const comparable = comparableSpecs(p.specifications);
     return [
         {
             "@context": "https://schema.org",
@@ -236,7 +249,13 @@ export const productLd = (p, categoryName, categoryPath) => {
             description: plainText(p.short_description || p.description || p.name, 5000),
             image: p.images?.length ? p.images : p.image_url ? [p.image_url] : undefined,
             sku: p.id,
-            brand: { "@type": "Brand", name: SITE_NAME },
+            // The maker, not the shop: a Bambu Lab printer is not a ProtoDesign product.
+            brand: brand ? { "@type": "Brand", name: brand } : undefined,
+            model: specLookup(p.specifications, MODEL_KEYS),
+            // The specs shoppers compare printers on, under one name each.
+            additionalProperty: comparable.length
+                ? comparable.map(([name, value]) => ({ "@type": "PropertyValue", name, value }))
+                : undefined,
             category: categoryName,
             material: specs.Material || undefined,
             weight: grams > 0 ? { "@type": "QuantitativeValue", value: grams, unitCode: "GRM" } : undefined,
@@ -254,6 +273,13 @@ export const productLd = (p, categoryName, categoryPath) => {
                 url,
                 priceCurrency: "INR",
                 price: Number(p.price).toFixed(2),
+                // During a festival sale, the price this product sold at the day before.
+                priceSpecification: regular ? {
+                    "@type": "UnitPriceSpecification",
+                    priceType: "https://schema.org/StrikethroughPrice",
+                    price: regular.toFixed(2),
+                    priceCurrency: "INR",
+                } : undefined,
                 // A festival price lapses at its sale's end; its last day, in IST.
                 priceValidUntil: p.festival?.ends_at
                     ? new Date(new Date(p.festival.ends_at).getTime() - 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
@@ -265,6 +291,7 @@ export const productLd = (p, categoryName, categoryPath) => {
                 shippingDetails: {
                     "@type": "OfferShippingDetails",
                     shippingDestination: { "@type": "DefinedRegion", addressCountry: "IN" },
+                    shippingRate: { "@type": "MonetaryAmount", value: p.category === PRINTER_CATEGORY ? 0 : ONLINE_SHIPPING_INR, currency: "INR" },
                     deliveryTime: {
                         "@type": "ShippingDeliveryTime",
                         handlingTime: { "@type": "QuantitativeValue", minValue: 2, maxValue: 3, unitCode: "DAY" },
@@ -283,6 +310,23 @@ export const productLd = (p, categoryName, categoryPath) => {
         breadcrumbLd([{ name: "Shop", path: "/shop" }, { name: categoryName, path: categoryPath }, { name: plainText(p.name, 200), path: new URL(url).pathname }]),
     ];
 };
+
+/**
+ * A category page's products as an ItemList, so search engines and assistants
+ * read the listing as a set of products rather than a page of links.
+ * @param {SeoProduct[]} products
+ */
+export const itemListLd = (products) => ({
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    numberOfItems: products.length,
+    itemListElement: products.map((p, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        url: productUrl(p),
+        name: plainText(p.name, 200),
+    })),
+});
 
 // --- Helpers ------------------------------------------------------------------
 
@@ -308,6 +352,85 @@ export function specMap(specs) {
     return Object.fromEntries(entries.filter(([k, v]) => typeof k === "string" && v != null).map(([k, v]) => [k, String(v)]));
 }
 
+/**
+ * The festival's struck price: the stored price while a sale discounts it.
+ * Null outside a sale. Our own earlier price is the only honest strikethrough;
+ * reference prices copied from other stores are never marked up as one.
+ * @param {SeoProduct} p
+ */
+export function festivalRegularPrice(p) {
+    const regular = Number(p.list_price);
+    return p.festival && regular > Number(p.price) ? regular : null;
+}
+
+// Makers we resell, spelled as they spell themselves. Matched at the start of
+// a product name when the Brand specification is missing.
+const MAKERS = ["Bambu Lab", "Creality", "ELEGOO", "Anycubic", "Snapmaker", "Phrozen", "Flashforge", "Prusa", "QIDI", "Sovol", "Formlabs", "xTool", SITE_NAME];
+
+/**
+ * The maker: the Brand specification, else a known maker the name starts
+ * with. ProtoDesign for our own prints, filament and parts. A printer we
+ * cannot attribute gets no brand rather than ours.
+ * @param {SeoProduct} p
+ */
+export function productBrand(p) {
+    const fromSpec = specLookup(p.specifications, ["brand"]);
+    if (fromSpec) return fromSpec;
+    const name = plainText(p.name, 200).toLowerCase();
+    const maker = MAKERS.find((m) => name === m.toLowerCase() || new RegExp(`^${m.toLowerCase()}\\b`).test(name));
+    if (maker) return maker;
+    return p.category === PRINTER_CATEGORY ? undefined : SITE_NAME;
+}
+
+const MODEL_KEYS = ["model", "model name", "model no."];
+
+// Specification keys arrive from several sources with stray tabs, colons and
+// casing ("Build Size (mm)\t", " Technology:"). Each comparable spec lists the
+// keys that mean it; the first one present wins.
+const COMPARABLE_SPECS = /** @type {const} */ ([
+    ["Technology", ["technology", "print technology"]],
+    ["Build volume", ["build volume", "build size (mm)", "print size (l x w x h) (mm)", "build volume (w*d*h)", "print volume", "printing volume"]],
+    ["Max print speed", ["max print speed", "printing speed (mm/s)", "print speed", "printing speed", "maximum printing speed", "max speed of toolhead"]],
+    ["Max nozzle temperature", ["max nozzle temperature", "nozzle max temperature (°c)", "max hotend temperature", "nozzle temperature (°c)"]],
+    ["Multi-colour", ["multi-colour"]],
+    ["Bed levelling", ["bed levelling"]],
+    ["Motion system", ["motion system"]],
+    ["Connectivity", ["connectivity", "data transmission method"]],
+]);
+
+const normKey = (/** @type {string} */ k) => k.replace(/[\t:]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * The value of the first of `keys` present, matched loosely; undefined if none.
+ * @param {unknown} specs
+ * @param {readonly string[]} keys
+ */
+export function specLookup(specs, keys) {
+    const byKey = new Map(Object.entries(specMap(specs)).map(([k, v]) => [normKey(k), plainText(v, 200)]));
+    for (const key of keys) {
+        const value = byKey.get(key);
+        if (value) return value;
+    }
+    return undefined;
+}
+
+// A bare number under a key that named its unit ("Printing Speed (mm/s)": "500").
+const UNITS = /** @type {Record<string, string>} */ ({ "Max print speed": "mm/s", "Max nozzle temperature": "°C" });
+
+/** [name, value] for each comparable spec the product records. @param {unknown} specs */
+export const comparableSpecs = (specs) => COMPARABLE_SPECS
+    .map(([name, keys]) => {
+        const value = specLookup(specs, keys);
+        return [name, value && UNITS[name] && /^\d+(\.\d+)?$/.test(value) ? `${value} ${UNITS[name]}` : value];
+    })
+    .filter((/** @type {[string, string | undefined]} */ [, v]) => v);
+
+/** "11 Oct": the day an instant falls on in IST, where sale dates are set. @param {string | number} at */
+export const istDay = (at) => new Date(at).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+
+/** A sale's last day; its end is the exclusive midnight after it. @param {string} endsAt */
+export const saleLastDay = (endsAt) => istDay(new Date(endsAt).getTime() - 1000);
+
 /** Strip markup and collapse whitespace, then trim to a word boundary. */
 export function plainText(s = "", max = 160) {
     const t = String(s).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -325,8 +448,15 @@ export const productTitle = (/** @type {string} */ rawName, /** @type {string} *
     return `${plainText(name, 50)} | ${SITE_NAME}`;
 };
 
-export const productDescription = (/** @type {{ name: string, price: number | string, short_description?: string, description?: string }} */ p) => {
+export const productDescription = (/** @type {SeoProduct} */ p) => {
     const price = `₹${Math.round(Number(p.price)).toLocaleString("en-IN")}`;
+    const name = plainText(p.name, 200);
+    if (p.category === PRINTER_CATEGORY) {
+        // The full price to the door, so it compares straight against other stores.
+        const sale = p.festival ? ` in our ${p.festival.name}, until ${saleLastDay(p.festival.ends_at)}` : "";
+        const body = plainText(p.short_description || p.description || "", 90);
+        return plainText(`${name} at ${price}${sale}, GST included, free shipping across India. ${body}`, 160);
+    }
     const body = plainText(p.short_description || p.description || "", 110);
-    return plainText(`${plainText(p.name, 200)} at ${price}. ${body} Delivered across India.`, 160);
+    return plainText(`${name} at ${price}. ${body} Delivered across India.`, 160);
 };

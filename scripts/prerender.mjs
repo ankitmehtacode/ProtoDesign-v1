@@ -16,8 +16,9 @@ import { createServer } from "vite";
 import { FAQ, faqLd } from "../src/seo/faq.js";
 import {
     CATEGORY_PAGES, DEFAULT_IMAGE, NOT_FOUND, ORG, PAGES, SITE_NAME, SITE_URL,
-    breadcrumbLd, organizationLd, plainText, productDescription, productLd,
-    productTitle, productUrl, quoteServiceLd, specMap, websiteLd,
+    PRINTER_CATEGORY, breadcrumbLd, comparableSpecs, festivalRegularPrice, itemListLd, organizationLd,
+    plainText, productBrand, productDescription, productLd, productTitle, productUrl, quoteServiceLd,
+    istDay, saleLastDay, specMap, websiteLd,
 } from "../src/seo/site.js";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
@@ -56,23 +57,36 @@ const nav = () => {
     return `<nav aria-label="Site"><ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">${links
         .map(([href, label]) => `<li><a href="${href}">${esc(label)}</a></li>`).join("")}</ul></nav>`;
 };
+// Same rule as the home page's deals: the product name is the reliable signal.
+const IS_PRINTER = /\bprinter\b/i;
 const inr = (n) => `₹${Math.round(Number(n)).toLocaleString("en-IN")}`;
 
 function pageBody(meta, products = [], extra = "") {
     if (!meta.h1) return "";
     const list = products.length
         ? `<ul class="mt-8 space-y-2">${products
-            .map((p) => `<li><a href="${new URL(productUrl(p)).pathname}">${esc(plainText(p.name, 200))}</a>: ${inr(p.price)}${p.stock > 0 ? "" : " (sold out)"}</li>`)
+            .map((p) => `<li><a href="${new URL(productUrl(p)).pathname}">${esc(plainText(p.name, 200))}</a>: ${esc(priceText(p))}${p.stock > 0 ? "" : " (sold out)"}</li>`)
             .join("")}</ul>`
         : "";
     return shell(`${nav()}<h1 class="mt-8 font-display text-3xl font-bold">${esc(meta.h1)}</h1><p class="mt-3 max-w-xl text-muted-foreground">${esc(meta.intro ?? meta.description)}</p>${list}${extra}`);
 }
 
+/** "₹37,144 (Navratri Sale until 20 Oct; regular price ₹39,099)", or the plain price. */
+function priceText(p) {
+    const regular = festivalRegularPrice(p);
+    return regular ? `${inr(p.price)} (${p.festival.name} until ${saleLastDay(p.festival.ends_at)}; regular price ${inr(regular)})` : inr(p.price);
+}
+
+const stockText = (p) => p.stock <= 0 ? "Sold out" : specMap(p.specifications).Fulfilment === "Made to order" ? "Made to order" : "In stock";
+
 function productBody(p, categoryName, categoryPath) {
     const desc = plainText(p.description || p.short_description || "", 1200);
+    const printer = p.category === PRINTER_CATEGORY;
+    const specs = comparableSpecs(p.specifications);
     return shell(`${nav()}<p class="mt-8 text-sm text-muted-foreground"><a href="${categoryPath}">${esc(categoryName)}</a></p>` +
         `<h1 class="mt-2 font-display text-3xl font-bold">${esc(plainText(p.name, 200))}</h1>` +
-        `<p class="mt-3 text-lg">${inr(p.price)} · ${p.stock <= 0 ? "Sold out" : specMap(p.specifications).Fulfilment === "Made to order" ? "Made to order" : "In stock"} · Delivered across India</p>` +
+        `<p class="mt-3 text-lg">${esc(priceText(p))} · GST included · ${stockText(p)} · ${printer ? "Free shipping across India" : "Delivered across India"}</p>` +
+        (specs.length ? `<ul class="mt-4 space-y-1 text-sm">${specs.map(([k, v]) => `<li>${esc(k)}: ${esc(v)}</li>`).join("")}</ul>` : "") +
         (desc ? `<p class="mt-4 max-w-xl text-muted-foreground">${esc(desc)}</p>` : ""));
 }
 
@@ -109,6 +123,15 @@ async function fetchProducts() {
         }));
 }
 
+/** The running and next festival sale, from the schedule checkout charges by. */
+async function fetchFestival() {
+    if (!API) return null;
+    const res = await fetch(`${API}/festival`, { signal: AbortSignal.timeout(20_000) });
+    if (res.status === 404) return null; // a backend without the festival schedule
+    if (!res.ok) throw new Error(`GET ${API}/festival -> ${res.status}`);
+    return res.json();
+}
+
 const template = await readFile(join(DIST, "index.html"), "utf8");
 
 // Renders real app components (legal pages, FAQ) to HTML at build time, so the
@@ -118,6 +141,13 @@ const vite = await createServer({ root: ROOT, appType: "custom", logLevel: "erro
 const { renderPage, renderFaq } = await vite.ssrLoadModule("/src/seo/ssr.tsx");
 
 let products = [];
+let festival = null;
+try {
+    festival = await fetchFestival();
+} catch (error) {
+    // llms.txt then just omits the sale schedule; prices still come from /products.
+    console.error(`[prerender] festival schedule unavailable: ${error.message}`);
+}
 try {
     products = await fetchProducts();
 } catch (error) {
@@ -136,6 +166,7 @@ for (const [route, meta] of Object.entries(PAGES)) {
     }
     const inCategory = meta.category ? products.filter((p) => p.category === meta.category)
         : route === "/shop" ? products : [];
+    if (!meta.noindex && meta.category && inCategory.length) ld.push(itemListLd(inCategory));
     await write(route, render(template,
         head({ title: meta.title, description: meta.description, canonical: `${SITE_URL}${route}`, noindex: meta.noindex, ld }),
         meta.noindex ? "" : renderedBody(route) ?? pageBody(meta, inCategory, route === "/custom" ? renderFaq() : "")));
@@ -162,7 +193,7 @@ for (const p of products) {
 await write("/_app", render(template, head({ title: SITE_NAME, description: PAGES["/"].description, canonical: "" }), ""));
 await write("/404", render(template, head({ ...NOT_FOUND, canonical: "" }), ""));
 
-await writeFile(join(DIST, "llms.txt"), llmsTxt(products));
+await writeFile(join(DIST, "llms.txt"), llmsTxt(products, festival));
 await vite.close();
 
 console.log(`[prerender] wrote ${count} pages (${products.length} products) + _app.html, 404.html, llms.txt`);
@@ -177,14 +208,32 @@ function renderedBody(route) {
  * /llms.txt (llmstxt.org): a plain-Markdown brief for AI assistants and agents,
  * built from the same data as the pages so it never goes stale.
  */
-function llmsTxt(list) {
+function llmsTxt(list, festival) {
     const a = ORG.address;
     const md = (s) => String(s).replace(/\s+/g, " ").trim();
     const indexable = Object.entries(PAGES).filter(([, m]) => !m.noindex);
+    // Printers cheapest first with brand and key specs: the shape of a price comparison.
+    const printerLine = (p) => {
+        const facts = [productBrand(p), ...comparableSpecs(p.specifications).filter(([k]) => k === "Technology" || k === "Build volume").map(([k, v]) => `${k.toLowerCase()} ${v}`)]
+            .filter(Boolean).join(", ");
+        return `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${priceText(p)}, GST included, free shipping. ${stockText(p)}.${facts ? ` ${md(facts)}.` : ""}`;
+    };
     const byCategory = Object.entries(CATEGORY_PAGES).map(([key, [name, path]]) => {
         const items = list.filter((p) => p.category === key);
-        return items.length ? [`### ${name} (${SITE_URL}${path})`, ...items.map((p) => `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${inr(p.price)}, GST included`), ""] : [];
+        if (!items.length) return [];
+        if (key === PRINTER_CATEGORY) {
+            // The category also holds scanners, engravers and wash stations; listing
+            // them among the printers would make them read as the cheapest printers.
+            const cheapestFirst = [...items].sort((x, y) => Number(x.price) - Number(y.price));
+            const printers = cheapestFirst.filter((p) => IS_PRINTER.test(p.name));
+            const others = cheapestFirst.filter((p) => !IS_PRINTER.test(p.name));
+            return [`### ${name} (${SITE_URL}${path})`, ...printers.map(printerLine), "",
+                ...(others.length ? ["### Scanners, laser engravers and resin wash & cure stations (also ship free)", ...others.map(printerLine), ""] : [])];
+        }
+        return [`### ${name} (${SITE_URL}${path})`, ...items.map((p) => `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${priceText(p)}, GST included`), ""];
     }).flat();
+    const sales = [festival?.active, festival?.next].filter(Boolean).map((s) =>
+        `- ${s.name}: ${s.percent_off}% off every 3D printer, ${istDay(s.starts_at)} to ${saleLastDay(s.ends_at)} (IST).`);
     return [
         `# ${SITE_NAME}`,
         "",
@@ -198,6 +247,14 @@ function llmsTxt(list) {
         "",
         "## Pages",
         ...indexable.map(([path, m]) => `- [${md(m.h1 ?? m.title)}](${SITE_URL}${path === "/" ? "/" : path}): ${md(m.description)}`),
+        "",
+        "## Buying a 3D printer from ProtoDesign",
+        "- Listed prices include 18% GST. A GST invoice is issued by " + ORG.legalName + ` (GSTIN ${ORG.gstin}).`,
+        "- Every order containing a 3D printer ships free anywhere in India. Other orders pay ₹199 shipping.",
+        "- Payment online through PhonePe. Cash on delivery is not available for orders containing a 3D printer.",
+        `- Dispatched in 2–3 business days; delivered in 3–5 working days to metro cities and 5–7 elsewhere (${SITE_URL}/shipping-policy).`,
+        `- Returns within 7 days of delivery for items that arrive defective, damaged or not as described (${SITE_URL}/return-policy).`,
+        ...(sales.length ? ["", "### Festival sales", ...sales, "The printer prices below include the sale that is running."] : []),
         "",
         "## Frequently asked questions",
         ...FAQ.flatMap(({ q, a: ans }) => [`### ${q}`, ans, ""]),
