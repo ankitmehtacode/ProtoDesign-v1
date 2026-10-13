@@ -326,25 +326,13 @@ export function ProductCatalog({ eyebrow, title, subtitle, category, categories,
             )}
 
             <div className="container mx-auto px-4">
-                <header className="grid gap-4 border-b border-border pb-5 pt-6 md:grid-cols-[1fr_auto] md:items-end md:pt-10">
+                <header className="border-b border-border pb-5 pt-6 md:pt-10">
                     <div>
                         <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-primary">
                             {eyebrow}
-                            <span className="text-muted-foreground md:hidden">
-                                {' · '}{loading ? '…' : `${products.length} ${products.length === 1 ? 'product' : 'products'}`}
-                            </span>
                         </p>
                         <h1 className="mt-2 font-display text-3xl font-bold leading-tight tracking-tight text-foreground md:text-[2.75rem]">{title}</h1>
                         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">{subtitle}</p>
-                    </div>
-                    {/* Live count from the catalogue: a real number, not decoration */}
-                    <div aria-hidden className="hidden text-right md:block">
-                        <p className="font-display text-4xl font-bold leading-none tabular-nums text-foreground/90">
-                            {loading ? '—' : String(products.length).padStart(2, '0')}
-                        </p>
-                        <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                            {products.length === 1 ? 'Product' : 'Products'}
-                        </p>
                     </div>
                 </header>
 
@@ -408,13 +396,11 @@ export function ProductCatalog({ eyebrow, title, subtitle, category, categories,
                     </LayoutGroup>
                 </div>
 
-                <div className="flex h-12 items-center justify-between text-sm text-muted-foreground" aria-live="polite">
-                    {loading ? <span>Loading products</span> : (
-                        <span>
-                            <span className="font-semibold text-foreground">{visibleProducts.length}</span>{' '}
-                            {visibleProducts.length === 1 ? 'product' : 'products'}
-                        </span>
-                    )}
+                <div className={`flex items-center justify-end text-sm text-muted-foreground ${filtersActive ? 'h-12' : 'h-4'}`} aria-live="polite">
+                    {/* No visible total; screen readers still hear how many matched after filtering. */}
+                    <span className="sr-only">
+                        {loading ? 'Loading products' : `${visibleProducts.length} ${visibleProducts.length === 1 ? 'product' : 'products'}`}
+                    </span>
                     {filtersActive && (
                         <button type="button" onClick={clearAll} className="flex items-center gap-1 rounded-full px-2 py-1 font-medium text-foreground hover:bg-secondary">
                             <X className="h-3.5 w-3.5" /> Clear filters
