@@ -57,6 +57,8 @@ const nav = () => {
     return `<nav aria-label="Site"><ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">${links
         .map(([href, label]) => `<li><a href="${href}">${esc(label)}</a></li>`).join("")}</ul></nav>`;
 };
+// Same rule as the home page's deals: the product name is the reliable signal.
+const IS_PRINTER = /\bprinter\b/i;
 const inr = (n) => `₹${Math.round(Number(n)).toLocaleString("en-IN")}`;
 
 function pageBody(meta, products = [], extra = "") {
@@ -219,10 +221,16 @@ function llmsTxt(list, festival) {
     const byCategory = Object.entries(CATEGORY_PAGES).map(([key, [name, path]]) => {
         const items = list.filter((p) => p.category === key);
         if (!items.length) return [];
-        const lines = key === PRINTER_CATEGORY
-            ? [...items].sort((x, y) => Number(x.price) - Number(y.price)).map(printerLine)
-            : items.map((p) => `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${priceText(p)}, GST included`);
-        return [`### ${name} (${SITE_URL}${path})`, ...lines, ""];
+        if (key === PRINTER_CATEGORY) {
+            // The category also holds scanners, engravers and wash stations; listing
+            // them among the printers would make them read as the cheapest printers.
+            const cheapestFirst = [...items].sort((x, y) => Number(x.price) - Number(y.price));
+            const printers = cheapestFirst.filter((p) => IS_PRINTER.test(p.name));
+            const others = cheapestFirst.filter((p) => !IS_PRINTER.test(p.name));
+            return [`### ${name} (${SITE_URL}${path})`, ...printers.map(printerLine), "",
+                ...(others.length ? ["### Scanners, laser engravers and resin wash & cure stations (also ship free)", ...others.map(printerLine), ""] : [])];
+        }
+        return [`### ${name} (${SITE_URL}${path})`, ...items.map((p) => `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${priceText(p)}, GST included`), ""];
     }).flat();
     const sales = [festival?.active, festival?.next].filter(Boolean).map((s) =>
         `- ${s.name}: ${s.percent_off}% off every 3D printer, ${istDay(s.starts_at)} to ${saleLastDay(s.ends_at)} (IST).`);
