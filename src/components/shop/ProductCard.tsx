@@ -110,8 +110,8 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                     </span>
                 )}
 
-                {/* Separate from the status badge: a deal and "Only 2 left" are both true at once. */}
-                {was !== null && (
+                {/* Separate from the status badge: a deal and "Only 2 left" are both true at once. A sold-out deal is not one. */}
+                {was !== null && !soldOut && (
                     <span className="absolute bottom-3 left-3 rounded-full bg-[hsl(var(--ember))] px-2.5 py-1 text-[11px] font-semibold text-neutral-950">
                         Festive Deal
                     </span>

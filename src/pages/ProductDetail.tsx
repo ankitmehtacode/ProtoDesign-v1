@@ -860,7 +860,7 @@ const ProductDetail = () => {
                                 </div>
                             ) : (
                                 <>
-                                    {dealPrice(product) !== null && (
+                                    {dealPrice(product) !== null && inStock && (
                                         <div className="mb-2 flex items-center gap-3">
                                             <span className="rounded-full bg-[hsl(var(--ember))] px-3 py-1 text-xs font-semibold text-neutral-950">Festive Deal</span>
                                             <s className="text-lg tabular-nums text-muted-foreground">

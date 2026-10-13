@@ -495,7 +495,7 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         const subCategory = parseSubCategory(sub_category);
         const compareAtPrice = parseCompareAtPrice(compare_at_price);
 
-        const existing =await db.oneOrNone('SELECT slug FROM products WHERE id = $1', [req.params.id]);
+        const existing = await db.oneOrNone('SELECT slug FROM products WHERE id = $1', [req.params.id]);
         if (!existing) return res.status(404).json({ error: 'Product not found' });
 
         // A slug is the product's public URL, so it is minted once and kept
