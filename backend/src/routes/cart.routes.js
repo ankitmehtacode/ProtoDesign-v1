@@ -28,6 +28,7 @@ router.get('/', authMiddleware, async (req, res, next) => {
                                         'product', json_build_object(
                                                 'id', p.id,
                                                 'name', p.name,
+                                                'slug', p.slug,
                                                 'price', p.price,
                                                 'image_url', CASE
                                                                  WHEN p.image_data IS NOT NULL
