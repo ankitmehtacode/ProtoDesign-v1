@@ -66,7 +66,7 @@ const App = () => (
                                         eyebrow="3D Printers"
                                         title="Machines that make things."
                                         subtitle="FDM, resin and metal printers, plus 3D pens. From a first print to production runs."
-                                        subCategories={['FDM', 'SLA', 'Metal 3D Printer', '3D Pen', 'Others']}
+                                        subCategories={['FDM', 'SLA', 'Metal 3D Printer', '3D Pen', '3D Scanner', 'Laser Engraver', 'Wash & Cure', 'Others']}
                                     />
                                 } />
 
