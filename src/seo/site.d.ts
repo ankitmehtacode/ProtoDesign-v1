@@ -6,8 +6,9 @@ export type PageMeta = {
 };
 type ProductInput = {
     name: string; slug?: string; id: string; description?: string; short_description?: string;
-    price: number | string; stock: number; image_url?: string | null; images?: string[]; category?: string;
-    specifications?: unknown;
+    price: number | string; list_price?: number | string; stock: number; image_url?: string | null;
+    images?: string[]; category?: string; specifications?: unknown;
+    festival?: { name: string; ends_at: string } | null;
 };
 export const SITE_URL: string;
 export const SITE_NAME: string;
@@ -25,4 +26,12 @@ export function productUrl(p: { slug?: string; id: string }): string;
 export function specMap(specs: unknown): Record<string, string>;
 export function plainText(s?: string, max?: number): string;
 export function productTitle(name: string, categoryName: string): string;
-export function productDescription(p: { name: string; price: number | string; short_description?: string; description?: string }): string;
+export function productDescription(p: Pick<ProductInput, "name" | "price" | "short_description" | "description" | "category" | "festival">): string;
+export const PRINTER_CATEGORY: string;
+export function itemListLd(products: ProductInput[]): object;
+export function festivalRegularPrice(p: ProductInput): number | null;
+export function productBrand(p: ProductInput): string | undefined;
+export function specLookup(specs: unknown, keys: readonly string[]): string | undefined;
+export function comparableSpecs(specs: unknown): [string, string][];
+export function istDay(at: string | number): string;
+export function saleLastDay(endsAt: string): string;
