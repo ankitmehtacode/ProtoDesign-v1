@@ -867,7 +867,7 @@ const ProductDetail = () => {
                                 <>
                                     {dealPrice(product) !== null && inStock && (
                                         <div className="mb-2 flex items-center gap-3">
-                                            <span className="rounded-full bg-[hsl(var(--ember))] px-3 py-1 text-xs font-semibold text-neutral-950">{product.festival?.name ?? 'Festive Deal'}</span>
+                                            <span className="rounded-full bg-[hsl(var(--festive-on-dark))] px-3 py-1 text-xs font-semibold text-neutral-950">{product.festival?.name ?? 'Festive Deal'}</span>
                                             <s className="text-lg tabular-nums text-muted-foreground">
                                                 <span className="sr-only">Was </span>{formatINR(dealPrice(product)!)}
                                             </s>

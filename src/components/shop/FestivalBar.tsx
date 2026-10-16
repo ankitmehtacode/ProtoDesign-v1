@@ -62,18 +62,22 @@ export function FestivalBar() {
     };
 
     return (
-        <div className="relative bg-[hsl(var(--ember))] text-neutral-950" style={{ height: HEIGHT }}>
+        // The site's dark surface with a warm glow at the centre, like lamplight; gold for the sale.
+        <div
+            className="relative border-b border-[hsl(var(--festive-on-dark)/0.25)] bg-[hsl(160_30%_7%)] text-white/85 [background-image:radial-gradient(60%_140%_at_50%_50%,hsl(36_80%_40%/0.28),transparent)]"
+            style={{ height: HEIGHT }}
+        >
             <Link
                 to="/printers"
                 className="group flex h-full items-center justify-center gap-2 pl-3 pr-10 text-xs font-semibold sm:px-10 sm:text-sm"
             >
                 <span className="truncate">
-                    <span className="hidden sm:inline">{sale.name}: extra {sale.percent_off}% off every 3D printer</span>
-                    <span className="sm:hidden">{sale.name.replace(/ Sale$/, '')}: {sale.percent_off}% off printers</span>
+                    <span className="hidden sm:inline"><span className="text-[hsl(var(--festive-on-dark))]">{sale.name}</span>: extra {sale.percent_off}% off every 3D printer</span>
+                    <span className="sm:hidden"><span className="text-[hsl(var(--festive-on-dark))]">{sale.name.replace(/ Sale$/, '')}</span>: {sale.percent_off}% off printers</span>
                     <span className="mx-2 opacity-60" aria-hidden="true">·</span>
                     <span className="tabular-nums"><span className="hidden sm:inline">ends in </span>{shortLeft(left)}<span className="sm:hidden"> left</span></span>
                 </span>
-                <span className="hidden items-center gap-1 underline underline-offset-2 sm:inline-flex">
+                <span className="hidden items-center gap-1 text-[hsl(var(--festive-on-dark))] underline underline-offset-2 sm:inline-flex">
                     Shop printers
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </span>
@@ -82,7 +86,7 @@ export function FestivalBar() {
                 type="button"
                 onClick={dismiss}
                 aria-label={`Hide the ${sale.name} bar`}
-                className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full hover:bg-neutral-950/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950"
+                className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
                 <X className="h-4 w-4" />
             </button>

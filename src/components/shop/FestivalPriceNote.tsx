@@ -26,7 +26,7 @@ export function FestivalPriceNote({ product }: { product: PricedProduct }) {
         : null;
 
     return (
-        <p className="mt-2 text-sm font-medium text-[hsl(var(--ember))]">
+        <p className="mt-2 text-sm font-medium text-[hsl(var(--festive))]">
             {product.festival.name.replace(/ Sale$/, '')} price ends in {shortLeft(left)}.
             {nextPrice !== null && <> From {saleDay(next!.starts_at)}: {formatINR(nextPrice)}.</>}
         </p>

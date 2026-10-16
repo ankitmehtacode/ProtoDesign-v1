@@ -66,6 +66,12 @@ All colors MUST be HSL.
            thermometer, molten metal). Mint stays the brand and action colour. */
         --ember: 22 95% 55%;
 
+        /* Festival sales only (banners, sale prices, deal ribbons): marigold
+           gold. Never ember, which means heat. --festive is for text on the
+           page; --festive-on-dark for text and fills on the dark sale banner. */
+        --festive: 34 92% 34%;
+        --festive-on-dark: 42 96% 62%;
+
         /* Transitions */
         --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -110,6 +116,8 @@ All colors MUST be HSL.
         --shadow-glow: 0 0 40px hsl(152 65% 70% / 0.4);
 
         --ember: 22 95% 57%;
+
+        --festive: 42 96% 62%;
     }
 }
 
