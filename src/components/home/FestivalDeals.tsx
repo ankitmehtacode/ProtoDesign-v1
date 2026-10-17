@@ -101,14 +101,15 @@ function DealTile({ product }: { product: Product }) {
                 to={`/product/${product.slug || product.id}`}
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_hsl(160_35%_11%/0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-                <div className="aspect-square bg-secondary/60 dark:bg-[hsl(150_18%_88%)]">
+                {/* The photo is pinned inside, so a tall one cannot stretch its square. */}
+                <div className="relative aspect-square overflow-hidden bg-secondary/60 dark:bg-[hsl(150_18%_88%)]">
                     <img
                         src={sizedImage(image, 480)}
                         srcSet={sizedSrcSet(image, 480)}
                         alt=""
                         loading="lazy"
                         decoding="async"
-                        className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.03] dark:mix-blend-normal"
+                        className="absolute inset-0 h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.03] dark:mix-blend-normal"
                     />
                 </div>
                 <div className="flex flex-1 flex-col p-4">
@@ -124,7 +125,7 @@ function DealTile({ product }: { product: Product }) {
                         </span>
                     </p>
                     {festivalOff > 0 && (
-                        <p className="mt-1 text-xs font-semibold text-[hsl(var(--ember))]">
+                        <p className="mt-1 text-xs font-semibold text-[hsl(var(--festive))]">
                             {formatINR(festivalOff)} off for {product.festival!.name.replace(/ Sale$/, "")}
                         </p>
                     )}
