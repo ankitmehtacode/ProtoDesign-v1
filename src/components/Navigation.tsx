@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logoNav from "@/assets/logo-nav-light.webp";
 import { FestivalBar } from "@/components/shop/FestivalBar";
+import { cn } from "@/lib/utils";
 
 interface UserInfo {
     id: string;
@@ -48,6 +49,12 @@ const CATEGORIES = [
 // Promoted out of the Products dropdown to top-level links; they stay in the
 // dropdown too so it remains the complete category list.
 const FEATURED_CATEGORIES = CATEGORIES.filter(c => ['/printers', '/printables', '/filaments'].includes(c.path));
+
+// Frosted glass for both nav menus: a faint top-lit sheen over a translucent tint,
+// a hairline edge, an inner highlight and a deep soft shadow. Utilities rather than
+// a CSS class so cn() can replace DropdownMenuContent's opaque popover defaults.
+const GLASS_PANEL = "rounded-2xl border border-foreground/10 bg-background/60 bg-gradient-to-b from-foreground/[0.07] to-foreground/[0.01] backdrop-blur-2xl backdrop-saturate-150 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.08),0_24px_48px_-12px_rgb(0_0_0/0.6)]";
+const GLASS_ITEM = "rounded-lg px-3 py-2 text-[13px] text-foreground/75 transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus:bg-foreground/[0.06] focus:text-foreground focus-visible:outline-none";
 
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -113,7 +120,11 @@ export const Navigation = () => {
     };
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
+        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border shadow-sm">
+            {/* The bar's own frost lives on this layer, not on <nav>: an element with
+                backdrop-filter is a backdrop root, and the Products menu's glass would
+                then blur only the bar instead of the page under it. */}
+            <div aria-hidden className="absolute inset-0 -z-10 bg-background/95 backdrop-blur-md" />
             <FestivalBar />
             <div className="container mx-auto px-4">
                 <div className="flex items-center justify-between h-20">
@@ -137,17 +148,30 @@ export const Navigation = () => {
                                 <ChevronDown size={14} className="transition-transform duration-200 group-hover:rotate-180 group-focus-within:rotate-180" />
                             </button>
 
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-56 bg-background rounded-xl shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 transform group-hover:translate-y-0 group-focus-within:translate-y-0 translate-y-2 p-2">
-                                {CATEGORIES.map((cat) => (
-                                    <Link
-                                        key={cat.name}
-                                        to={cat.path}
-                                        className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded-lg group/item transition-colors"
-                                    >
-                                        <span className="text-sm text-foreground group-hover/item:text-foreground">{cat.name}</span>
-                                        {cat.path === '/shop' ? <Search size={14} /> : <ChevronRight size={14} className="text-muted-foreground group-hover/item:text-foreground" />}
-                                    </Link>
-                                ))}
+                            {/* pt-2 floats the panel clear of the bar while keeping the gap
+                                hoverable, so crossing it does not close the menu. */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 invisible transition-[visibility] duration-200 group-hover:visible group-focus-within:visible motion-reduce:transition-none">
+                                <div className={`${GLASS_PANEL} w-60 p-1.5 origin-top opacity-0 -translate-y-1 scale-[0.98] transition duration-200 ease-out group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 motion-reduce:transition-none motion-reduce:transform-none`}>
+                                    {CATEGORIES.map((cat) => {
+                                        const current = location.pathname === cat.path;
+                                        return (
+                                            <Link
+                                                key={cat.name}
+                                                to={cat.path}
+                                                aria-current={current ? 'page' : undefined}
+                                                className={cn(GLASS_ITEM, "group/item flex items-center justify-between focus-visible:bg-foreground/[0.06] focus-visible:text-foreground", current && "text-foreground", cat.path === '/shop' && "mb-1")}
+                                            >
+                                                <span className="flex items-center gap-2.5">
+                                                    <span className={`h-1 w-1 rounded-full transition-colors ${current ? 'bg-primary' : 'bg-foreground/20 group-hover/item:bg-foreground/50'}`} />
+                                                    {cat.name}
+                                                </span>
+                                                {cat.path === '/shop'
+                                                    ? <Search size={13} className="text-foreground/40 group-hover/item:text-foreground/80 transition-colors" />
+                                                    : <ChevronRight size={13} className="text-foreground/60 opacity-0 -translate-x-1 transition duration-200 group-hover/item:opacity-100 group-hover/item:translate-x-0 group-focus-visible/item:opacity-100 group-focus-visible/item:translate-x-0 motion-reduce:transition-none" />}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 
@@ -211,34 +235,36 @@ export const Navigation = () => {
                                             <ChevronDown size={14} className="text-muted-foreground" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-56">
-                                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
+                                    <DropdownMenuContent align="end" sideOffset={10} className={`${GLASS_PANEL} w-64 p-1.5 text-foreground`}>
+                                        <DropdownMenuLabel className="px-3 py-2 font-normal">
+                                            <span className="block truncate text-sm font-medium text-foreground">{user.name}</span>
+                                            <span className="block truncate text-xs text-foreground/50">{user.email}</span>
+                                        </DropdownMenuLabel>
+                                        <DropdownMenuSeparator className="mx-1.5 bg-foreground/10" />
 
-                                        <DropdownMenuItem onClick={() => navigate('/profile')}>
-                                            <UserCircle className="mr-2 h-4 w-4" /> Profile
+                                        <DropdownMenuItem className={`${GLASS_ITEM} cursor-pointer`} onClick={() => navigate('/profile')}>
+                                            <UserCircle className="mr-2.5 h-4 w-4 opacity-60" /> Profile
                                         </DropdownMenuItem>
 
-                                        <DropdownMenuItem onClick={() => navigate('/orders')}>
-                                            <Package className="mr-2 h-4 w-4" /> Orders
+                                        <DropdownMenuItem className={`${GLASS_ITEM} cursor-pointer`} onClick={() => navigate('/orders')}>
+                                            <Package className="mr-2.5 h-4 w-4 opacity-60" /> Orders
                                         </DropdownMenuItem>
 
-                                        {/* ✅ Bulk Upload (Desktop Dropdown) */}
                                         {isAdmin && (
                                             <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => navigate('/bulk-upload')}>
-                                                    <Upload className="mr-2 h-4 w-4" /> Bulk Upload
+                                                <DropdownMenuSeparator className="mx-1.5 bg-foreground/10" />
+                                                <DropdownMenuItem className={`${GLASS_ITEM} cursor-pointer`} onClick={() => navigate('/bulk-upload')}>
+                                                    <Upload className="mr-2.5 h-4 w-4 opacity-60" /> Bulk Upload
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => navigate('/admin')}>
-                                                    <Settings className="mr-2 h-4 w-4" /> Admin Dashboard
+                                                <DropdownMenuItem className={`${GLASS_ITEM} cursor-pointer`} onClick={() => navigate('/admin')}>
+                                                    <Settings className="mr-2.5 h-4 w-4 opacity-60" /> Admin Dashboard
                                                 </DropdownMenuItem>
                                             </>
                                         )}
 
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                                            <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                                        <DropdownMenuSeparator className="mx-1.5 bg-foreground/10" />
+                                        <DropdownMenuItem onClick={handleSignOut} className={`${GLASS_ITEM} cursor-pointer text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive`}>
+                                            <LogOut className="mr-2.5 h-4 w-4" /> Sign Out
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
