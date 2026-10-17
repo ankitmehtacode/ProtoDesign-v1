@@ -94,7 +94,9 @@ function render(template, headHtml, bodyHtml) {
     const [before, rest] = template.split("<!--seo:start-->");
     const [, after] = rest.split("<!--seo:end-->");
     if (after === undefined) throw new Error("index.html is missing the <!--seo:start/end--> markers");
-    return `${before}${headHtml}${after}`.replace("<!--seo:body-->", bodyHtml);
+    // data-prerender hides the summary from people while the app loads (rule in index.html).
+    const body = bodyHtml ? `<div data-prerender>${bodyHtml}</div>` : "";
+    return `${before}${headHtml}${after}`.replace("<!--seo:body-->", body);
 }
 
 async function write(route, html) {

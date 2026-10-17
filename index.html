@@ -14,6 +14,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600..800&display=swap" rel="stylesheet">
 
+    <!--
+      scripts/prerender.mjs puts a plain text summary of each page in #root for
+      crawlers; React replaces it on mount. Hide it from people meanwhile so it
+      does not flash before the real page. Crawlers ignore CSS. If the app has
+      not mounted after 4s (slow network, script failure), show it after all;
+      without JavaScript it shows at once.
+    -->
+    <style>
+      [data-prerender] { visibility: hidden; animation: prerender-reveal 0s 4s forwards; }
+      @keyframes prerender-reveal { to { visibility: visible; } }
+    </style>
+    <noscript><style>[data-prerender] { visibility: visible; animation: none; }</style></noscript>
+
     <meta property="og:site_name" content="ProtoDesign" />
     <meta property="og:locale" content="en_IN" />
     <meta property="og:image:width" content="1200" />
