@@ -10,8 +10,6 @@ import {
     ShoppingCart,
     Heart,
     Star,
-    Truck,
-    ShieldCheck,
     Minus,
     Plus,
     Check,
@@ -19,8 +17,6 @@ import {
     Share2,
     PenLine,
     ArrowRight,
-    Headset,
-    MapPin,
     Play,
     Save,
     X,
@@ -44,6 +40,7 @@ import { useDropzone } from 'react-dropzone';
 import { Seo } from "@/seo/Seo";
 import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, productUrl } from "@/seo/site.js";
 import { CATEGORY_LABELS, dealPrice, isMadeToOrder } from '@/components/shop/product';
+import { ProductPromises } from '@/components/shop/ProductPromises';
 import { FestivalPriceNote } from '@/components/shop/FestivalPriceNote';
 
 // --- INTERFACES ---
@@ -616,6 +613,23 @@ const ProductDetail = () => {
     if (!product) return null;
 
     const inStock = isEditing ? (editState?.stock ?? 0) > 0 : product.stock > 0;
+
+    // The system share sheet where there is one (phones), else copy the link.
+    const shareProduct = async () => {
+        const url = productUrl(product);
+        try {
+            if (navigator.share) {
+                await navigator.share({ title: product.name, url });
+                return;
+            }
+            await navigator.clipboard.writeText(url);
+            toast.success('Link copied');
+        } catch (error) {
+            if ((error as Error)?.name === 'AbortError') return; // the shopper closed the share sheet
+            console.error('Share failed', error);
+            toast.error('Could not share this link. Copy it from the address bar.');
+        }
+    };
     const madeToOrder = isMadeToOrder(product);
     // Derived from the loaded reviews so it stays in step with the count after a post or delete.
     const averageRating = reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
@@ -957,15 +971,10 @@ const ProductDetail = () => {
                                 {isAddingToCart ? <Loader2 className="animate-spin mr-2"/> : <ShoppingCart className="mr-2"/>}
                                 {isAddingToCart ? 'Adding...' : 'Add to Cart'}
                             </Button>
-                            <Button variant="outline" className="h-12 w-12 p-0"><Share2 className="w-5 h-5"/></Button>
+                            <Button variant="outline" className="h-12 w-12 p-0" onClick={shareProduct} aria-label="Share this product"><Share2 className="w-5 h-5"/></Button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground p-4 bg-secondary/10 rounded-xl border border-border/50">
-                            <div className="flex items-center gap-2"><Truck className="w-5 h-5 text-primary"/> Free Shipping</div>
-                            <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary"/> 1 Year Warranty</div>
-                            <div className="flex items-center gap-2"><Headset className="w-5 h-5 text-primary"/> 24/7 Support</div>
-                            <div className="flex items-center gap-2"><MapPin className="w-5 h-5 text-primary"/> Live Tracking</div>
-                        </div>
+                        <ProductPromises product={product} />
                     </div>
                 </div>
 

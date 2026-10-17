@@ -46,8 +46,9 @@ const NO_SUBCATEGORIES: string[] = [];
 const normalizeKeyword = (subCategory: string) =>
     subCategory.toLowerCase().replace(' fiber', '').replace(' 3d printer', '');
 
+// The stored sub-category counts too: a listing whose copy never says "FDM" still files under it.
 const searchableText = (p: Product) =>
-    `${p.name} ${p.description || ''} ${p.short_description || ''}`.toLowerCase();
+    `${p.name} ${p.sub_category || ''} ${p.description || ''} ${p.short_description || ''}`.toLowerCase();
 
 function matchesSubCategory(product: Product, subCategory: string, all: string[]) {
     const text = searchableText(product);
