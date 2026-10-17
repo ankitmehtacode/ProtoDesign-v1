@@ -138,8 +138,13 @@ export default function HeroSequence({ progress, onSpool }: Props) {
             const any = cache.values().next().value as ImageBitmap | undefined;
             return any ? any.width * any.height * 4 : 1920 * 1080 * 4;
         };
-        const capacity = () => Math.max(16, Math.floor(260e6 / frameBytes()));
-        const AHEAD = 28, BEHIND = 10;
+        // Phones (the portrait and light sets) get a phone-sized budget: at the desktop's
+        // 260 MB they held 45-125 decoded frames, and mobile browsers answered with memory
+        // pressure and re-decodes mid-scroll. The window shrinks with the budget, so it never
+        // asks for more frames than the cache keeps (which would decode and evict in a loop).
+        const budget = set === SETS.wide ? 260e6 : 96e6;
+        const capacity = () => Math.max(16, Math.floor(budget / frameBytes()));
+        const AHEAD = set === SETS.wide ? 28 : 11, BEHIND = set === SETS.wide ? 10 : 4;
         const pickNext = () => {
             let best = -1, bestScore = Infinity;
             for (let d = -BEHIND; d <= AHEAD; d++) {
