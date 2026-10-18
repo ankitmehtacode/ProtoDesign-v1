@@ -235,7 +235,6 @@ const ONLINE_SHIPPING_INR = 199;
 export const productLd = (p, categoryName, categoryPath) => {
     const url = productUrl(p);
     const specs = specMap(p.specifications);
-    const madeToOrder = specs.Fulfilment === "Made to order";
     const grams = parseFloat(specs["Approx. weight"] ?? "");
     const brand = productBrand(p);
     const regular = festivalRegularPrice(p);
@@ -284,8 +283,9 @@ export const productLd = (p, categoryName, categoryPath) => {
                 priceValidUntil: p.festival?.ends_at
                     ? new Date(new Date(p.festival.ends_at).getTime() - 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
                     : undefined,
-                availability: p.stock <= 0 ? "https://schema.org/OutOfStock"
-                    : madeToOrder ? "https://schema.org/MadeToOrder" : "https://schema.org/InStock",
+                // Same rule as the Merchant feed (sitemap.routes.js). Google has no
+                // MadeToOrder availability, so made-to-order pages failed to match the feed.
+                availability: p.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
                 itemCondition: "https://schema.org/NewCondition",
                 seller: { "@id": `${SITE_URL}/#organization` },
                 shippingDetails: {
