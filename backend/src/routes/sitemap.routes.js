@@ -1,9 +1,9 @@
 import express from 'express';
 import db from '../config/database.js';
-import { FESTIVAL_SALES, festivalPrice } from '../services/festival.js';
+import { festivalPrice, schedule } from '../services/festival.js';
 
 const festivalWindow = (id) => {
-    const s = FESTIVAL_SALES.find((x) => x.id === id);
+    const s = schedule.sales.find((x) => x.id === id);
     return `${s.startsAt}/${s.endsAt}`;
 };
 
