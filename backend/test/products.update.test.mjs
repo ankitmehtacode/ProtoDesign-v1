@@ -133,7 +133,10 @@ describe('PUT /api/products/:id', () => {
 
     it('refuses a save that would make the festival price permanent', async () => {
         const festival = await import('../src/services/festival.js');
+        const { TEST_SALES } = await import('./helpers/festival-schedule.mjs');
         const realNow = festival.clock.now;
+        const realSales = festival.schedule.sales;
+        festival.schedule.sales = TEST_SALES;
         festival.clock.now = () => new Date('2026-10-15T12:00:00+05:30').getTime();
         try {
             const p = await db.one(`INSERT INTO products (name, price, category) VALUES ('Printer', 100, '3d_printer') RETURNING id`);
@@ -143,6 +146,7 @@ describe('PUT /api/products/:id', () => {
             assert.equal((await put(p.id, { ...body, price: 90 })).status, 200); // unchanged price
         } finally {
             festival.clock.now = realNow;
+            festival.schedule.sales = realSales;
         }
     });
 

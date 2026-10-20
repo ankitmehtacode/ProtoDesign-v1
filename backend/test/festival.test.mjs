@@ -4,7 +4,10 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { activeSale, festivalPrice, festivalStatus, nextSale } from '../src/services/festival.js';
+import { activeSale, festivalPrice, festivalStatus, nextSale, schedule } from '../src/services/festival.js';
+import { TEST_SALES } from './helpers/festival-schedule.mjs';
+
+schedule.sales = TEST_SALES;
 
 const at = (iso) => new Date(iso).getTime();
 const printer = { id: 'p1', category: '3d_printer', price: '40000.00', compare_at_price: null };

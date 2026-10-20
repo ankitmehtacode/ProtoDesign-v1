@@ -25,6 +25,8 @@ const orders = await import('../src/services/order.service.js');
 const { phonePeService } = await import('../src/services/phonepe.service.js');
 const { emailService } = await import('../src/services/email.service.js');
 const festival = await import('../src/services/festival.js');
+const { TEST_SALES } = await import('./helpers/festival-schedule.mjs');
+festival.schedule.sales = TEST_SALES;
 
 // Outside every festival sale, so list prices are what gets charged.
 const OFF_SEASON = new Date('2026-12-01T12:00:00+05:30').getTime();

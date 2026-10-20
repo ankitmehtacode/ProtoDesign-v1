@@ -7,22 +7,18 @@
  * never changed, so a sale ends on its own at endsAt and there is nothing to
  * revert.
  *
- * Dates are IST and the end is exclusive. Navratri ends with Dussehra
- * (2026-10-20) and Diwali with Bhai Dooj (2026-11-11), per the 2026 panchang.
+ * Dates are IST and the end is exclusive. No sale is scheduled (the 2026
+ * Navratri and Diwali sales were ended on 2026-10-20). Add an entry to
+ * schedule.sales to run one again, e.g.
+ *
+ *   { id: 'diwali-2026', name: 'Diwali Sale', percentOff: 3, category: '3d_printer',
+ *     startsAt: '2026-10-21T00:00:00+05:30', endsAt: '2026-11-12T00:00:00+05:30' }
  */
 
 export const FESTIVAL_REBUILD_EVENT_SOURCE = 'protodesign.festival-rebuild';
 
-export const FESTIVAL_SALES = Object.freeze([
-    {
-        id: 'navratri-2026', name: 'Navratri Sale', percentOff: 5, category: '3d_printer',
-        startsAt: '2026-10-11T00:00:00+05:30', endsAt: '2026-10-21T00:00:00+05:30',
-    },
-    {
-        id: 'diwali-2026', name: 'Diwali Sale', percentOff: 3, category: '3d_printer',
-        startsAt: '2026-10-21T00:00:00+05:30', endsAt: '2026-11-12T00:00:00+05:30',
-    },
-].map(Object.freeze));
+// Replaceable by tests only, so pricing tests do not depend on the live schedule.
+export const schedule = { sales: Object.freeze([]) };
 
 const ms = (iso) => new Date(iso).getTime();
 
@@ -31,12 +27,12 @@ export const clock = { now: () => Date.now() };
 
 /** The sale running at `now`, or null. */
 export function activeSale(now = clock.now()) {
-    return FESTIVAL_SALES.find((s) => ms(s.startsAt) <= now && now < ms(s.endsAt)) ?? null;
+    return schedule.sales.find((s) => ms(s.startsAt) <= now && now < ms(s.endsAt)) ?? null;
 }
 
 /** The next sale to start after `now`, or null. */
 export function nextSale(now = clock.now()) {
-    return FESTIVAL_SALES.find((s) => ms(s.startsAt) > now) ?? null;
+    return schedule.sales.find((s) => ms(s.startsAt) > now) ?? null;
 }
 
 /** Whole rupees: listed prices are shown and charged without paise. */
