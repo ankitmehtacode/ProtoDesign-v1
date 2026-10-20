@@ -315,7 +315,7 @@ function ProductSheet({ product, onClose, onSaved }: { product: AdminProduct | "
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="Price (₹, GST included)"><Input type="number" min="0" step="0.01" value={form.price} onChange={(e) => set("price", e.target.value)} required /></Field>
-                        <Field label="Was price (₹, struck through; blank ends the deal)"><Input type="number" min="0" step="0.01" value={form.compare_at_price} onChange={(e) => set("compare_at_price", e.target.value)} /></Field>
+                        <Field label="M.R.P. (₹, struck through; blank shows none)"><Input type="number" min="0" step="0.01" value={form.compare_at_price} onChange={(e) => set("compare_at_price", e.target.value)} /></Field>
                         <Field label="Stock"><Input type="number" min="0" value={form.stock} onChange={(e) => set("stock", e.target.value)} required /></Field>
                         <Field label="Category">
                             <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v, sub_category: "" }))}>

@@ -70,13 +70,21 @@ export const CATEGORY_LABELS: Record<string, string> = {
 };
 
 /**
- * The struck-through price, when the product is on a deal. A reference price
- * at or below the selling price is not a deal and shows nothing, so an admin
- * ends a deal just by changing the price.
+ * The struck-through price, when the product is on a deal. Outside a festival
+ * sale it is the M.R.P.; during one, the price before the sale. A reference
+ * price at or below the selling price is not a deal and shows nothing, so an
+ * admin ends a deal just by changing the price.
  */
 export function dealPrice(product: Pick<Product, 'price' | 'compare_at_price'>): number | null {
     const was = Number(product.compare_at_price);
     return Number.isFinite(was) && was > Number(product.price) ? was : null;
+}
+
+/** Ribbon for a deal: the sale's name during a festival, otherwise the saving on the M.R.P. */
+export function dealBadge(product: Pick<Product, 'price' | 'festival'>, was: number): string {
+    if (product.festival) return product.festival.name;
+    const percent = Math.floor((1 - Number(product.price) / was) * 100);
+    return percent >= 1 ? `${percent}% off M.R.P.` : 'Below M.R.P.';
 }
 
 /**

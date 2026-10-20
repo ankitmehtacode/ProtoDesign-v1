@@ -39,7 +39,7 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
 import { Seo } from "@/seo/Seo";
 import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, productUrl } from "@/seo/site.js";
-import { CATEGORY_LABELS, dealPrice, isMadeToOrder } from '@/components/shop/product';
+import { CATEGORY_LABELS, dealBadge, dealPrice, isMadeToOrder } from '@/components/shop/product';
 import { ProductPromises } from '@/components/shop/ProductPromises';
 import { FestivalPriceNote } from '@/components/shop/FestivalPriceNote';
 
@@ -881,10 +881,10 @@ const ProductDetail = () => {
                                 <>
                                     {dealPrice(product) !== null && inStock && (
                                         <div className="mb-2 flex items-center gap-3">
-                                            <span className="rounded-full bg-[hsl(var(--festive-on-dark))] px-3 py-1 text-xs font-semibold text-neutral-950">{product.festival?.name ?? 'Festive Deal'}</span>
-                                            <s className="text-lg tabular-nums text-muted-foreground">
-                                                <span className="sr-only">Was </span>{formatINR(dealPrice(product)!)}
-                                            </s>
+                                            <span className="rounded-full bg-[hsl(var(--festive-on-dark))] px-3 py-1 text-xs font-semibold text-neutral-950">{dealBadge(product, dealPrice(product)!)}</span>
+                                            <span className="text-lg tabular-nums text-muted-foreground">
+                                                {product.festival ? <span className="sr-only">Was </span> : 'M.R.P. '}<s>{formatINR(dealPrice(product)!)}</s>
+                                            </span>
                                         </div>
                                     )}
                                     <p className="text-5xl font-bold text-foreground">{formatINR(product.price)}</p>
