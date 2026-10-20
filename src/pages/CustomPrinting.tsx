@@ -38,6 +38,8 @@ export default function CustomPrinting() {
 
     const [contact, setContact] = useState({ email: "", phone: "", notes: "" });
     const [quoteId, setQuoteId] = useState<string | null>(null);
+    // Where the server sent the confirmation: the typed email or the account's.
+    const [sentTo, setSentTo] = useState("");
     const [isSending, setIsSending] = useState(false);
     // null when idle; 0..1 while the model is uploading to storage.
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -89,6 +91,18 @@ export default function CustomPrinting() {
             navigate('/auth');
             return;
         }
+        // Checked before the upload: the team needs a way to reach the customer,
+        // and the server rejects a quote without one only after the model is sent.
+        // Same rules as the server (backend/src/services/quote.email.js).
+        if (contact.email.trim() && !/^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/.test(contact.email.trim())) {
+            toast.error("Please check your email address.");
+            return;
+        }
+        const phoneDigits = contact.phone.replace(/\D/g, "").length;
+        if (!/^\+?[0-9\s()-]+$/.test(contact.phone.trim()) || phoneDigits < 10 || phoneDigits > 15) {
+            toast.error("Please enter a phone number so we can reach you about this quote.");
+            return;
+        }
         setIsSending(true);
 
         if (!file) {
@@ -127,6 +141,7 @@ export default function CustomPrinting() {
             });
 
             setQuoteId(result?.quoteId ?? null);
+            setSentTo(result?.email || contact.email.trim());
             toast.success("Quote sent successfully!");
             setIsSuccess(true);
         } catch (error: any) {
@@ -212,7 +227,7 @@ export default function CustomPrinting() {
                     </div>
                     <h2 className="text-3xl font-bold mb-4">Request Sent!</h2>
                     <p className="text-muted-foreground mb-8">
-                        Our team will verify your file and send the payment link to <strong>{contact.email}</strong> shortly.
+                        Our team will verify your file and send the payment link{sentTo && <> to <strong>{sentTo}</strong></>} shortly.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                         {quoteId && <WhatsAppUpdatesButton kind="quote" id={quoteId} size="default" />}
@@ -522,8 +537,8 @@ export default function CustomPrinting() {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Input placeholder="Your Email *" value={contact.email} onChange={e => setContact(c => ({...c, email: e.target.value}))} />
-                                    <Input placeholder="Phone Number *" value={contact.phone} onChange={e => setContact(c => ({...c, phone: e.target.value}))} />
+                                    <Input type="email" placeholder="Email (blank uses your account email)" value={contact.email} onChange={e => setContact(c => ({...c, email: e.target.value}))} />
+                                    <Input type="tel" inputMode="tel" placeholder="Phone Number *" value={contact.phone} onChange={e => setContact(c => ({...c, phone: e.target.value}))} />
                                 </div>
                                 <Textarea placeholder="Special instructions (optional)..." value={contact.notes} onChange={e => setContact(c => ({...c, notes: e.target.value}))} />
 

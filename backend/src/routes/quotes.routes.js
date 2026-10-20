@@ -5,6 +5,7 @@ import { storageService } from '../services/storage.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 import { notifyQuote } from '../services/whatsapp.service.js';
+import { quoteAdminEmail, quoteContact, quoteCustomerEmail } from '../services/quote.email.js';
 
 const router = express.Router();
 
@@ -57,7 +58,7 @@ router.post('/upload-url', authMiddleware, async (req, res, next) => {
  */
 router.post('/request', authMiddleware, async (req, res, next) => {
     try {
-        const { email, phone, notes, specifications, fileKey, fileName } = req.body || {};
+        const { notes, specifications, fileKey, fileName } = req.body || {};
 
         if (!fileKey || !fileName) {
             return res.status(400).json({ error: 'fileKey and fileName are required' });
@@ -69,6 +70,11 @@ router.post('/request', authMiddleware, async (req, res, next) => {
             return res.status(403).json({ error: 'That file does not belong to you' });
         }
 
+        // A quote nobody can be contacted about is no use to the team.
+        const account = await db.oneOrNone('SELECT email, full_name, phone_number FROM users WHERE id = $1', [req.userId]);
+        const contact = quoteContact(req.body, account);
+        if (contact.problem) return res.status(400).json({ error: contact.problem });
+
         // Confirm the object exists rather than trusting the client's word that
         // the upload succeeded -- otherwise a quote can reference nothing.
         const stat = await storageService.statModel(fileKey);
@@ -76,137 +82,40 @@ router.post('/request', authMiddleware, async (req, res, next) => {
             return res.status(400).json({ error: 'Upload not found. Please upload the file again.' });
         }
 
-        const file = { originalname: fileName, size: stat.contentLength };
-        const fileUrl = fileKey;
-
-        // 2. Parse Specifications
         let specs = {};
         try {
-            specs = typeof specifications === 'string' ? JSON.parse(specifications) : specifications;
+            specs = (typeof specifications === 'string' ? JSON.parse(specifications) : specifications) || {};
         } catch (e) {
             console.error("Spec Parse Error", e);
             specs = {};
         }
 
-        const estPrice = specs.estimatedPrice || 0;
-        const modelStats = specs.originalStats || {};
-        const printDims = specs.printDimensions || {};
-
-        // 3. Insert into DB (LINK TO LOGGED IN USER: req.userId)
         const quote = await db.one(`
             INSERT INTO quotes (user_id, email, phone, file_url, file_name, specifications, estimated_price, admin_notes, status)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
             RETURNING id
-        `, [req.userId, email, phone, fileUrl, file.originalname, specs, estPrice, notes]);
+        `, [req.userId, contact.email, contact.phone, fileKey, fileName, specs, specs.estimatedPrice || 0, notes]);
 
-        // 4. Prepare Email Content (The "Dark Theme" Format)
-        const adminHtml = `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #1e293b; max-width: 600px; margin: 0 auto; border-radius: 8px; overflow: hidden; background-color: #0f172a; color: #e2e8f0;">
-                
-                <div style="background-color: #1e293b; padding: 20px; text-align: center; border-bottom: 2px solid #3b82f6;">
-                    <h2 style="color: #ffffff; margin: 0;">New 3D Printing Request</h2>
-                </div>
-                
-                <div style="padding: 25px;">
-                    
-                    <div style="background: #1e293b; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
-                        <h3 style="margin-top: 0; color: #93c5fd; font-size: 16px; margin-bottom: 10px;">👤 Customer Details</h3>
-                        <p style="margin: 5px 0; color: #cbd5e1;"><strong>User ID:</strong> ${req.userId}</p>
-                        <p style="margin: 5px 0; color: #cbd5e1;"><strong>Email:</strong> <a href="mailto:${email}" style="color: #60a5fa;">${email}</a></p>
-                        <p style="margin: 5px 0; color: #cbd5e1;"><strong>Phone:</strong> ${phone}</p>
-                    </div>
-
-                    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                        
-                        <div style="flex: 1; background: #172554; padding: 15px; border-radius: 6px; border: 1px solid #1e3a8a;">
-                            <h3 style="margin-top: 0; color: #60a5fa; font-size: 15px; margin-bottom: 10px;">⚙️ Settings</h3>
-                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: #e2e8f0;">
-                                <li style="margin-bottom: 6px;"><strong>Material:</strong> ${specs.material}</li>
-                                <li style="margin-bottom: 6px;"><strong>Quality:</strong> ${specs.quality}</li>
-                                <li style="margin-bottom: 6px;"><strong>Infill:</strong> ${specs.infill}</li>
-                                <li style="margin-bottom: 6px;"><strong>Scale:</strong> ${specs.scale || '100%'}</li>
-                            </ul>
-                        </div>
-                        
-                        <div style="flex: 1; background: #27272a; padding: 15px; border-radius: 6px; border: 1px solid #3f3f46;">
-                            <h3 style="margin-top: 0; color: #fb923c; font-size: 15px; margin-bottom: 10px;">📊 Model Analysis</h3>
-                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: #e2e8f0;">
-                                <li style="margin-bottom: 6px;"><strong>Volume:</strong> ${modelStats.volume?.toFixed(2) || 0} cm³</li>
-                                <li style="margin-bottom: 6px;"><strong>Weight:</strong> ${specs.estimatedWeight || 'N/A'}</li>
-                                <li style="margin-bottom: 6px;"><strong>Polygons:</strong> ${specs.polygonCount ? specs.polygonCount.toLocaleString() : 'N/A'}</li>
-                                <li style="margin-bottom: 6px;"><strong>Rotation:</strong> ${specs.rotation || '0,0,0'}</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div style="background: #1e293b; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
-                        <h3 style="margin-top: 0; color: #facc15; font-size: 16px; margin-bottom: 5px;">✏️ Final Dimensions</h3>
-                        <p style="font-family: monospace; font-size: 16px; margin: 0; color: #ffffff;">
-                            ${printDims.x} x ${printDims.y} x ${printDims.z} cm
-                        </p>
-                    </div>
-
-                    <div style="border: 1px dashed #475569; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
-                         <h3 style="margin-top: 0; color: #94a3b8; font-size: 15px; margin-bottom: 5px;">📝 Customer Notes</h3>
-                         <p style="font-style: italic; color: #cbd5e1; margin: 0;">"${notes || "None provided"}"</p>
-                    </div>
-
-                    <div style="text-align: center; padding-top: 10px;">
-                        <div style="display: inline-block; padding: 12px 25px; background-color: #334155; border-radius: 50px;">
-                            <span style="font-weight: bold; color: #94a3b8; margin-right: 15px;">Est. Time: ${specs.estimatedTime}</span>
-                            <span style="font-weight: bold; color: #ffffff; font-size: 18px;">Total: ₹${specs.estimatedPrice}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="background-color: #1e293b; padding: 12px; text-align: center; font-size: 13px; color: #94a3b8; border-top: 1px solid #334155;">
-                    <a href="${fileUrl}" style="color: #60a5fa; text-decoration: none; font-weight: bold;">Download ${file.originalname}</a> • ${(file.size / 1024 / 1024).toFixed(2)} MB
-                </div>
-            </div>
-        `;
-
-        // ----------------------------------------------------
-        // 5. Send Admin Email
-        // ----------------------------------------------------
+        // The model is not attached: the server never receives the bytes. The
+        // email links to the admin dashboard, which downloads it on demand via
+        // GET /api/quotes/:id/download.
+        const adminUrl = `${(process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '')}/admin?tab=quotes`;
+        const adminEmail = quoteAdminEmail({ quoteId: quote.id, contact, fileName, fileSize: stat.contentLength, specs, notes, adminUrl });
         const adminMail = transporter.sendMail({
             from: `"ProtoDesign System" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER, // Send to Admin
-            subject: `New Request: ${file.originalname} - ₹${specs.estimatedPrice}`,
-            html: adminHtml
-            // The model is no longer attached: the server never receives the
-            // bytes. It is retrieved on demand from the admin dashboard via
-            // GET /api/quotes/:id/download, which issues a short-lived URL.
+            to: process.env.EMAIL_USER,
+            replyTo: contact.email,
+            ...adminEmail,
         }).catch(err => console.error(JSON.stringify({
-            event: 'email_failed', type: 'quote_admin', file: file.originalname, error: err.message
+            event: 'email_failed', type: 'quote_admin', quoteId: quote.id, error: err.message
         })));
 
-
-        // ----------------------------------------------------
-        // 6. Send Customer Confirmation Email
-        // ----------------------------------------------------
-        const customerHtml = `
-            <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #2563eb;">🚀 We received your request!</h2>
-                <p>Hi there,</p>
-                <p>Thank you for submitting your model <strong>${file.originalname}</strong>.</p>
-                
-                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <p><strong>Estimated Price:</strong> ₹${specs.estimatedPrice}</p>
-                    <p><strong>Next Steps:</strong> Our engineers are reviewing the file for printability. We will contact you soon.</p>
-                </div>
-
-                <p>Best regards,<br><strong>The ProtoDesign Team</strong></p>
-            </div>
-        `;
-
-        // ✅ Removed 'await' so UI doesn't freeze
         const customerMail = transporter.sendMail({
             from: `"ProtoDesign" <${process.env.EMAIL_USER}>`,
-            to: email, 
-            subject: `Order Received: ${file.originalname}`,
-            html: customerHtml
+            to: contact.email,
+            ...quoteCustomerEmail({ contact, fileName, specs }),
         }).catch(err => console.error(JSON.stringify({
-            event: 'email_failed', type: 'quote_customer', to: email, error: err.message
+            event: 'email_failed', type: 'quote_customer', quoteId: quote.id, error: err.message
         })));
 
         // Both sends are awaited together rather than left dangling. Lambda freezes
@@ -216,7 +125,7 @@ router.post('/request', authMiddleware, async (req, res, next) => {
         await Promise.allSettled([adminMail, customerMail]);
 
         // quoteId lets the page offer "Get updates on WhatsApp" for this quote.
-        res.json({ success: true, message: "Quote requested successfully", quoteId: quote.id });
+        res.json({ success: true, message: "Quote requested successfully", quoteId: quote.id, email: contact.email });
 
     } catch (error) {
         console.error('Quote Process Error:', error);
