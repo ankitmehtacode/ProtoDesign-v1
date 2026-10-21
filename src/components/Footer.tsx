@@ -29,6 +29,8 @@ export const Footer = () => {
                         <ul className="text-sm text-foreground/80 md:space-y-2">
                             <li><Link to="/printers" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">3D Printers</Link></li>
                             <li><Link to="/filaments" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Filaments</Link></li>
+                            <li><Link to="/printer-advisor" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Printer advisor</Link></li>
+                            <li><Link to="/filament-calculator" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Filament calculator</Link></li>
                             <li><Link to="/resins" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Resins</Link></li>
                             <li><Link to="/custom" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Custom Printing</Link></li>
                         </ul>

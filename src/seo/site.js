@@ -76,6 +76,22 @@ export const PAGES = {
         crumbs: [{ name: "Custom 3D printing", path: "/custom" }],
         service: true,
     },
+    "/printer-advisor": {
+        title: "Which 3D Printer Should I Buy? Free Printer Advisor | ProtoDesign",
+        description:
+            "Answer three questions about your budget, what you want to print and which materials, and get the three best 3D printers in stock in India, with prices in rupees.",
+        h1: "Which 3D printer should you buy?",
+        intro: "Tell us your budget, what you want to print and which materials. We match you with the best three printers we have in stock, and say why each one fits.",
+        crumbs: [{ name: "3D printers", path: "/printers" }, { name: "Printer advisor", path: "/printer-advisor" }],
+    },
+    "/filament-calculator": {
+        title: "3D Printer Filament Usage & Cost Calculator | ProtoDesign",
+        description:
+            "Work out how much PLA, PETG, ABS or carbon-fibre filament you use a month, how often you need a new spool, and what it costs in rupees.",
+        h1: "How much filament do you use?",
+        intro: "Enter how many prints you make a week and how heavy they are. See your monthly filament use, how long a spool lasts and the monthly cost at our prices.",
+        crumbs: [{ name: "Filaments", path: "/filaments" }, { name: "Filament calculator", path: "/filament-calculator" }],
+    },
     "/shop": {
         title: "Buy 3D Printers, Filament & Resin Online in India | ProtoDesign",
         description:

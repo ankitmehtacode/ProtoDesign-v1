@@ -34,6 +34,8 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Profile = lazy(() => import("./pages/Profile"));
 const BulkUpload = lazy(() => import("./pages/BulkUpload.tsx"));
+const PrinterAdvisor = lazy(() => import("./pages/PrinterAdvisor"));
+const FilamentCalculator = lazy(() => import("./pages/FilamentCalculator"));
 
 const queryClient = new QueryClient();
 
@@ -130,6 +132,8 @@ const App = () => (
                                 {/* Details & Other Pages */}
                                 <Route path="/product/:productId" element={<ProductDetail />} />
                                 <Route path="/custom" element={<CustomPrinting />} />
+                                <Route path="/printer-advisor" element={<PrinterAdvisor />} />
+                                <Route path="/filament-calculator" element={<FilamentCalculator />} />
                                 <Route path="/cart" element={<Cart />} />
                                 <Route path="/checkout" element={<Checkout />} />
                                 <Route path="/orders" element={<Orders />} />

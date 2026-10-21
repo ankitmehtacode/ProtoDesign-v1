@@ -128,6 +128,7 @@ export const PrivacyPage = () => (
             <li><strong>Contact Data:</strong> Billing address, Shipping address, Email address, and Phone number (e.g., +91 8249581682).</li>
             <li><strong>Transaction Data:</strong> Details of products ordered and payment timestamps.</li>
             <li><strong>Enquiry Data:</strong> When you use an "Ask an expert" form: your name, WhatsApp number or email, your message, and the product you asked about.</li>
+            <li><strong>Tool and Alert Data:</strong> Your answers to the printer advisor or filament calculator and the result. If you send the result to our WhatsApp, your WhatsApp number and name. If you ask for a stock or price alert, your email address and the product.</li>
             <li><strong>Usage Data (only if you allow analytics):</strong> The pages and products you view on this site, items you add to your cart, and how you first arrived (for example a search engine, an ad, or a link), stored against a random ID kept in your browser.</li>
         </ul>
 
@@ -140,6 +141,7 @@ export const PrivacyPage = () => (
             <li>Delivering products via our logistics partners.</li>
             <li>Sending order updates, invoices, and support communications.</li>
             <li>Replying to your enquiry. If you allowed analytics, the pages you viewed are linked to your enquiry, and to your account when you sign in, so we can answer with the right product.</li>
+            <li>Sending you a stock or price alert you asked for. Each alert is sent once, by email, with an unsubscribe link.</li>
             <li>Understanding which pages and channels bring visitors, so we can improve the shop. Usage data is not sold or used to show you ads.</li>
         </ul>
 

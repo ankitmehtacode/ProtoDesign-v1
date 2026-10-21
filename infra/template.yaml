@@ -251,6 +251,13 @@ Resources:
           Properties:
             Schedule: cron(30 22 * * ? *)
             Input: '{"source":"protodesign.lead-maintenance"}'
+        # Emails back-in-stock and price-drop alerts that have come true
+        # (backend/src/services/product-alerts.service.js). Every hour.
+        ProductAlertsSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+            Input: '{"source":"protodesign.product-alerts"}'
         # Rebuild the prerendered site when a festival sale changes printer
         # prices (backend/src/services/festival.js). One-off: the year field
         # pins each to 2026. 18:31 UTC is 00:01 IST the next day.
