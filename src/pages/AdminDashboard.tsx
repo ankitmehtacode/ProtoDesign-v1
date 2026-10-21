@@ -45,6 +45,8 @@ export default function AdminDashboard() {
         // Leads and search demand load inside their sections; Refresh reloads them too.
         void queryClient.invalidateQueries({ queryKey: ["leads-overview"] });
         void queryClient.invalidateQueries({ queryKey: ["search-demand"] });
+        void queryClient.invalidateQueries({ queryKey: ["leads-reorders"] });
+        void queryClient.invalidateQueries({ queryKey: ["leads-ads"] });
         try {
             const [o, q, p] = await Promise.all([
                 apiService.getAdminOrders(),

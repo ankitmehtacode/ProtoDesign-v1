@@ -38,6 +38,20 @@ export const CONSENT_TEXTS = Object.freeze({
         + 'Every email has an unsubscribe link, and I can ask for my details to be deleted at any time.',
 });
 
+export const ADS_MEASUREMENT_VERSION = 'ads-measurement-v1';
+
+// Google Ads consents (docs/google-ads.md): optional, unticked, and separate
+// from the consents above. Shown in AnalyticsConsent.tsx and LeadCapture.tsx.
+export const ADS_CONSENT_TEXTS = Object.freeze({
+    // Ad measurement: only the ad click id goes to Google.
+    'ads-measurement-v1': 'You came here from a Google ad. Also let ProtoDesign tell Google Ads when that visit leads '
+        + 'to an enquiry or order, so we stop paying for ads that do not help. Only the ad click ID is shared, '
+        + 'never your name or contact details.',
+    // Customer Match: hashed contact details go to Google.
+    'lead-ads-v1': 'Also show me ProtoDesign offers in Google ads. ProtoDesign may share my phone number and email '
+        + 'with Google in scrambled (hashed) form for this. I can withdraw at any time.',
+});
+
 const MAX_BATCH = 20;
 const MAX_BODY_CHARS = 16_000;
 const PER_VISITOR_DAILY_EVENTS = 300;
@@ -128,7 +142,9 @@ export function classifySource(raw = {}) {
         source: null, medium: null,
         campaign: clip(raw.utm_campaign, 150),
         term: clip(raw.utm_term, 150),
-        gclid: clip(raw.gclid, 200),
+        // Google click ids are URL-safe base64; anything else is not one, and
+        // must not reach the conversions file Google imports.
+        gclid: /^[A-Za-z0-9_-]{10,200}$/.test(String(raw.gclid ?? '')) ? String(raw.gclid) : null,
         referrer_host: clip(raw.referrer_host, 255)?.toLowerCase().replace(/^www\./, '') ?? null,
         landing_path: sitePath(raw.landing_path),
     };
@@ -212,12 +228,34 @@ export async function recordEvents({ visitorId, events, attribution, ipHash: ip 
     }
 
     const t = classifySource(attribution || {});
+    // Ad measurement is asked only of visitors who arrived from an ad, so it
+    // means nothing without a click id, and counts only under known wording.
+    const adsVersion = t.gclid && attribution?.ads === true && attribution.adsVersion === ADS_MEASUREMENT_VERSION
+        ? ADS_MEASUREMENT_VERSION : null;
     return db.tx(async (tx) => {
+        // Source and landing stay first-touch. A new ad click replaces the
+        // old one, with this visit's measurement choice; the same click
+        // again (a second tab) can only add a consent.
         await tx.none(
-            `INSERT INTO visitors (id, source, medium, campaign, term, gclid, referrer_host, landing_path, ip_hash)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             ON CONFLICT (id) DO UPDATE SET last_seen_at = now()`,
-            [visitorId, t.source, t.medium, t.campaign, t.term, t.gclid, t.referrer_host, t.landing_path, ip]
+            `INSERT INTO visitors (id, source, medium, campaign, term, gclid, referrer_host, landing_path, ip_hash,
+                                   gclid_at, ads_consent_at, ads_consent_version)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                     CASE WHEN $6::text IS NOT NULL THEN now() END,
+                     CASE WHEN $10::text IS NOT NULL THEN now() END, $10)
+             ON CONFLICT (id) DO UPDATE SET
+                last_seen_at = now(),
+                gclid = COALESCE(EXCLUDED.gclid, visitors.gclid),
+                gclid_at = CASE WHEN EXCLUDED.gclid IS DISTINCT FROM visitors.gclid AND EXCLUDED.gclid IS NOT NULL
+                                THEN now() ELSE visitors.gclid_at END,
+                ads_consent_at = CASE
+                    WHEN EXCLUDED.gclid IS NULL THEN visitors.ads_consent_at
+                    WHEN EXCLUDED.gclid IS DISTINCT FROM visitors.gclid THEN EXCLUDED.ads_consent_at
+                    ELSE COALESCE(visitors.ads_consent_at, EXCLUDED.ads_consent_at) END,
+                ads_consent_version = CASE
+                    WHEN EXCLUDED.gclid IS NULL THEN visitors.ads_consent_version
+                    WHEN EXCLUDED.gclid IS DISTINCT FROM visitors.gclid THEN EXCLUDED.ads_consent_version
+                    ELSE COALESCE(visitors.ads_consent_version, EXCLUDED.ads_consent_version) END`,
+            [visitorId, t.source, t.medium, t.campaign, t.term, t.gclid, t.referrer_host, t.landing_path, ip, adsVersion]
         );
         // A product id that is not in the catalogue is stored as NULL rather
         // than failing the batch on the foreign key.
@@ -230,6 +268,24 @@ export async function recordEvents({ visitorId, events, attribution, ipHash: ip 
         );
         return inserted.rowCount;
     });
+}
+
+/**
+ * The ad-measurement choice changed after the first visit (the consent
+ * notice reopened from the footer). Withdrawing stops any further upload of
+ * this browser's ad click.
+ */
+export async function setVisitorAdsConsent(visitorId, granted, version) {
+    if (!isUuid(visitorId)) throw new InputError('visitorId must be a UUID');
+    const grant = granted === true;
+    if (grant && version !== ADS_MEASUREMENT_VERSION) throw new InputError('Unknown consent version');
+    const res = await db.result(
+        `UPDATE visitors SET ads_consent_at = CASE WHEN $2 THEN COALESCE(ads_consent_at, now()) END,
+                             ads_consent_version = CASE WHEN $2 THEN COALESCE(ads_consent_version, $3) END
+          WHERE id = $1 AND (gclid IS NOT NULL OR NOT $2)`,
+        [visitorId, grant, grant ? version : null]
+    );
+    if (res.rowCount) logEvent('visitor_ads_consent', { visitorId, granted: granted === true });
 }
 
 /** "No thanks" after an earlier "Allow": the browser's visits are deleted, not just forgotten locally. */
@@ -281,8 +337,11 @@ export function validateLead(body = {}) {
 
     const interest = INTERESTS.has(body.interest) ? body.interest : 'other';
     const form = /^[a-z_]{1,40}$/.test(body.form || '') ? body.form : 'unknown';
+    // Optional; only the Customer Match wording counts here.
+    const adsConsentText = body.adsConsent === true && body.adsConsentVersion === 'lead-ads-v1'
+        ? ADS_CONSENT_TEXTS['lead-ads-v1'] : null;
     return {
-        name: clip(body.name, 120), phone, email, interest, form, consentText,
+        name: clip(body.name, 120), phone, email, interest, form, consentText, adsConsentText,
         message: clip(body.message, 1000),
         productId: isUuid(body.productId) ? body.productId : null,
         visitorId: isUuid(body.visitorId) ? body.visitorId : null,
@@ -346,20 +405,32 @@ export async function captureLead(input, { userId = null, ipHash: ip = null } = 
                     interest = $5, message = COALESCE($6, message), product_id = COALESCE($7, product_id),
                     form = $8, user_id = COALESCE(user_id, $9),
                     submissions = submissions + 1, last_submitted_at = now(),
-                    status = CASE WHEN status = 'lost' THEN 'new' ELSE status END
+                    status = CASE WHEN status = 'lost' THEN 'new' ELSE status END,
+                    -- Numbers are unverified, so a repeat can add an ads
+                    -- consent only for the signed-in account the lead
+                    -- belongs to: anyone else typing this number must not
+                    -- opt its owner in. Recorded once, never rewritten.
+                    ads_consent_text = CASE WHEN user_id IS NOT NULL AND user_id = $9
+                                            THEN COALESCE(ads_consent_text, $10) ELSE ads_consent_text END,
+                    ads_consented_at = CASE WHEN user_id IS NOT NULL AND user_id = $9
+                                             AND ads_consent_text IS NULL AND $10::text IS NOT NULL
+                                            THEN now() ELSE ads_consented_at END
                   WHERE id = $1 RETURNING *`,
                 [existing.id, input.name, input.phone, input.email, input.interest, input.message,
-                    product?.id ?? null, input.form, userId]
+                    product?.id ?? null, input.form, userId, input.adsConsentText ?? null]
             );
         } else {
             const v = visitor || {};
             lead = await tx.one(
                 `INSERT INTO leads (name, phone, email, interest, message, product_id, form, user_id, consent_text,
-                                    source, medium, campaign, term, gclid, referrer_host, landing_path, ip_hash)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+                                    source, medium, campaign, term, gclid, referrer_host, landing_path, ip_hash,
+                                    ads_consent_text, ads_consented_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+                         $18, CASE WHEN $18::text IS NULL THEN NULL ELSE now() END) RETURNING *`,
                 [input.name, input.phone, input.email, input.interest, input.message, product?.id ?? null,
                     input.form, userId, input.consentText, v.source ?? null, v.medium ?? null, v.campaign ?? null,
-                    v.term ?? null, v.gclid ?? null, v.referrer_host ?? null, v.landing_path ?? null, ip]
+                    v.term ?? null, v.gclid ?? null, v.referrer_host ?? null, v.landing_path ?? null, ip,
+                    input.adsConsentText ?? null]
             );
         }
 
@@ -425,7 +496,7 @@ export async function adminOverview() {
         db.any(
             `SELECT l.id, l.name, l.phone, l.email, l.interest, l.message, l.form, l.status, l.admin_notes,
                     l.source, l.medium, l.campaign, l.landing_path, l.submissions, l.created_at,
-                    l.last_submitted_at, p.name AS product_name,
+                    l.last_submitted_at, l.score, l.score_reasons, l.scored_at, p.name AS product_name,
                     COALESCE(a.events, 0)::int AS events, COALESCE(a.product_views, 0)::int AS product_views,
                     GREATEST(l.last_submitted_at, a.last_event_at) AS last_activity_at
                FROM leads l
@@ -481,11 +552,23 @@ export async function adminLeadDetail(leadId) {
     return { lead, events: events.reverse(), orders };
 }
 
-export async function updateLead(leadId, { status, admin_notes }) {
+export async function updateLead(leadId, { status, admin_notes, withdraw_ads }) {
     if (!isUuid(leadId)) return null;
     if (status !== undefined && !LEAD_STATUSES.has(status)) throw new InputError('Unknown status');
+    // The person asked to leave Google ads audiences (docs/google-ads.md):
+    // they drop out of the next Customer Match file.
+    if (withdraw_ads === true) {
+        const res = await db.oneOrNone(
+            `UPDATE leads SET ads_consent_text = NULL, ads_consented_at = NULL WHERE id = $1
+             RETURNING id, status, admin_notes`, [leadId]);
+        if (res) logEvent('lead_ads_consent_withdrawn', { leadId });
+        if (status === undefined && admin_notes === undefined) return res;
+    }
     return db.oneOrNone(
-        `UPDATE leads SET status = COALESCE($2, status), admin_notes = CASE WHEN $3 THEN $4 ELSE admin_notes END
+        // A won or lost lead loses its score (lead-intel.service.js scores open leads only).
+        `UPDATE leads SET status = COALESCE($2, status), admin_notes = CASE WHEN $3 THEN $4 ELSE admin_notes END,
+                score = CASE WHEN $2 IN ('won', 'lost') THEN NULL ELSE score END,
+                score_reasons = CASE WHEN $2 IN ('won', 'lost') THEN NULL ELSE score_reasons END
           WHERE id = $1 RETURNING id, status, admin_notes`,
         [leadId, status ?? null, admin_notes !== undefined, clip(admin_notes, 2000)]
     );
@@ -563,12 +646,14 @@ export async function runLeadMaintenance({ alert } = {}) {
         `WITH newest AS (SELECT max(day) AS day FROM search_console_days),
               d AS (DELETE FROM search_console_days WHERE day < (SELECT day FROM newest) - $1::int)
          DELETE FROM search_console_rows WHERE day < (SELECT day FROM newest) - $1::int`, [SEARCH_RETENTION_DAYS]);
+    const adsFetchesDeleted = await step('ads_feed_fetches',
+        `DELETE FROM ads_feed_fetches WHERE fetched_at < now() - interval '60 days'`, []);
     const searchSyncsDeleted = await step('search_console_syncs',
         `DELETE FROM search_console_syncs WHERE started_at < now() - interval '60 days'`, []);
     const storage = await databaseSize();
     const result = {
         visitorsDeleted: anon.rowCount, eventsDeleted: old.rowCount, toolResultsDeleted, alertsDeleted,
-        searchRowsDeleted, searchSyncsDeleted, ...storage,
+        searchRowsDeleted, searchSyncsDeleted, adsFetchesDeleted, ...storage,
     };
     logEvent('lead_maintenance', result);
 

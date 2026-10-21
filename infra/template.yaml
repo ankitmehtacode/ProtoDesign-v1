@@ -231,6 +231,23 @@ Parameters:
     Default: /protodesign/search-console-key
     AllowedPattern: '^/[A-Za-z0-9/_.-]+$'
 
+  # ── Google Ads (docs/google-ads.md) ─────────────────────────────────────
+  # Secret Google Ads uses to fetch /api/ads/conversions.csv (Basic-auth
+  # password, or ?key=). At least 24 characters; empty keeps the feed off.
+  AdsFeedSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    AllowedPattern: '^$|^[A-Za-z0-9_-]{24,}$'
+    ConstraintDescription: Empty, or at least 24 letters, digits, - or _ (openssl rand -hex 24).
+  # Must match the conversion action names created in Google Ads.
+  AdsLeadConversion:
+    Type: String
+    Default: ProtoDesign lead
+  AdsPurchaseConversion:
+    Type: String
+    Default: ProtoDesign purchase
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -281,6 +298,20 @@ Resources:
           Properties:
             Schedule: cron(0 1 * * ? *)
             Input: '{"source":"protodesign.search-console"}'
+        # Rescores open leads and alerts the ones that just turned hot
+        # (backend/src/services/lead-intel.service.js). Every hour.
+        LeadScoringSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+            Input: '{"source":"protodesign.lead-scoring"}'
+        # Telegram list of filament buyers likely to run out this week.
+        # Mondays at 10:00 IST.
+        ReorderDigestSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(30 4 ? * MON *)
+            Input: '{"source":"protodesign.reorder-digest"}'
         # Rebuild the prerendered site when a festival sale changes printer
         # prices (backend/src/services/festival.js). One-off: the year field
         # pins each to 2026. 18:31 UTC is 00:01 IST the next day.
@@ -345,6 +376,9 @@ Resources:
           VERCEL_DEPLOY_HOOK_URL: !Ref VercelDeployHookUrl
           GSC_SITE_URL: !Ref SearchConsoleSiteUrl
           GSC_KEY_PARAMETER: !Ref SearchConsoleKeyParameter
+          ADS_FEED_SECRET: !Ref AdsFeedSecret
+          ADS_LEAD_CONVERSION: !Ref AdsLeadConversion
+          ADS_PURCHASE_CONVERSION: !Ref AdsPurchaseConversion
           # AWS_REGION is deliberately not set here: it is a reserved Lambda
           # runtime variable that AWS populates automatically to the function's
           # actual region, and CloudFormation rejects any attempt to set it

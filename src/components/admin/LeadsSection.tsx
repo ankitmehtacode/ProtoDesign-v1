@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Mail, Trash2 } from "lucide-react";
+import { Download, Loader2, Mail, Megaphone, Trash2 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiService } from "@/services/api.service";
+import { API_URL, apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { Empty, FilterPills, Kpi, PageHeader, Panel, StatusBadge } from "./ui";
 import { LEAD_STATUSES, delta, downloadCsv, formatDate, relativeTime, statusMeta } from "./model";
@@ -25,6 +25,20 @@ interface Lead {
     source: string | null; medium: string | null; campaign: string | null; landing_path: string | null;
     submissions: number; created_at: string; last_submitted_at: string; product_name: string | null;
     events: number; product_views: number; last_activity_at: string;
+    score: number | null; score_reasons: { label: string; points: number }[] | null;
+}
+
+interface AdsStatus {
+    feedEnabled: boolean; leadConversion: string; purchaseConversion: string; feedDays: number;
+    lastFetch: { fetched_at: string; conversions: number } | null;
+    feed: { leads: number; purchases: number; value: number };
+    ad_visitors: number; ad_consented: number; match_consented: number; matchRows: number;
+}
+
+interface Reorder {
+    user_id: string; name: string | null; email: string | null; phone: string | null; materials: string[];
+    orders: number; lastOrderAt: string; lastKg: number; assumedKg: boolean;
+    kgPerMonth: number; basis: "history" | "calculator" | "typical"; runsOutAt: string; daysLeft: number;
 }
 
 interface Overview {
@@ -41,10 +55,26 @@ interface Overview {
 const TOOL_LABEL: Record<string, string> = { printer_advisor: "Printer advisor", filament_estimator: "Filament calculator" };
 
 interface Detail {
-    lead: Lead & { gclid: string | null; referrer_host: string | null; term: string | null; consent_text: string; consented_at: string };
+    lead: Lead & {
+        gclid: string | null; referrer_host: string | null; term: string | null; consent_text: string; consented_at: string;
+        ads_consent_text: string | null; ads_consented_at: string | null;
+    };
     events: { name: string; path: string | null; created_at: string; product_id: string | null; product_name: string | null }[];
     orders: { id: string; status: string; total_amount: string; created_at: string }[];
 }
+
+// Same bands as backend lead-intel.service.js: hot from 60, warm from 35.
+const scoreMeta = (score: number | null): { label: string; tone: "red" | "amber" | "neutral" } | null =>
+    score === null ? null : score >= 60 ? { label: `Hot ${score}`, tone: "red" } : score >= 35 ? { label: `Warm ${score}`, tone: "amber" } : { label: `Cold ${score}`, tone: "neutral" };
+const BASIS_LABEL: Record<Reorder["basis"], string> = {
+    history: "from their buying rhythm", calculator: "from their filament calculator answer", typical: "typical rate, first purchase",
+};
+const runsOut = (d: number) => (d < 0 ? `likely ran out ${-d} day${d === -1 ? "" : "s"} ago` : d === 0 ? "likely runs out today" : `runs out in ~${d} day${d === 1 ? "" : "s"}`);
+// Checkout phones are free text: "98765 43210", "09876543210" or "+91 98765 43210".
+const waNumber = (phone: string) => {
+    const d = phone.replace(/\D/g, "").replace(/^0(?=\d{10}$)/, "");
+    return d.length === 10 ? `91${d}` : d;
+};
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "–");
 const mb = (b: number) => `${(b / 1024 / 1024).toFixed(0)} MB`;
@@ -60,15 +90,41 @@ const EVENT_LABEL: Record<string, string> = {
 export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
     const [filter, setFilter] = useState(initialFilter && LEAD_STATUSES.some((s) => s.value === initialFilter) ? initialFilter : "all");
     const [openId, setOpenId] = useState<string | null>(null);
+    const [sort, setSort] = useState<"score" | "recent">("score");
     const { data, isLoading, isError } = useQuery({
         queryKey: ["leads-overview"],
         queryFn: () => apiService.request("/leads/admin") as Promise<Overview>,
         retry: false,
     });
+    const ads = useQuery({
+        queryKey: ["leads-ads"],
+        queryFn: () => apiService.request("/leads/ads") as Promise<AdsStatus>,
+        retry: false,
+    });
+    const downloadAudience = async (interest?: string) => {
+        try {
+            const csv = await apiService.request(`/leads/ads/customer-match.csv${interest ? `?interest=${interest}` : ""}`) as string;
+            const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+            const a = Object.assign(document.createElement("a"), { href: url, download: `customer-match-${interest ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv` });
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Could not build the audience file");
+        }
+    };
+    const reorders = useQuery({
+        queryKey: ["leads-reorders"],
+        queryFn: () => apiService.request("/leads/reorders") as Promise<{ customers: Reorder[]; buyers: number; repeatBuyers: number }>,
+        retry: false,
+    });
 
     const shown = useMemo(
-        () => (data?.leads ?? []).filter((l) => filter === "all" || l.status === filter),
-        [data, filter],
+        () => {
+            const list = (data?.leads ?? []).filter((l) => filter === "all" || l.status === filter);
+            // Unscored (closed, or not yet scored) last; the server already orders by activity.
+            return sort === "score" ? [...list].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)) : list;
+        },
+        [data, filter, sort],
     );
 
     if (isLoading) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -76,8 +132,8 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
 
     const { totals, storage } = data;
     const exportCsv = () => downloadCsv(`leads-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Name", "Phone (with country code)", "Email", "Interest", "Product", "Status", "Source", "Medium", "Campaign", "Landing page", "Message", "Created"],
-        shown.map((l) => [l.name ?? "", l.phone ?? "", l.email ?? "", l.interest, l.product_name ?? "", l.status,
+        ["Name", "Phone (with country code)", "Email", "Interest", "Product", "Status", "Score", "Source", "Medium", "Campaign", "Landing page", "Message", "Created"],
+        shown.map((l) => [l.name ?? "", l.phone ?? "", l.email ?? "", l.interest, l.product_name ?? "", l.status, l.score ?? "",
             l.source ?? "", l.medium ?? "", l.campaign ?? "", l.landing_path ?? "", l.message ?? "", l.created_at]));
 
     return (
@@ -174,11 +230,77 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
                 </Panel>
             </div>
 
-            <Panel className="mt-6" title="Leads" action={
-                <FilterPills value={filter} onChange={setFilter} options={[
-                    { value: "all", label: "All", count: data.leads.length },
-                    ...LEAD_STATUSES.map((s) => ({ ...s, count: data.leads.filter((l) => l.status === s.value).length })),
-                ]} />
+            <Panel className="mt-6" title="Google Ads" description="Only people who opted in: ad clicks that became enquiries or orders go back to Google, and opted-in leads can be uploaded as a hashed audience.">
+                {ads.isError || !ads.data ? <Empty title={ads.isError ? "Couldn't load Google Ads status." : "Loading…"} body={ads.isError ? "Check that migration 019_ads.sql has been applied." : undefined} /> : (
+                    <div className="grid gap-6 px-5 py-4 text-sm md:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <h3 className="flex items-center gap-2 font-medium"><Megaphone className="h-4 w-4" />Offline conversions</h3>
+                            {!ads.data.feedEnabled ? (
+                                <p className="text-muted-foreground">Off. Set <code className="font-mono text-xs">AdsFeedSecret</code> and deploy; see docs/google-ads.md.</p>
+                            ) : (
+                                <>
+                                    <p className="font-mono text-xs break-all">{API_URL}/ads/conversions.csv</p>
+                                    <p className="text-muted-foreground">
+                                        {ads.data.lastFetch ? `Google last fetched it ${relativeTime(ads.data.lastFetch.fetched_at)} (${ads.data.lastFetch.conversions} conversions).` : "Not fetched yet: set up the scheduled import in Google Ads."}
+                                    </p>
+                                </>
+                            )}
+                            <p className="text-muted-foreground">
+                                Last {ads.data.feedDays} days: {ads.data.feed.leads} × “{ads.data.leadConversion}”, {ads.data.feed.purchases} × “{ads.data.purchaseConversion}” worth {formatINR(ads.data.feed.value)}.
+                            </p>
+                            <p className="text-muted-foreground">Last 30 days: {ads.data.ad_consented} of {ads.data.ad_visitors} tracked visitors from ads allowed measurement.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <h3 className="font-medium">Customer Match audience</h3>
+                            <p className="text-muted-foreground">
+                                {ads.data.match_consented} leads opted in; {ads.data.matchRows} have a WhatsApp-verified number or confirmed email and can be uploaded.
+                                Upload as a full replacement each time, so people who withdrew drop out.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button size="sm" variant="outline" onClick={() => downloadAudience()} disabled={ads.data.matchRows === 0}><Download className="mr-1.5 h-4 w-4" />All</Button>
+                                {(["printer", "filament", "resin"] as const).map((i) => (
+                                    <Button key={i} size="sm" variant="outline" className="capitalize" onClick={() => downloadAudience(i)} disabled={ads.data!.matchRows === 0}><Download className="mr-1.5 h-4 w-4" />{i}</Button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Panel>
+
+            <Panel className="mt-6" title="Filament running low" description="Customers whose filament is likely running out, from their orders. A call list: nothing is sent to them.">
+                {reorders.isError ? <Empty title="Couldn't load predictions." /> : !reorders.data || reorders.data.customers.length === 0 ? (
+                    <Empty title="Nobody due right now." body={reorders.data ? `${reorders.data.buyers} filament buyers in the last year; customers appear here from 3 weeks before their spool is likely to run out.` : undefined} />
+                ) : (
+                    <ul className="divide-y text-sm">
+                        {reorders.data.customers.map((c) => (
+                            <li key={c.user_id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                                        {c.name || c.email}
+                                        <StatusBadge label={runsOut(c.daysLeft)} tone={c.daysLeft <= 0 ? "red" : c.daysLeft <= 7 ? "amber" : "neutral"} />
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {c.materials.join(", ") || "Filament"} · last bought {c.lastKg} kg{c.assumedKg ? " (assumed 1 kg spools)" : ""} {formatDate(c.lastOrderAt)} · ~{c.kgPerMonth} kg a month, {BASIS_LABEL[c.basis]}
+                                    </div>
+                                </div>
+                                <div className="flex shrink-0 gap-2">
+                                    {c.phone && <Button asChild size="sm" variant="outline"><a href={`https://wa.me/${waNumber(c.phone)}`} target="_blank" rel="noopener noreferrer"><FaWhatsapp className="mr-1.5" />WhatsApp</a></Button>}
+                                    {c.email && <Button asChild size="sm" variant="outline"><a href={`mailto:${c.email}`}><Mail className="mr-1.5 h-4 w-4" />Email</a></Button>}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </Panel>
+
+            <Panel className="mt-6" title="Leads" description="Scores update hourly from what each lead did; open a lead to see why." action={
+                <div className="flex flex-col items-end gap-2">
+                    <FilterPills value={filter} onChange={setFilter} options={[
+                        { value: "all", label: "All", count: data.leads.length },
+                        ...LEAD_STATUSES.map((s) => ({ ...s, count: data.leads.filter((l) => l.status === s.value).length })),
+                    ]} />
+                    <FilterPills value={sort} onChange={setSort} options={[{ value: "score", label: "Hottest first" }, { value: "recent", label: "Latest activity" }]} />
+                </div>
             }>
                 {shown.length === 0 ? <Empty title="No leads here." body="Enquiries from printer, filament and resin pages appear here." /> : (
                     <ul className="divide-y">
@@ -190,6 +312,7 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2 font-medium">
                                                 {contact(l)} <StatusBadge label={st.label} tone={st.tone} />
+                                                {scoreMeta(l.score) && <StatusBadge {...scoreMeta(l.score)!} />}
                                                 <span className="text-xs font-normal capitalize text-muted-foreground">{l.interest}{l.product_name ? ` · ${l.product_name}` : ""}</span>
                                             </div>
                                             <div className="truncate text-sm text-muted-foreground">{l.message || channel(l)}</div>
@@ -225,7 +348,7 @@ function LeadDialog({ id, onClose }: { id: string | null; onClose: () => void })
 
     const close = () => { setNotes(null); setConfirmDelete(false); onClose(); };
 
-    const save = async (patch: { status?: string; admin_notes?: string }) => {
+    const save = async (patch: { status?: string; admin_notes?: string; withdraw_ads?: boolean }) => {
         setBusy(true);
         try {
             await apiService.request(`/leads/admin/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
@@ -273,12 +396,34 @@ function LeadDialog({ id, onClose }: { id: string | null; onClose: () => void })
                         </div>
 
                         <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-1.5">
+                            <dt className="text-muted-foreground">Score</dt>
+                            <dd>
+                                {lead.score === null ? "Not scored yet (scores update hourly, open leads only)" : (
+                                    <>
+                                        <StatusBadge {...scoreMeta(lead.score)!} />
+                                        <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                                            {(lead.score_reasons ?? []).map((r) => (
+                                                <li key={r.label}><span className={`inline-block w-9 tabular-nums ${r.points < 0 ? "text-rose-300" : ""}`}>{r.points > 0 ? `+${r.points}` : r.points}</span>{r.label}</li>
+                                            ))}
+                                        </ul>
+                                    </>
+                                )}
+                            </dd>
                             <dt className="text-muted-foreground">Interest</dt><dd className="capitalize">{lead.interest}{lead.product_name ? ` · ${lead.product_name}` : ""}</dd>
                             <dt className="text-muted-foreground">Message</dt><dd className="whitespace-pre-wrap">{lead.message || "–"}</dd>
                             <dt className="text-muted-foreground">First came from</dt><dd>{channel(lead)}{lead.campaign ? ` · campaign ${lead.campaign}` : ""}{lead.gclid ? " · Google Ads click" : ""}</dd>
                             <dt className="text-muted-foreground">Landed on</dt><dd className="font-mono text-xs">{lead.landing_path || "–"}</dd>
                             <dt className="text-muted-foreground">Enquiries</dt><dd>{lead.submissions} · first {formatDate(lead.created_at)}</dd>
                             <dt className="text-muted-foreground">Consent</dt><dd className="text-xs text-muted-foreground">{formatDate(lead.consented_at)}: “{lead.consent_text}”</dd>
+                            <dt className="text-muted-foreground">Google ads</dt>
+                            <dd className="text-xs text-muted-foreground">
+                                {lead.ads_consented_at ? (
+                                    <>
+                                        {formatDate(lead.ads_consented_at)}: “{lead.ads_consent_text}”{" "}
+                                        <Button size="sm" variant="link" className="h-auto p-0 text-xs text-rose-300" disabled={busy} onClick={() => save({ withdraw_ads: true })}>Withdraw on request</Button>
+                                    </>
+                                ) : "Not opted in"}
+                            </dd>
                         </dl>
 
                         {data.orders.length > 0 && (

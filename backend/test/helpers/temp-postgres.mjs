@@ -46,12 +46,12 @@ export async function startTempPostgres() {
         chmodSync(join(data, 'server.key'), 0o600);
 
         run('pg_ctl', ['-D', data, '-w', '-l', join(dir, 'pg.log'),
-            '-o', `-p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=${dir} -c ssl=on`, 'start']);
+            '-o', `-p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=${dir} -c ssl=on -c timezone=UTC`, 'start']);
 
         const psql = (db, args) => run('psql', ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres',
             '-v', 'ON_ERROR_STOP=1', '-d', db, ...args]);
         psql('postgres', ['-c', 'CREATE DATABASE protodesign_test']);
-        for (const file of ['001_initial_schema.sql', '009_add_payment_status.sql', '010_add_product_slug.sql', '011_whatsapp.sql', '012_add_compare_at_price.sql', '015_leads.sql', '016_lead_tools.sql', '017_search_console.sql']) {
+        for (const file of ['001_initial_schema.sql', '009_add_payment_status.sql', '010_add_product_slug.sql', '011_whatsapp.sql', '012_add_compare_at_price.sql', '015_leads.sql', '016_lead_tools.sql', '017_search_console.sql', '018_lead_scoring.sql', '019_ads.sql']) {
             psql('protodesign_test', ['-q', '-f', join(MIGRATIONS, file)]);
         }
     } catch (err) {

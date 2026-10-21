@@ -75,14 +75,19 @@ export async function sendMessage(config, chatId, text) {
     return false;
 }
 
-/** An alert to every admin chat. Never throws. */
+/**
+ * An alert to every admin chat. Never throws. Resolves true when at least one
+ * chat accepted it, for callers that must not count an undelivered alert as sent.
+ */
 export async function notifyAdmin(text) {
     const config = getConfig();
-    if (!config.enabled || config.adminChatIds.length === 0) return;
+    if (!config.enabled || config.adminChatIds.length === 0) return false;
     try {
-        await Promise.all(config.adminChatIds.map((id) => sendMessage(config, id, text)));
+        const sent = await Promise.all(config.adminChatIds.map((id) => sendMessage(config, id, text)));
+        return sent.some(Boolean);
     } catch (err) {
         logFault('telegram_admin_alert_failed', { error: err.message });
+        return false;
     }
 }
 

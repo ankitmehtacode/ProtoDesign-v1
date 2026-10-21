@@ -14,6 +14,13 @@ export type Consent = "granted" | "denied";
 export type TrackedEvent = "page_view" | "product_view" | "add_to_cart" | "quote_start";
 
 const CONSENT_KEY = "pd_analytics_consent";
+// Ad measurement (docs/google-ads.md): separate, and asked about one ad
+// visit at a time, when a tab arrives from a Google ad. The answer for this
+// tab's click (sessionStorage) travels with the tab's first batch; the last
+// answer (localStorage) only pre-ticks the box in "Analytics preferences".
+const ADS_KEY = "pd_ads_consent";
+const ADS_TAB_KEY = "pd_ads_this_visit";
+export const ADS_MEASUREMENT_VERSION = "ads-measurement-v1";
 const VISITOR_KEY = "pd_visitor_id";
 const IDENTIFIED_KEY = "pd_visitor_identified";
 const FLUSH_MS = 5_000;
@@ -73,10 +80,41 @@ export function setConsent(value: Consent) {
         try {
             localStorage.removeItem(VISITOR_KEY);
             localStorage.removeItem(IDENTIFIED_KEY);
+            localStorage.removeItem(ADS_KEY);
+            sessionStorage.removeItem(ADS_TAB_KEY);
         } catch { /* nothing stored */ }
     }
     write(() => localStorage, CONSENT_KEY, value);
     listeners.forEach((fn) => fn(value));
+}
+
+/** Whether this tab arrived from a Google ad. */
+export const cameFromAd = () => Boolean(landing?.gclid);
+
+/** The last ad-measurement answer in this browser. */
+export const getAdsConsent = () => read(() => localStorage, ADS_KEY) === "granted";
+
+/** Whether this tab's ad visit has been asked about. */
+export const adsAskedThisVisit = () => read(() => sessionStorage, ADS_TAB_KEY) !== null;
+
+/**
+ * Records the ad-measurement choice. It reaches the server twice over: with
+ * this tab's first batch (for a new visitor, or a new ad click) and, for a
+ * browser the server already knows, directly -- which is also how a later
+ * withdrawal from "Analytics preferences" arrives. Decided by the stored
+ * visitor id, not by the analytics choice, which "Analytics preferences"
+ * clears while it is being made again.
+ */
+export function setAdsConsent(granted: boolean) {
+    write(() => localStorage, ADS_KEY, granted ? "granted" : "denied");
+    write(() => sessionStorage, ADS_TAB_KEY, granted ? "granted" : "denied");
+    const id = read(() => localStorage, VISITOR_KEY);
+    if (!id) return;
+    const body = new Blob([JSON.stringify({ visitorId: id, granted, version: ADS_MEASUREMENT_VERSION })], { type: "text/plain" });
+    if (!navigator.sendBeacon?.(`${API_URL}/track/ads`, body)) {
+        fetch(`${API_URL}/track/ads`, { method: "POST", body, keepalive: true, credentials: "omit" })
+            .catch((e) => console.warn("Ads consent request failed", e));
+    }
 }
 
 /** Shows the consent notice again (footer "Analytics preferences"). */
@@ -107,7 +145,10 @@ function takeBatches(): Blob[] {
     const batches: Blob[] = [];
     while (queue.length > 0) {
         const events = queue.splice(0, MAX_BATCH);
-        const body = JSON.stringify({ visitorId: id, events, attribution: attributionSent ? undefined : landing });
+        const adsHere = read(() => sessionStorage, ADS_TAB_KEY) === "granted";
+        const attribution = attributionSent ? undefined
+            : { ...landing, ...(adsHere ? { ads: true, adsVersion: ADS_MEASUREMENT_VERSION } : {}) };
+        const body = JSON.stringify({ visitorId: id, events, attribution });
         attributionSent = true;
         batches.push(new Blob([body], { type: "text/plain" }));
     }
