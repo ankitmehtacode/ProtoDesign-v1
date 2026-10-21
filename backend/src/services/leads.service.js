@@ -425,7 +425,7 @@ export async function adminOverview() {
         db.any(
             `SELECT l.id, l.name, l.phone, l.email, l.interest, l.message, l.form, l.status, l.admin_notes,
                     l.source, l.medium, l.campaign, l.landing_path, l.submissions, l.created_at,
-                    l.last_submitted_at, p.name AS product_name,
+                    l.last_submitted_at, l.score, l.score_reasons, l.scored_at, p.name AS product_name,
                     COALESCE(a.events, 0)::int AS events, COALESCE(a.product_views, 0)::int AS product_views,
                     GREATEST(l.last_submitted_at, a.last_event_at) AS last_activity_at
                FROM leads l
@@ -485,7 +485,10 @@ export async function updateLead(leadId, { status, admin_notes }) {
     if (!isUuid(leadId)) return null;
     if (status !== undefined && !LEAD_STATUSES.has(status)) throw new InputError('Unknown status');
     return db.oneOrNone(
-        `UPDATE leads SET status = COALESCE($2, status), admin_notes = CASE WHEN $3 THEN $4 ELSE admin_notes END
+        // A won or lost lead loses its score (lead-intel.service.js scores open leads only).
+        `UPDATE leads SET status = COALESCE($2, status), admin_notes = CASE WHEN $3 THEN $4 ELSE admin_notes END,
+                score = CASE WHEN $2 IN ('won', 'lost') THEN NULL ELSE score END,
+                score_reasons = CASE WHEN $2 IN ('won', 'lost') THEN NULL ELSE score_reasons END
           WHERE id = $1 RETURNING id, status, admin_notes`,
         [leadId, status ?? null, admin_notes !== undefined, clip(admin_notes, 2000)]
     );

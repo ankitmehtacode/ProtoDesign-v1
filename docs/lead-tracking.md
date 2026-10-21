@@ -5,7 +5,8 @@ First-party visit tracking and an "Ask an expert" enquiry form, feeding a
 database: no third-party analytics, no new AWS resources.
 
 Phase 3, the Search Console view of what people search before they arrive,
-is in [search-demand.md](search-demand.md).
+is in [search-demand.md](search-demand.md); phase 4, lead scoring and filament
+reorders, in [lead-intel.md](lead-intel.md).
 
 ## What it can and cannot know
 

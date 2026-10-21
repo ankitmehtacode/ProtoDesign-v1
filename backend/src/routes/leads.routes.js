@@ -8,6 +8,7 @@ import {
     adminLeadDetail, adminOverview, captureLead, deleteLead, forgetVisitor, identifyVisitor, ipHash, parseBeacon,
     recordEvents, updateLead, validateLead,
 } from '../services/leads.service.js';
+import { reorderPredictions } from '../services/lead-intel.service.js';
 import { SEARCH_PERIODS, runSearchConsoleSync, searchDemand } from '../services/search-console.service.js';
 
 /*
@@ -77,6 +78,11 @@ leadsRouter.post('/', optionalAuthMiddleware, handle(async (req, res) => {
 
 leadsRouter.get('/admin', authMiddleware, isAdmin, handle(async (req, res) => {
     res.json(await adminOverview());
+}));
+
+// Filament buyers likely to run out soon (docs/lead-intel.md).
+leadsRouter.get('/reorders', authMiddleware, isAdmin, handle(async (req, res) => {
+    res.json(await reorderPredictions());
 }));
 
 // Search demand (docs/search-demand.md). Registered before /admin/:id.

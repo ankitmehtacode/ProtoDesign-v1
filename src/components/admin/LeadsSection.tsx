@@ -25,6 +25,13 @@ interface Lead {
     source: string | null; medium: string | null; campaign: string | null; landing_path: string | null;
     submissions: number; created_at: string; last_submitted_at: string; product_name: string | null;
     events: number; product_views: number; last_activity_at: string;
+    score: number | null; score_reasons: { label: string; points: number }[] | null;
+}
+
+interface Reorder {
+    user_id: string; name: string | null; email: string | null; phone: string | null; materials: string[];
+    orders: number; lastOrderAt: string; lastKg: number; assumedKg: boolean;
+    kgPerMonth: number; basis: "history" | "calculator" | "typical"; runsOutAt: string; daysLeft: number;
 }
 
 interface Overview {
@@ -46,6 +53,19 @@ interface Detail {
     orders: { id: string; status: string; total_amount: string; created_at: string }[];
 }
 
+// Same bands as backend lead-intel.service.js: hot from 60, warm from 35.
+const scoreMeta = (score: number | null): { label: string; tone: "red" | "amber" | "neutral" } | null =>
+    score === null ? null : score >= 60 ? { label: `Hot ${score}`, tone: "red" } : score >= 35 ? { label: `Warm ${score}`, tone: "amber" } : { label: `Cold ${score}`, tone: "neutral" };
+const BASIS_LABEL: Record<Reorder["basis"], string> = {
+    history: "from their buying rhythm", calculator: "from their filament calculator answer", typical: "typical rate, first purchase",
+};
+const runsOut = (d: number) => (d < 0 ? `likely ran out ${-d} day${d === -1 ? "" : "s"} ago` : d === 0 ? "likely runs out today" : `runs out in ~${d} day${d === 1 ? "" : "s"}`);
+// Checkout phones are free text: "98765 43210", "09876543210" or "+91 98765 43210".
+const waNumber = (phone: string) => {
+    const d = phone.replace(/\D/g, "").replace(/^0(?=\d{10}$)/, "");
+    return d.length === 10 ? `91${d}` : d;
+};
+
 const pct = (part: number, whole: number) => (whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "–");
 const mb = (b: number) => `${(b / 1024 / 1024).toFixed(0)} MB`;
 const contact = (l: Lead) => l.name || (l.phone ? `+${l.phone}` : l.email) || "Unknown";
@@ -60,15 +80,25 @@ const EVENT_LABEL: Record<string, string> = {
 export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
     const [filter, setFilter] = useState(initialFilter && LEAD_STATUSES.some((s) => s.value === initialFilter) ? initialFilter : "all");
     const [openId, setOpenId] = useState<string | null>(null);
+    const [sort, setSort] = useState<"score" | "recent">("score");
     const { data, isLoading, isError } = useQuery({
         queryKey: ["leads-overview"],
         queryFn: () => apiService.request("/leads/admin") as Promise<Overview>,
         retry: false,
     });
+    const reorders = useQuery({
+        queryKey: ["leads-reorders"],
+        queryFn: () => apiService.request("/leads/reorders") as Promise<{ customers: Reorder[]; buyers: number; repeatBuyers: number }>,
+        retry: false,
+    });
 
     const shown = useMemo(
-        () => (data?.leads ?? []).filter((l) => filter === "all" || l.status === filter),
-        [data, filter],
+        () => {
+            const list = (data?.leads ?? []).filter((l) => filter === "all" || l.status === filter);
+            // Unscored (closed, or not yet scored) last; the server already orders by activity.
+            return sort === "score" ? [...list].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)) : list;
+        },
+        [data, filter, sort],
     );
 
     if (isLoading) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -76,8 +106,8 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
 
     const { totals, storage } = data;
     const exportCsv = () => downloadCsv(`leads-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Name", "Phone (with country code)", "Email", "Interest", "Product", "Status", "Source", "Medium", "Campaign", "Landing page", "Message", "Created"],
-        shown.map((l) => [l.name ?? "", l.phone ?? "", l.email ?? "", l.interest, l.product_name ?? "", l.status,
+        ["Name", "Phone (with country code)", "Email", "Interest", "Product", "Status", "Score", "Source", "Medium", "Campaign", "Landing page", "Message", "Created"],
+        shown.map((l) => [l.name ?? "", l.phone ?? "", l.email ?? "", l.interest, l.product_name ?? "", l.status, l.score ?? "",
             l.source ?? "", l.medium ?? "", l.campaign ?? "", l.landing_path ?? "", l.message ?? "", l.created_at]));
 
     return (
@@ -174,11 +204,40 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
                 </Panel>
             </div>
 
-            <Panel className="mt-6" title="Leads" action={
-                <FilterPills value={filter} onChange={setFilter} options={[
-                    { value: "all", label: "All", count: data.leads.length },
-                    ...LEAD_STATUSES.map((s) => ({ ...s, count: data.leads.filter((l) => l.status === s.value).length })),
-                ]} />
+            <Panel className="mt-6" title="Filament running low" description="Customers whose filament is likely running out, from their orders. A call list: nothing is sent to them.">
+                {reorders.isError ? <Empty title="Couldn't load predictions." /> : !reorders.data || reorders.data.customers.length === 0 ? (
+                    <Empty title="Nobody due right now." body={reorders.data ? `${reorders.data.buyers} filament buyers in the last year; customers appear here from 3 weeks before their spool is likely to run out.` : undefined} />
+                ) : (
+                    <ul className="divide-y text-sm">
+                        {reorders.data.customers.map((c) => (
+                            <li key={c.user_id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                                        {c.name || c.email}
+                                        <StatusBadge label={runsOut(c.daysLeft)} tone={c.daysLeft <= 0 ? "red" : c.daysLeft <= 7 ? "amber" : "neutral"} />
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {c.materials.join(", ") || "Filament"} · last bought {c.lastKg} kg{c.assumedKg ? " (assumed 1 kg spools)" : ""} {formatDate(c.lastOrderAt)} · ~{c.kgPerMonth} kg a month, {BASIS_LABEL[c.basis]}
+                                    </div>
+                                </div>
+                                <div className="flex shrink-0 gap-2">
+                                    {c.phone && <Button asChild size="sm" variant="outline"><a href={`https://wa.me/${waNumber(c.phone)}`} target="_blank" rel="noopener noreferrer"><FaWhatsapp className="mr-1.5" />WhatsApp</a></Button>}
+                                    {c.email && <Button asChild size="sm" variant="outline"><a href={`mailto:${c.email}`}><Mail className="mr-1.5 h-4 w-4" />Email</a></Button>}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </Panel>
+
+            <Panel className="mt-6" title="Leads" description="Scores update hourly from what each lead did; open a lead to see why." action={
+                <div className="flex flex-col items-end gap-2">
+                    <FilterPills value={filter} onChange={setFilter} options={[
+                        { value: "all", label: "All", count: data.leads.length },
+                        ...LEAD_STATUSES.map((s) => ({ ...s, count: data.leads.filter((l) => l.status === s.value).length })),
+                    ]} />
+                    <FilterPills value={sort} onChange={setSort} options={[{ value: "score", label: "Hottest first" }, { value: "recent", label: "Latest activity" }]} />
+                </div>
             }>
                 {shown.length === 0 ? <Empty title="No leads here." body="Enquiries from printer, filament and resin pages appear here." /> : (
                     <ul className="divide-y">
@@ -190,6 +249,7 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2 font-medium">
                                                 {contact(l)} <StatusBadge label={st.label} tone={st.tone} />
+                                                {scoreMeta(l.score) && <StatusBadge {...scoreMeta(l.score)!} />}
                                                 <span className="text-xs font-normal capitalize text-muted-foreground">{l.interest}{l.product_name ? ` · ${l.product_name}` : ""}</span>
                                             </div>
                                             <div className="truncate text-sm text-muted-foreground">{l.message || channel(l)}</div>
@@ -273,6 +333,19 @@ function LeadDialog({ id, onClose }: { id: string | null; onClose: () => void })
                         </div>
 
                         <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-1.5">
+                            <dt className="text-muted-foreground">Score</dt>
+                            <dd>
+                                {lead.score === null ? "Not scored yet (scores update hourly, open leads only)" : (
+                                    <>
+                                        <StatusBadge {...scoreMeta(lead.score)!} />
+                                        <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                                            {(lead.score_reasons ?? []).map((r) => (
+                                                <li key={r.label}><span className={`inline-block w-9 tabular-nums ${r.points < 0 ? "text-rose-300" : ""}`}>{r.points > 0 ? `+${r.points}` : r.points}</span>{r.label}</li>
+                                            ))}
+                                        </ul>
+                                    </>
+                                )}
+                            </dd>
                             <dt className="text-muted-foreground">Interest</dt><dd className="capitalize">{lead.interest}{lead.product_name ? ` · ${lead.product_name}` : ""}</dd>
                             <dt className="text-muted-foreground">Message</dt><dd className="whitespace-pre-wrap">{lead.message || "–"}</dd>
                             <dt className="text-muted-foreground">First came from</dt><dd>{channel(lead)}{lead.campaign ? ` · campaign ${lead.campaign}` : ""}{lead.gclid ? " · Google Ads click" : ""}</dd>

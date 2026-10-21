@@ -26,6 +26,9 @@ import { requestSiteRebuild } from './src/services/site.rebuild.js';
 import { MAINTENANCE_EVENT_SOURCE, runLeadMaintenance } from './src/services/leads.service.js';
 import { ALERTS_EVENT_SOURCE, runProductAlerts } from './src/services/product-alerts.service.js';
 import { SEARCH_CONSOLE_EVENT_SOURCE, runSearchConsoleSync } from './src/services/search-console.service.js';
+import {
+    LEAD_SCORING_EVENT_SOURCE, REORDER_DIGEST_EVENT_SOURCE, runLeadScoring, runReorderDigest,
+} from './src/services/lead-intel.service.js';
 import { notifyAdmin } from './src/services/telegram.service.js';
 
 const app = express();
@@ -210,6 +213,14 @@ export const handler = async (event: any, context: any) => {
     // Daily: copy Search Console's newest final day(s) for the Search demand section.
     if (event?.source === SEARCH_CONSOLE_EVENT_SOURCE) {
         return runSearchConsoleSync({ remainingMs: () => context.getRemainingTimeInMillis(), alert: notifyAdmin });
+    }
+    // Hourly: rescore open leads and alert the ones that just turned hot.
+    if (event?.source === LEAD_SCORING_EVENT_SOURCE) {
+        return runLeadScoring({ alert: notifyAdmin, remainingMs: () => context.getRemainingTimeInMillis() });
+    }
+    // Mondays: who is likely to need filament this week.
+    if (event?.source === REORDER_DIGEST_EVENT_SOURCE) {
+        return runReorderDigest({ alert: notifyAdmin });
     }
     return httpHandler(event, context);
 };
