@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { emailService } from './email.service.js';
+import { alertSignIn } from './telegram.service.js';
 import { OAuth2Client } from 'google-auth-library'; // ✅ Added Import
 
 // Authentication service
@@ -43,6 +44,7 @@ export const authService = {
         }
 
         const token = this._generateToken(user.id, user.email, 'user');
+        await alertSignIn({ name: user.full_name, email: user.email, method: 'email', isNew: true });
 
         return {
             user: {
@@ -78,6 +80,7 @@ export const authService = {
 
         const role = await this._getUserRole(user.id);
         const token = this._generateToken(user.id, user.email, role);
+        await alertSignIn({ name: user.full_name, email: user.email, method: 'email', role });
 
         return {
             user: {
@@ -106,6 +109,7 @@ export const authService = {
 
         // 2. Check if user exists (Use db.oneOrNone)
         let user = await db.oneOrNone('SELECT * FROM users WHERE email = $1', [email]);
+        const isNew = !user;
         let role = 'user';
 
         // 3. If no user, create one
@@ -139,6 +143,7 @@ export const authService = {
 
         // 4. Generate Token
         const token = this._generateToken(user.id, user.email, role);
+        await alertSignIn({ name: user.full_name || name, email: user.email, method: 'Google', isNew, role });
 
         return {
             user: {

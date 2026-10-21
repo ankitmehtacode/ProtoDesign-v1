@@ -15,6 +15,8 @@ their order and quote updates go out on WhatsApp
 | ♻️ Unpaid checkouts cancelled to free stock (one summary) | `releaseStaleHolds` |
 | 🚨 Refund needed: paid after it was cancelled | `settlePayment` |
 | 🧊 New quote request (file, price, contact) | `POST /api/quotes/request` |
+| 🆕 New account, by email or Google | `authService.signup`, `authService.loginWithGoogle` |
+| 👤 Sign-in, by email or Google; admin accounts are marked `ADMIN` | `authService.login`, `authService.loginWithGoogle` |
 | 📱 WhatsApp alerts, including customer WhatsApp messages | `alertAdmin` in `whatsapp.worker.js`, which also emails them |
 
 Each alert ends with a link to the matching admin tab. They go to every chat
@@ -23,7 +25,9 @@ in `TELEGRAM_ADMIN_CHAT_IDS`.
 - **Inline sends, no queue.** Telegram answers in well under a second, so
   alerts are sent inside the request: one attempt, capped at 2 s. They run
   inside checkout and payment settlement, which share a 20 s Lambda timeout,
-  so a slow Telegram drops an alert rather than delaying a payment. Failures
+  so a slow Telegram drops an alert rather than delaying a payment. A
+  sign-in waits for its alert in the same way, so it can take up to 2 s
+  longer while Telegram is slow. Failures
   are logged as `telegram_send_failed` or `telegram_admin_alert_failed`.
 - **The bot only talks to the team.** An admin chat that messages it gets
   "shop alerts are on". Anyone else gets one line saying the bot is for the
