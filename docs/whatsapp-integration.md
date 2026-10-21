@@ -252,7 +252,7 @@ Other costs:
 `backend/src/services/whatsapp.service.js`,
 `backend/src/services/whatsapp.worker.js`,
 `backend/src/routes/whatsapp.routes.js`, `backend/test/whatsapp.test.mjs`,
-`src/components/WhatsAppUpdatesButton.tsx`,
+`src/components/ChatUpdatesButton.tsx` (was `WhatsAppUpdatesButton.tsx`),
 `src/components/admin/WhatsAppPanel.tsx`, `src/hooks/use-whatsapp-status.ts`,
 `docs/whatsapp-integration.md`, `docs/whatsapp-integration-audit.md`.
 

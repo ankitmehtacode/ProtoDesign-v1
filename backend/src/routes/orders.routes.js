@@ -4,7 +4,8 @@ import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 import { emailService } from '../services/email.service.js';
 import { phonePeService } from '../services/phonepe.service.js';
-import { notifyOrder } from '../services/whatsapp.service.js';
+import { notifyOrder } from '../services/notify.js';
+import { alertNewOrder } from '../services/telegram.service.js';
 import {
     PENDING_STATUSES,
     CANCELLABLE_STATUSES,
@@ -176,6 +177,7 @@ router.post('/', authMiddleware, async (req, res, next) => {
         // Awaited deliberately: Lambda freezes the execution environment as soon as
         // the response is returned, so a promise left dangling here would never
         // settle. A failed email must not fail the order, but it must be visible.
+        await alertNewOrder(order.id, { cod: true });
         const buyer = await db.oneOrNone('SELECT email, full_name FROM users WHERE id = $1', [req.userId]);
         if (buyer) {
             try {

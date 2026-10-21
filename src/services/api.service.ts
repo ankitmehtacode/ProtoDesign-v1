@@ -489,6 +489,20 @@ class ApiService {
         });
     }
 
+    // --- Telegram -----------------------------------------------------------
+    // Like WhatsApp: the bot token stays on the backend, and the browser only
+    // gets t.me links, which open the customer's own Telegram.
+
+    async getTelegramStatus(): Promise<{ enabled: boolean; botUrl?: string }> {
+        return this.request("/telegram/status", { skipAuth: true });
+    }
+
+    /** A t.me link whose Start button links this order/quote to the chat. */
+    async getTelegramLink(kind: "order" | "quote", id: string): Promise<string> {
+        const { url } = await this.request(`/telegram/link?kind=${kind}&id=${encodeURIComponent(id)}`);
+        return url;
+    }
+
     async getAllQuotes() {
         return this.request('/quotes/admin/all');
     }

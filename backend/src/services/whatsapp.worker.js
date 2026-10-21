@@ -3,6 +3,7 @@ import { Readable } from 'stream';
 import path from 'path';
 import db from '../config/database.js';
 import { emailService } from './email.service.js';
+import { notifyAdmin } from './telegram.service.js';
 import { isModelFilename, storageService } from './storage.service.js';
 import {
     GraphError,
@@ -281,6 +282,7 @@ async function alertAdmin(subject, text) {
     } catch (err) {
         logFault('email_failed', { type: 'whatsapp_admin_alert', error: err.message });
     }
+    await notifyAdmin(`📱 ${subject}\n\n${text}`);
 }
 
 const SERVICE_CONSENT_TEXT = 'Customer messaged ProtoDesign on WhatsApp to receive updates about {what}. '
