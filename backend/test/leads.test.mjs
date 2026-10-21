@@ -72,7 +72,7 @@ beforeEach(async () => {
 describe('classifySource', () => {
     const c = leads.classifySource;
     it('credits a Google Ads click to google / cpc', () => {
-        assert.deepEqual([c({ gclid: 'abc', referrer_host: 'google.com' }).source, c({ gclid: 'abc' }).medium], ['google', 'cpc']);
+        assert.deepEqual([c({ gclid: 'Cj0KCQjwAbc123', referrer_host: 'google.com' }).source, c({ gclid: 'Cj0KCQjwAbc123' }).medium], ['google', 'cpc']);
     });
     it('prefers UTM tags over the referrer', () => {
         const t = c({ utm_source: 'Instagram', utm_medium: 'Story', utm_campaign: 'diwali', referrer_host: 'l.instagram.com' });
@@ -206,7 +206,7 @@ describe('POST /api/leads', () => {
     it('stores a lead with the server-side consent wording and the visitor’s first touch', async () => {
         const visitorId = randomUUID();
         const productId = await seedProduct();
-        await beacon({ visitorId, attribution: { gclid: 'g-1', utm_campaign: 'a1-launch' }, events: [{ name: 'product_view', productId }] });
+        await beacon({ visitorId, attribution: { gclid: 'Cj0KCQjw-g1', utm_campaign: 'a1-launch' }, events: [{ name: 'product_view', productId }] });
 
         const res = await call('POST', '/api/leads', { body: lead({ visitorId, productId, consentText: 'I agree to anything' }) });
         assert.equal(res.status, 201);
@@ -214,7 +214,7 @@ describe('POST /api/leads', () => {
         const row = await db.one('SELECT * FROM leads');
         assert.equal(row.phone, '919876543210');
         assert.equal(row.consent_text, leads.CONSENT_TEXTS['lead-contact-v1']);
-        assert.deepEqual([row.source, row.medium, row.campaign, row.gclid], ['google', 'cpc', 'a1-launch', 'g-1']);
+        assert.deepEqual([row.source, row.medium, row.campaign, row.gclid], ['google', 'cpc', 'a1-launch', 'Cj0KCQjw-g1']);
         assert.equal(row.product_id, productId);
         assert.equal((await db.one('SELECT lead_id FROM visitors WHERE id = $1', [visitorId])).lead_id, row.id);
         const names = (await db.any('SELECT name FROM visitor_events WHERE visitor_id = $1 ORDER BY id', [visitorId])).map((e) => e.name);

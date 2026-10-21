@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Mail, Trash2 } from "lucide-react";
+import { Download, Loader2, Mail, Megaphone, Trash2 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiService } from "@/services/api.service";
+import { API_URL, apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { Empty, FilterPills, Kpi, PageHeader, Panel, StatusBadge } from "./ui";
 import { LEAD_STATUSES, delta, downloadCsv, formatDate, relativeTime, statusMeta } from "./model";
@@ -26,6 +26,13 @@ interface Lead {
     submissions: number; created_at: string; last_submitted_at: string; product_name: string | null;
     events: number; product_views: number; last_activity_at: string;
     score: number | null; score_reasons: { label: string; points: number }[] | null;
+}
+
+interface AdsStatus {
+    feedEnabled: boolean; leadConversion: string; purchaseConversion: string; feedDays: number;
+    lastFetch: { fetched_at: string; conversions: number } | null;
+    feed: { leads: number; purchases: number; value: number };
+    ad_visitors: number; ad_consented: number; match_consented: number; matchRows: number;
 }
 
 interface Reorder {
@@ -48,7 +55,10 @@ interface Overview {
 const TOOL_LABEL: Record<string, string> = { printer_advisor: "Printer advisor", filament_estimator: "Filament calculator" };
 
 interface Detail {
-    lead: Lead & { gclid: string | null; referrer_host: string | null; term: string | null; consent_text: string; consented_at: string };
+    lead: Lead & {
+        gclid: string | null; referrer_host: string | null; term: string | null; consent_text: string; consented_at: string;
+        ads_consent_text: string | null; ads_consented_at: string | null;
+    };
     events: { name: string; path: string | null; created_at: string; product_id: string | null; product_name: string | null }[];
     orders: { id: string; status: string; total_amount: string; created_at: string }[];
 }
@@ -86,6 +96,22 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
         queryFn: () => apiService.request("/leads/admin") as Promise<Overview>,
         retry: false,
     });
+    const ads = useQuery({
+        queryKey: ["leads-ads"],
+        queryFn: () => apiService.request("/leads/ads") as Promise<AdsStatus>,
+        retry: false,
+    });
+    const downloadAudience = async (interest?: string) => {
+        try {
+            const csv = await apiService.request(`/leads/ads/customer-match.csv${interest ? `?interest=${interest}` : ""}`) as string;
+            const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+            const a = Object.assign(document.createElement("a"), { href: url, download: `customer-match-${interest ?? "all"}-${new Date().toISOString().slice(0, 10)}.csv` });
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Could not build the audience file");
+        }
+    };
     const reorders = useQuery({
         queryKey: ["leads-reorders"],
         queryFn: () => apiService.request("/leads/reorders") as Promise<{ customers: Reorder[]; buyers: number; repeatBuyers: number }>,
@@ -204,6 +230,43 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
                 </Panel>
             </div>
 
+            <Panel className="mt-6" title="Google Ads" description="Only people who opted in: ad clicks that became enquiries or orders go back to Google, and opted-in leads can be uploaded as a hashed audience.">
+                {ads.isError || !ads.data ? <Empty title={ads.isError ? "Couldn't load Google Ads status." : "Loading…"} body={ads.isError ? "Check that migration 019_ads.sql has been applied." : undefined} /> : (
+                    <div className="grid gap-6 px-5 py-4 text-sm md:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <h3 className="flex items-center gap-2 font-medium"><Megaphone className="h-4 w-4" />Offline conversions</h3>
+                            {!ads.data.feedEnabled ? (
+                                <p className="text-muted-foreground">Off. Set <code className="font-mono text-xs">AdsFeedSecret</code> and deploy; see docs/google-ads.md.</p>
+                            ) : (
+                                <>
+                                    <p className="font-mono text-xs break-all">{API_URL}/ads/conversions.csv</p>
+                                    <p className="text-muted-foreground">
+                                        {ads.data.lastFetch ? `Google last fetched it ${relativeTime(ads.data.lastFetch.fetched_at)} (${ads.data.lastFetch.conversions} conversions).` : "Not fetched yet: set up the scheduled import in Google Ads."}
+                                    </p>
+                                </>
+                            )}
+                            <p className="text-muted-foreground">
+                                Last {ads.data.feedDays} days: {ads.data.feed.leads} × “{ads.data.leadConversion}”, {ads.data.feed.purchases} × “{ads.data.purchaseConversion}” worth {formatINR(ads.data.feed.value)}.
+                            </p>
+                            <p className="text-muted-foreground">Last 30 days: {ads.data.ad_consented} of {ads.data.ad_visitors} tracked visitors from ads allowed measurement.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <h3 className="font-medium">Customer Match audience</h3>
+                            <p className="text-muted-foreground">
+                                {ads.data.match_consented} leads opted in; {ads.data.matchRows} have a WhatsApp-verified number or confirmed email and can be uploaded.
+                                Upload as a full replacement each time, so people who withdrew drop out.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button size="sm" variant="outline" onClick={() => downloadAudience()} disabled={ads.data.matchRows === 0}><Download className="mr-1.5 h-4 w-4" />All</Button>
+                                {(["printer", "filament", "resin"] as const).map((i) => (
+                                    <Button key={i} size="sm" variant="outline" className="capitalize" onClick={() => downloadAudience(i)} disabled={ads.data!.matchRows === 0}><Download className="mr-1.5 h-4 w-4" />{i}</Button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Panel>
+
             <Panel className="mt-6" title="Filament running low" description="Customers whose filament is likely running out, from their orders. A call list: nothing is sent to them.">
                 {reorders.isError ? <Empty title="Couldn't load predictions." /> : !reorders.data || reorders.data.customers.length === 0 ? (
                     <Empty title="Nobody due right now." body={reorders.data ? `${reorders.data.buyers} filament buyers in the last year; customers appear here from 3 weeks before their spool is likely to run out.` : undefined} />
@@ -285,7 +348,7 @@ function LeadDialog({ id, onClose }: { id: string | null; onClose: () => void })
 
     const close = () => { setNotes(null); setConfirmDelete(false); onClose(); };
 
-    const save = async (patch: { status?: string; admin_notes?: string }) => {
+    const save = async (patch: { status?: string; admin_notes?: string; withdraw_ads?: boolean }) => {
         setBusy(true);
         try {
             await apiService.request(`/leads/admin/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
@@ -352,6 +415,15 @@ function LeadDialog({ id, onClose }: { id: string | null; onClose: () => void })
                             <dt className="text-muted-foreground">Landed on</dt><dd className="font-mono text-xs">{lead.landing_path || "–"}</dd>
                             <dt className="text-muted-foreground">Enquiries</dt><dd>{lead.submissions} · first {formatDate(lead.created_at)}</dd>
                             <dt className="text-muted-foreground">Consent</dt><dd className="text-xs text-muted-foreground">{formatDate(lead.consented_at)}: “{lead.consent_text}”</dd>
+                            <dt className="text-muted-foreground">Google ads</dt>
+                            <dd className="text-xs text-muted-foreground">
+                                {lead.ads_consented_at ? (
+                                    <>
+                                        {formatDate(lead.ads_consented_at)}: “{lead.ads_consent_text}”{" "}
+                                        <Button size="sm" variant="link" className="h-auto p-0 text-xs text-rose-300" disabled={busy} onClick={() => save({ withdraw_ads: true })}>Withdraw on request</Button>
+                                    </>
+                                ) : "Not opted in"}
+                            </dd>
                         </dl>
 
                         {data.orders.length > 0 && (

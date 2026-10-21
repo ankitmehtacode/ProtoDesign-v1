@@ -231,6 +231,23 @@ Parameters:
     Default: /protodesign/search-console-key
     AllowedPattern: '^/[A-Za-z0-9/_.-]+$'
 
+  # ── Google Ads (docs/google-ads.md) ─────────────────────────────────────
+  # Secret Google Ads uses to fetch /api/ads/conversions.csv (Basic-auth
+  # password, or ?key=). At least 24 characters; empty keeps the feed off.
+  AdsFeedSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    AllowedPattern: '^$|^[A-Za-z0-9_-]{24,}$'
+    ConstraintDescription: Empty, or at least 24 letters, digits, - or _ (openssl rand -hex 24).
+  # Must match the conversion action names created in Google Ads.
+  AdsLeadConversion:
+    Type: String
+    Default: ProtoDesign lead
+  AdsPurchaseConversion:
+    Type: String
+    Default: ProtoDesign purchase
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -359,6 +376,9 @@ Resources:
           VERCEL_DEPLOY_HOOK_URL: !Ref VercelDeployHookUrl
           GSC_SITE_URL: !Ref SearchConsoleSiteUrl
           GSC_KEY_PARAMETER: !Ref SearchConsoleKeyParameter
+          ADS_FEED_SECRET: !Ref AdsFeedSecret
+          ADS_LEAD_CONVERSION: !Ref AdsLeadConversion
+          ADS_PURCHASE_CONVERSION: !Ref AdsPurchaseConversion
           # AWS_REGION is deliberately not set here: it is a reserved Lambda
           # runtime variable that AWS populates automatically to the function's
           # actual region, and CloudFormation rejects any attempt to set it

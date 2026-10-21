@@ -75,9 +75,9 @@ The consent text stored with a lead comes from `CONSENT_TEXTS` in
 (`LeadCapture.tsx`). To change the wording, add a new version to both. Keep
 old versions so that earlier consents stay accurate.
 
-The analytics notice says usage data "is not used for ads". Phase 5 (sending
-conversions to Google Ads) changes that. The notice, the privacy policy and
-this document must be updated before it ships.
+The analytics notice says usage data "is not used for ads", and that stays true:
+Google Ads measurement and Customer Match are separate opt-ins, described in
+[google-ads.md](google-ads.md).
 
 ## Erasure
 

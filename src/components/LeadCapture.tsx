@@ -27,6 +27,11 @@ export const INTEREST_FOR_CATEGORY: Record<string, LeadInterest> = {
 const CONSENT_VERSION = "lead-contact-v1";
 const CONSENT_TEXT = "I agree that ProtoDesign may contact me on WhatsApp, phone or email about this enquiry. "
     + "I can ask for my details to be deleted at any time.";
+// Optional and separate (docs/google-ads.md). Must match
+// ADS_CONSENT_TEXTS['lead-ads-v1'] in the same backend file.
+const ADS_CONSENT_VERSION = "lead-ads-v1";
+const ADS_CONSENT_TEXT = "Also show me ProtoDesign offers in Google ads. ProtoDesign may share my phone number and email "
+    + "with Google in scrambled (hashed) form for this. I can withdraw at any time.";
 
 const COPY: Record<LeadInterest, { title: string; body: string; placeholder: string }> = {
     printer: {
@@ -57,6 +62,7 @@ export function LeadCapture({ interest, form, productId, productName }: {
     const [message, setMessage] = useState("");
     const [website, setWebsite] = useState(""); // honeypot, hidden from people
     const [consent, setConsent] = useState(false);
+    const [adsConsent, setAdsConsent] = useState(false);
     const [sending, setSending] = useState(false);
     const [sent, setSent] = useState(false);
     const copy = COPY[interest];
@@ -73,6 +79,7 @@ export function LeadCapture({ interest, form, productId, productName }: {
                 body: JSON.stringify({
                     name, phone, message, website, interest, form, productId,
                     consent, consentVersion: CONSENT_VERSION,
+                    ...(adsConsent ? { adsConsent: true, adsConsentVersion: ADS_CONSENT_VERSION } : {}),
                     visitorId: visitorId() ?? undefined,
                 }),
             });
@@ -119,6 +126,10 @@ export function LeadCapture({ interest, form, productId, productName }: {
                 <div className="flex items-start gap-2 sm:col-span-2">
                     <Checkbox id={`lead-consent-${form}`} checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5" />
                     <Label htmlFor={`lead-consent-${form}`} className="text-xs font-normal leading-relaxed text-muted-foreground">{CONSENT_TEXT}</Label>
+                </div>
+                <div className="flex items-start gap-2 sm:col-span-2">
+                    <Checkbox id={`lead-ads-${form}`} checked={adsConsent} onCheckedChange={(v) => setAdsConsent(v === true)} className="mt-0.5" />
+                    <Label htmlFor={`lead-ads-${form}`} className="text-xs font-normal leading-relaxed text-muted-foreground">{ADS_CONSENT_TEXT} (Optional.)</Label>
                 </div>
                 <Button type="submit" disabled={sending} className="sm:col-span-2 sm:justify-self-start">
                     {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Ask an expert
