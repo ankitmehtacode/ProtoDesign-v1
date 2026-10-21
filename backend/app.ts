@@ -16,11 +16,14 @@ import userRoutes from './src/routes/user.routes.js';
 import sitemapRoutes from './src/routes/sitemap.routes.js';
 import whatsappRoutes, { webhookRouter as whatsappWebhookRoutes } from './src/routes/whatsapp.routes.js';
 import telegramWebhookRoutes from './src/routes/telegram.routes.js';
+import { leadsRouter, trackRouter } from './src/routes/leads.routes.js';
 import { WORKER_EVENT_SOURCE } from './src/services/whatsapp.service.js';
 import { runWorker } from './src/services/whatsapp.worker.js';
 import { CATALOG_SYNC_EVENT_SOURCE, runCatalogSync } from './src/services/catalog.sync.js';
 import { FESTIVAL_REBUILD_EVENT_SOURCE, festivalStatus } from './src/services/festival.js';
 import { requestSiteRebuild } from './src/services/site.rebuild.js';
+import { MAINTENANCE_EVENT_SOURCE, runLeadMaintenance } from './src/services/leads.service.js';
+import { notifyAdmin } from './src/services/telegram.service.js';
 
 const app = express();
 
@@ -152,6 +155,8 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/track', trackRouter);
+app.use('/api/leads', leadsRouter);
 app.use('/api/webhooks/whatsapp', whatsappWebhookRoutes);
 app.use('/api/webhooks/telegram', telegramWebhookRoutes);
 
@@ -171,11 +176,11 @@ app.use(errorHandler);
 // Lambda entrypoint. serverless-http translates the Function URL event into the
 // req/res pair Express expects, so routing above is unchanged.
 //
-// The two other event shapes are the WhatsApp worker's own async self-invoke
-// (see dispatch.kick) and the daily catalog sync from EventBridge. Both can
+// The other event shapes are the WhatsApp worker's own async self-invoke
+// (see dispatch.kick) and the scheduled jobs from EventBridge. All can
 // only arrive through lambda:InvokeFunction, which requires IAM; a Function URL
 // request is always wrapped in an HTTP event, so it can never be mistaken for
-// either.
+// any of them.
 const httpHandler = serverless(app);
 export const handler = async (event: any, context: any) => {
     if (event?.source === WORKER_EVENT_SOURCE) {
@@ -188,6 +193,10 @@ export const handler = async (event: any, context: any) => {
     // must follow or Merchant Center sees them disagree with the feed.
     if (event?.source === FESTIVAL_REBUILD_EVENT_SOURCE) {
         return requestSiteRebuild('festival_boundary');
+    }
+    // Daily: prune visit tracking and alert before Neon's storage cap.
+    if (event?.source === MAINTENANCE_EVENT_SOURCE) {
+        return runLeadMaintenance({ alert: notifyAdmin });
     }
     return httpHandler(event, context);
 };

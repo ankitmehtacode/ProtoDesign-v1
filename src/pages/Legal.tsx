@@ -118,7 +118,7 @@ export const TermsPage = () => (
 
 // --- 2. PRIVACY POLICY ---
 export const PrivacyPage = () => (
-    <LegalPageLayout title="Privacy Policy" lastUpdated="January 12, 2026">
+    <LegalPageLayout title="Privacy Policy" lastUpdated="October 21, 2026">
         <h3>1. Information Collection</h3>
         <p>
             We collect personal information necessary to fulfill your orders and improve your shopping experience. This includes:
@@ -127,6 +127,8 @@ export const PrivacyPage = () => (
             <li><strong>Identity Data:</strong> Name, Username.</li>
             <li><strong>Contact Data:</strong> Billing address, Shipping address, Email address, and Phone number (e.g., +91 8249581682).</li>
             <li><strong>Transaction Data:</strong> Details of products ordered and payment timestamps.</li>
+            <li><strong>Enquiry Data:</strong> When you use an "Ask an expert" form: your name, WhatsApp number or email, your message, and the product you asked about.</li>
+            <li><strong>Usage Data (only if you allow analytics):</strong> The pages and products you view on this site, items you add to your cart, and how you first arrived (for example a search engine, an ad, or a link), stored against a random ID kept in your browser.</li>
         </ul>
 
         <h3>2. How We Use Your Data</h3>
@@ -137,7 +139,19 @@ export const PrivacyPage = () => (
             <li>Processing your orders and managing payments.</li>
             <li>Delivering products via our logistics partners.</li>
             <li>Sending order updates, invoices, and support communications.</li>
+            <li>Replying to your enquiry. If you allowed analytics, the pages you viewed are linked to your enquiry, and to your account when you sign in, so we can answer with the right product.</li>
+            <li>Understanding which pages and channels bring visitors, so we can improve the shop. Usage data is not sold or used to show you ads.</li>
         </ul>
+
+        <h3>Analytics and your choices</h3>
+        <p>
+            Usage data is collected only after you choose "Allow" in the analytics notice. If you choose "No thanks", nothing is recorded.
+            To change your choice at any time, use "Analytics preferences" at the bottom of any page. Choosing "No thanks" after allowing deletes the usage data recorded from your browser.
+            Usage data from browsers not linked to an enquiry or account is deleted after 30 days of inactivity, and all usage data after 180 days.
+        </p>
+        <p>
+            You can ask us to delete your enquiry and its linked usage data at any time by writing to help@protodesignstudio.com.
+        </p>
 
         <h3>3. Data Security</h3>
         <p>

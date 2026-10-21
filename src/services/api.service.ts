@@ -1,7 +1,7 @@
 // src/services/api.service.ts
 
 // @ts-ignore
-const API_URL = import.meta.env.VITE_API_URL || "/api";
+export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 interface RequestOptions extends RequestInit {
     skipAuth?: boolean;

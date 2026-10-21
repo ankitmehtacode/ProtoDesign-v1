@@ -4,6 +4,7 @@ import { Mail, Phone, MapPin, Facebook, Instagram, Youtube } from "lucide-react"
 import logoLockup from "@/assets/logo-lockup-light.webp";
 import { FaWhatsapp } from "react-icons/fa";
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status";
+import { reopenConsent } from "@/lib/analytics";
 
 export const Footer = () => {
     const { data: whatsapp } = useWhatsAppStatus();
@@ -40,6 +41,7 @@ export const Footer = () => {
                             <li><Link to="/orders" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Track Order</Link></li>
                             <li><Link to="/terms-and-conditions" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Terms & Conditions</Link></li>
                             <li><Link to="/privacy-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Privacy Policy</Link></li>
+                            <li><button type="button" onClick={reopenConsent} className="inline-block py-2.5 text-left transition-colors hover:text-primary md:py-0">Analytics preferences</button></li>
                             <li><Link to="/return-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Return Policy</Link></li>
                             <li><Link to="/refund-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Refund Policy</Link></li>
                             <li><Link to="/shipping-policy" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Shipping Policy</Link></li>

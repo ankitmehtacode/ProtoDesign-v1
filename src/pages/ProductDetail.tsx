@@ -42,6 +42,8 @@ import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, 
 import { CATEGORY_LABELS, dealBadge, dealPrice, isMadeToOrder } from '@/components/shop/product';
 import { ProductPromises } from '@/components/shop/ProductPromises';
 import { FestivalPriceNote } from '@/components/shop/FestivalPriceNote';
+import { INTEREST_FOR_CATEGORY, LeadCapture } from '@/components/LeadCapture';
+import { track } from '@/lib/analytics';
 
 // --- INTERFACES ---
 interface ProductImage {
@@ -244,11 +246,13 @@ const ProductDetail = () => {
                 if (!productId) { navigate("/shop"); return; }
                 setLoading(true);
 
-                await checkAdmin();
+                const admin = await checkAdmin();
 
                 const productRes = await apiService.getProduct(productId);
                 const fetchedProduct = productRes.data || productRes;
                 setProduct(fetchedProduct);
+                // The team's own browsing is not demand.
+                if (!admin) track('product_view', { productId: fetchedProduct.id });
 
                 const firstImg = fetchedProduct.product_images?.[0]?.image_url
                     || fetchedProduct.product_images?.[0]?.image_data
@@ -977,6 +981,13 @@ const ProductDetail = () => {
                         <ProductPromises product={product} />
                     </div>
                 </div>
+
+                {!isEditing && INTEREST_FOR_CATEGORY[product.category] && (
+                    <div className="mb-24">
+                        <LeadCapture interest={INTEREST_FOR_CATEGORY[product.category]} form="product_page"
+                            productId={product.id} productName={product.name} />
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24 items-start">
                     <div>
