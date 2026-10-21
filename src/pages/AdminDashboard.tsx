@@ -10,6 +10,7 @@ import { Overview } from "@/components/admin/Overview";
 import { OrdersSection } from "@/components/admin/OrdersSection";
 import { QuotesSection } from "@/components/admin/QuotesSection";
 import { LeadsSection } from "@/components/admin/LeadsSection";
+import { SearchDemandSection } from "@/components/admin/SearchDemandSection";
 import { ProductsSection } from "@/components/admin/ProductsSection";
 import { PageHeader } from "@/components/admin/ui";
 import { AdminOrder, AdminProduct, AdminQuote, AdminSection, SECTIONS, TO_FULFIL, stockState } from "@/components/admin/model";
@@ -41,8 +42,9 @@ export default function AdminDashboard() {
 
     const load = useCallback(async () => {
         setRefreshing(true);
-        // Leads load inside their section; Refresh reloads them too.
+        // Leads and search demand load inside their sections; Refresh reloads them too.
         void queryClient.invalidateQueries({ queryKey: ["leads-overview"] });
+        void queryClient.invalidateQueries({ queryKey: ["search-demand"] });
         try {
             const [o, q, p] = await Promise.all([
                 apiService.getAdminOrders(),
@@ -120,6 +122,7 @@ export default function AdminDashboard() {
                 />
             )}
             {section === "leads" && <LeadsSection key={filter} initialFilter={filter} />}
+            {section === "search" && <SearchDemandSection />}
             {section === "products" && <ProductsSection key={filter} products={products} initialFilter={filter} onChanged={load} />}
             {section === "whatsapp" && (
                 <>

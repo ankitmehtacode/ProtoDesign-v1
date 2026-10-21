@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import db from '../config/database.js';
+import { SEARCH_RETENTION_DAYS } from './search-console.service.js';
 
 /**
  * First-party visit tracking and lead capture (docs/lead-tracking.md).
@@ -555,9 +556,19 @@ export async function runLeadMaintenance({ alert } = {}) {
           WHERE (confirmed_at IS NULL AND created_at < now() - interval '7 days')
              OR COALESCE(notified_at, unsubscribed_at, failed_at, created_at) < now() - make_interval(days => $1)`,
         [EVENT_RETENTION_DAYS]);
+    // Search Console copies: the admin compares at most 2 x 56 days, and
+    // Google keeps 16 months should older figures ever be wanted. Counted from
+    // the newest stored day, so days of failed syncs never eat into the periods.
+    const searchRowsDeleted = await step('search_console_rows',
+        `WITH newest AS (SELECT max(day) AS day FROM search_console_days),
+              d AS (DELETE FROM search_console_days WHERE day < (SELECT day FROM newest) - $1::int)
+         DELETE FROM search_console_rows WHERE day < (SELECT day FROM newest) - $1::int`, [SEARCH_RETENTION_DAYS]);
+    const searchSyncsDeleted = await step('search_console_syncs',
+        `DELETE FROM search_console_syncs WHERE started_at < now() - interval '60 days'`, []);
     const storage = await databaseSize();
     const result = {
-        visitorsDeleted: anon.rowCount, eventsDeleted: old.rowCount, toolResultsDeleted, alertsDeleted, ...storage,
+        visitorsDeleted: anon.rowCount, eventsDeleted: old.rowCount, toolResultsDeleted, alertsDeleted,
+        searchRowsDeleted, searchSyncsDeleted, ...storage,
     };
     logEvent('lead_maintenance', result);
 

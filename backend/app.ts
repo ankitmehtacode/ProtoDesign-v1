@@ -25,6 +25,7 @@ import { FESTIVAL_REBUILD_EVENT_SOURCE, festivalStatus } from './src/services/fe
 import { requestSiteRebuild } from './src/services/site.rebuild.js';
 import { MAINTENANCE_EVENT_SOURCE, runLeadMaintenance } from './src/services/leads.service.js';
 import { ALERTS_EVENT_SOURCE, runProductAlerts } from './src/services/product-alerts.service.js';
+import { SEARCH_CONSOLE_EVENT_SOURCE, runSearchConsoleSync } from './src/services/search-console.service.js';
 import { notifyAdmin } from './src/services/telegram.service.js';
 
 const app = express();
@@ -205,6 +206,10 @@ export const handler = async (event: any, context: any) => {
     // Hourly: email back-in-stock and price-drop alerts that have come true.
     if (event?.source === ALERTS_EVENT_SOURCE) {
         return runProductAlerts({ remainingMs: () => context.getRemainingTimeInMillis() });
+    }
+    // Daily: copy Search Console's newest final day(s) for the Search demand section.
+    if (event?.source === SEARCH_CONSOLE_EVENT_SOURCE) {
+        return runSearchConsoleSync({ remainingMs: () => context.getRemainingTimeInMillis(), alert: notifyAdmin });
     }
     return httpHandler(event, context);
 };

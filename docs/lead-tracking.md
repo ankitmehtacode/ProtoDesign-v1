@@ -4,6 +4,9 @@ First-party visit tracking and an "Ask an expert" enquiry form, feeding a
 **Leads** section in the admin. Everything runs on the existing Lambda and Neon
 database: no third-party analytics, no new AWS resources.
 
+Phase 3, the Search Console view of what people search before they arrive,
+is in [search-demand.md](search-demand.md).
+
 ## What it can and cannot know
 
 Google does not tell any website who searched for what. Search Console reports
