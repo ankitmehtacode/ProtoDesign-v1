@@ -1,6 +1,6 @@
 import db from '../config/database.js';
 import { phonePeService } from './phonepe.service.js';
-import { notifyOrder } from './notify.js';
+import { notifyOrder } from './whatsapp.service.js';
 import { alertNewOrder, alertPaymentFailed, alertStaleHoldsReleased, notifyAdmin } from './telegram.service.js';
 import { clock, festivalPrice } from './festival.js';
 

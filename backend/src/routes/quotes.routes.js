@@ -4,7 +4,7 @@ import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
-import { notifyQuote } from '../services/notify.js';
+import { notifyQuote } from '../services/whatsapp.service.js';
 import { alertNewQuote } from '../services/telegram.service.js';
 import { quoteAdminEmail, quoteContact, quoteCustomerEmail } from '../services/quote.email.js';
 

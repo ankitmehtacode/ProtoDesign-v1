@@ -10,13 +10,3 @@ export function useWhatsAppStatus() {
         retry: false,
     });
 }
-
-/** Whether the Telegram bot is switched on server-side. Cached for the session. */
-export function useTelegramStatus() {
-    return useQuery({
-        queryKey: ["telegram-status"],
-        queryFn: () => apiService.getTelegramStatus(),
-        staleTime: Infinity,
-        retry: false,
-    });
-}

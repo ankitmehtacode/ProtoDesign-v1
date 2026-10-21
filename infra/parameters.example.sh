@@ -45,7 +45,6 @@ WhatsAppTemplateQuoteUpdate=
 WhatsAppTemplateLanguage=en
 WhatsAppTestRecipients=
 TelegramBotToken=
-TelegramBotUsername=
 TelegramWebhookSecret=
 TelegramAdminChatIds=
 PARAMS

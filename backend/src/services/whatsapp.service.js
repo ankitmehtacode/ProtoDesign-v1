@@ -339,14 +339,14 @@ export const dispatch = {
 // Business events -> notifications. Never throw into the caller.
 // ---------------------------------------------------------------------------
 
-export const ORDER_EVENTS = {
+const ORDER_EVENTS = {
     paid: { label: 'Payment confirmed', text: (ref) => `Payment confirmed for your ProtoDesign order ${ref}. We'll keep you posted here as it moves.` },
     shipped: { label: 'Shipped', text: (ref, url) => `Your ProtoDesign order ${ref} has been shipped.${url ? ` Track it here: ${url}/orders` : ''}` },
     delivered: { label: 'Delivered', text: (ref) => `Your ProtoDesign order ${ref} has been delivered. Thank you for shopping with us!` },
     cancelled: { label: 'Cancelled', text: (ref) => `Your ProtoDesign order ${ref} has been cancelled. Reply here if you have any questions.` }
 };
 
-export const QUOTE_EVENTS = {
+const QUOTE_EVENTS = {
     contacted: { label: 'In review', text: (ref) => `Your ProtoDesign quote ${ref} is being reviewed. Our team will be in touch with you shortly.` },
     paid: { label: 'Paid', text: (ref) => `Payment received for your ProtoDesign quote ${ref}. We'll start on it and keep you posted here.` },
     completed: { label: 'Completed', text: (ref) => `Your ProtoDesign quote ${ref} is complete. Thank you!` },
