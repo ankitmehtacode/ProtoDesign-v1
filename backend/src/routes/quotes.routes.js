@@ -4,7 +4,8 @@ import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
 import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
-import { notifyQuote } from '../services/whatsapp.service.js';
+import { notifyQuote } from '../services/notify.js';
+import { alertNewQuote } from '../services/telegram.service.js';
 import { quoteAdminEmail, quoteContact, quoteCustomerEmail } from '../services/quote.email.js';
 
 const router = express.Router();
@@ -122,7 +123,8 @@ router.post('/request', authMiddleware, async (req, res, next) => {
         // the environment the moment the response returns, so a background promise
         // here simply never completes. allSettled keeps a mail failure from failing
         // the quote itself, while the .catch handlers above keep it observable.
-        await Promise.allSettled([adminMail, customerMail]);
+        await Promise.allSettled([adminMail, customerMail,
+            alertNewQuote({ quoteId: quote.id, fileName, price: specs.estimatedPrice, contact })]);
 
         // quoteId lets the page offer "Get updates on WhatsApp" for this quote.
         res.json({ success: true, message: "Quote requested successfully", quoteId: quote.id, email: contact.email });

@@ -15,6 +15,7 @@ import errorHandler from './src/middleware/errorHandler.js';
 import userRoutes from './src/routes/user.routes.js';
 import sitemapRoutes from './src/routes/sitemap.routes.js';
 import whatsappRoutes, { webhookRouter as whatsappWebhookRoutes } from './src/routes/whatsapp.routes.js';
+import telegramRoutes, { webhookRouter as telegramWebhookRoutes } from './src/routes/telegram.routes.js';
 import { WORKER_EVENT_SOURCE } from './src/services/whatsapp.service.js';
 import { runWorker } from './src/services/whatsapp.worker.js';
 import { CATALOG_SYNC_EVENT_SOURCE, runCatalogSync } from './src/services/catalog.sync.js';
@@ -152,6 +153,8 @@ app.use('/api/quotes', quotesRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/webhooks/whatsapp', whatsappWebhookRoutes);
+app.use('/api/telegram', telegramRoutes);
+app.use('/api/webhooks/telegram', telegramWebhookRoutes);
 
 // ============================================
 // 5. ERROR HANDLING

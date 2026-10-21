@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { phonePeService } from './phonepe.service.js';
-import { notifyOrder } from './whatsapp.service.js';
+import { notifyOrder } from './notify.js';
+import { alertNewOrder, alertPaymentFailed, alertStaleHoldsReleased, notifyAdmin } from './telegram.service.js';
 import { clock, festivalPrice } from './festival.js';
 
 /**
@@ -137,7 +138,14 @@ function classifyGatewayState(data) {
  *
  * @returns {Promise<'paid'|'cancelled'|'pending'|'noop'|'unknown_order'|'amount_mismatch'|'paid_after_cancel'>}
  */
-export async function settlePayment(orderId, gatewayData) {
+/** Tells the customer and the shop that an unpaid order was cancelled. Never throws. */
+const announcePaymentFailed = (orderId) => Promise.all([notifyOrder(orderId, 'cancelled'), alertPaymentFailed(orderId)]);
+
+/**
+ * announce: false leaves telling the customer and the shop about a failed
+ * payment to the caller (releaseStaleHolds batches them).
+ */
+export async function settlePayment(orderId, gatewayData, { announce = true } = {}) {
     const outcome = classifyGatewayState(gatewayData);
     if (outcome === 'pending') return 'pending';
 
@@ -149,6 +157,7 @@ export async function settlePayment(orderId, gatewayData) {
 
     if (outcome === 'failed') {
         const cancelled = await cancelOrder(orderId, { from: PENDING_STATUSES, paymentStatus: 'failed' });
+        if (cancelled && announce) await announcePaymentFailed(orderId);
         return cancelled ? 'cancelled' : 'noop';
     }
 
@@ -170,7 +179,7 @@ export async function settlePayment(orderId, gatewayData) {
         // Only here: after PhonePe's status API confirmed the exact amount, and
         // only for the call that actually flipped the order (so exactly once).
         // Queues the message and returns; it never throws into settlement.
-        await notifyOrder(orderId, 'paid');
+        await Promise.all([notifyOrder(orderId, 'paid'), alertNewOrder(orderId)]);
         return 'paid';
     }
 
@@ -183,6 +192,7 @@ export async function settlePayment(orderId, gatewayData) {
     );
     if (late) {
         logFault('payment_received_for_cancelled_order', { orderId, action: 'REFUND_REQUIRED' });
+        await notifyAdmin(`🚨 Refund needed: order #${orderId.slice(0, 8).toUpperCase()} was paid after it was cancelled.`);
         return 'paid_after_cancel';
     }
     return 'noop'; // already processing/shipped/etc: a replayed notification
@@ -201,7 +211,7 @@ export async function settlePayment(orderId, gatewayData) {
  *        skipped because the order is no longer pending.
  * @returns {Promise<string>} a settlePayment outcome, 'unverified', or 'skipped'.
  */
-export async function reconcilePendingOrder(orderId, { includeCancelled = false } = {}) {
+export async function reconcilePendingOrder(orderId, { includeCancelled = false, announce = true } = {}) {
     const order = await db.oneOrNone(
         `SELECT id, status, payment_gateway,
                 EXTRACT(EPOCH FROM (NOW() - created_at)) / 60 AS age_minutes
@@ -215,7 +225,7 @@ export async function reconcilePendingOrder(orderId, { includeCancelled = false 
 
     try {
         const data = await phonePeService.verifyPaymentStatus(orderId);
-        return await settlePayment(orderId, data);
+        return await settlePayment(orderId, data, { announce });
     } catch (err) {
         const httpStatus = err.response?.status;
         // PhonePe documents INVALID_MERCHANT_ORDER_ID as the body for an order it
@@ -227,6 +237,7 @@ export async function reconcilePendingOrder(orderId, { includeCancelled = false 
         if (unknownToGateway && Number(order.age_minutes) > GATEWAY_UNKNOWN_GRACE_MINUTES) {
             logEvent('payment_unknown_to_gateway', { orderId, httpStatus });
             const cancelled = await cancelOrder(orderId, { from: PENDING_STATUSES, paymentStatus: 'failed' });
+            if (cancelled && announce) await announcePaymentFailed(orderId);
             return cancelled ? 'cancelled' : 'noop';
         }
         logFault('payment_verify_failed', { orderId, httpStatus: httpStatus ?? null, code: err.code ?? null, error: err.message });
@@ -260,12 +271,17 @@ export async function releaseStaleHolds(productIds) {
           LIMIT 20`,
         [productIds, PENDING_STATUSES, STALE_HOLD_MINUTES]
     );
-    let released = 0;
+    const released = [];
     for (const { id } of stale) {
-        if (await reconcilePendingOrder(id) === 'cancelled') released++;
+        if (await reconcilePendingOrder(id, { announce: false }) === 'cancelled') released.push(id);
     }
-    if (released) logEvent('stale_holds_released', { released });
-    return released;
+    if (released.length) {
+        logEvent('stale_holds_released', { released: released.length });
+        // Together rather than one by one inside the loop, so a slow channel
+        // costs this checkout one send timeout, not one per released order.
+        await Promise.all([...released.map((id) => notifyOrder(id, 'cancelled')), alertStaleHoldsReleased(released)]);
+    }
+    return released.length;
 }
 
 // ---------------------------------------------------------------------------

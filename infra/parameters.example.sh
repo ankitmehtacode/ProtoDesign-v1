@@ -44,6 +44,10 @@ WhatsAppTemplateOrderUpdate=
 WhatsAppTemplateQuoteUpdate=
 WhatsAppTemplateLanguage=en
 WhatsAppTestRecipients=
+TelegramBotToken=
+TelegramBotUsername=
+TelegramWebhookSecret=
+TelegramAdminChatIds=
 PARAMS
 )
 export PARAMETER_OVERRIDES
