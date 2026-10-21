@@ -17,7 +17,7 @@ import {
 
 // An input problem gets its message; anything else goes to errorHandler, which
 // logs it and hides the details.
-const handle = (fn) => async (req, res, next) => {
+export const handle = (fn) => async (req, res, next) => {
     try {
         await fn(req, res);
     } catch (err) {
@@ -28,7 +28,7 @@ const handle = (fn) => async (req, res, next) => {
 
 // Under Lambda, serverless-http sets the socket address from AWS's sourceIp,
 // which a client cannot forge with a header.
-const clientIp = (req) => ipHash(req.socket?.remoteAddress);
+export const clientIp = (req) => ipHash(req.socket?.remoteAddress);
 
 export const trackRouter = express.Router();
 

@@ -34,7 +34,11 @@ interface Overview {
     products: { id: string; name: string; category: string; views: number; viewers: number; carts: number; leads: number }[];
     leads: Lead[];
     storage: { bytes: number; limitBytes: number; alertBytes: number };
+    tools: { tool: string; runs: number; sent_to_whatsapp: number }[];
+    waiting: { id: string; name: string; kind: string; people: number }[];
 }
+
+const TOOL_LABEL: Record<string, string> = { printer_advisor: "Printer advisor", filament_estimator: "Filament calculator" };
 
 interface Detail {
     lead: Lead & { gclid: string | null; referrer_host: string | null; term: string | null; consent_text: string; consented_at: string };
@@ -50,6 +54,7 @@ const channel = (l: { source: string | null; medium: string | null }) => (l.sour
 const EVENT_LABEL: Record<string, string> = {
     page_view: "Viewed page", product_view: "Viewed product", add_to_cart: "Added to cart",
     quote_start: "Started a print quote", lead_submit: "Sent the enquiry",
+    tool_use: "Used", alert_signup: "Asked for an alert on",
 };
 
 export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
@@ -135,6 +140,33 @@ export function LeadsSection({ initialFilter }: { initialFilter?: string }) {
                                 <li key={p.id} className="flex items-center justify-between gap-4 px-5 py-2.5">
                                     <span className="truncate">{p.name}</span>
                                     <span className="shrink-0 tabular-nums text-muted-foreground">{p.views} views · {p.carts} carts · {p.leads} leads</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Panel>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <Panel title="Tools" description="Advisor and calculator runs, and how many were sent to WhatsApp (each one is a lead with a verified number).">
+                    {data.tools.length === 0 ? <Empty title="No runs yet." /> : (
+                        <ul className="divide-y text-sm">
+                            {data.tools.map((t) => (
+                                <li key={t.tool} className="flex items-center justify-between gap-4 px-5 py-2.5">
+                                    <span>{TOOL_LABEL[t.tool] ?? t.tool}</span>
+                                    <span className="tabular-nums text-muted-foreground">{t.runs} runs · {t.sent_to_whatsapp} to WhatsApp</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Panel>
+                <Panel title="Waiting for stock or a lower price" description="Open alerts: people who will buy when this changes.">
+                    {data.waiting.length === 0 ? <Empty title="No open alerts." /> : (
+                        <ul className="divide-y text-sm">
+                            {data.waiting.map((w) => (
+                                <li key={`${w.id}/${w.kind}`} className="flex items-center justify-between gap-4 px-5 py-2.5">
+                                    <span className="truncate">{w.name}</span>
+                                    <span className="shrink-0 tabular-nums text-muted-foreground">{w.people} {w.kind === "back_in_stock" ? "want it back" : "want a lower price"}</span>
                                 </li>
                             ))}
                         </ul>

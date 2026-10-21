@@ -29,6 +29,12 @@ export const LEAD_STATUSES = new Set(['new', 'contacted', 'qualified', 'won', 'l
 export const CONSENT_TEXTS = Object.freeze({
     'lead-contact-v1': 'I agree that ProtoDesign may contact me on WhatsApp, phone or email about this enquiry. '
         + 'I can ask for my details to be deleted at any time.',
+    // Not a checkbox: recorded when someone sends a tool result code from
+    // their own WhatsApp, which is the request this text describes.
+    'whatsapp-tool-v1': 'Sent their ProtoDesign printer advisor or filament estimator code from WhatsApp, '
+        + 'asking for the result there and for ProtoDesign to help with it on WhatsApp.',
+    'product-alert-v1': 'I agree that ProtoDesign may email me about this product, and contact me about it. '
+        + 'Every email has an unsubscribe link, and I can ask for my details to be deleted at any time.',
 });
 
 const MAX_BATCH = 20;
@@ -379,7 +385,7 @@ export async function captureLead(input, { userId = null, ipHash: ip = null } = 
 
 /** The Leads section: 30-day funnel by channel, top pages and products, and the leads. */
 export async function adminOverview() {
-    const [totals, channels, landings, products, leads, storage] = await Promise.all([
+    const [totals, channels, landings, products, leads, storage, tools, waiting] = await Promise.all([
         db.one(
             `SELECT (SELECT count(*) FROM visitors WHERE first_seen_at > now() - interval '30 days')::int AS visitors_30d,
                     (SELECT count(*) FROM visitors WHERE first_seen_at > now() - interval '60 days'
@@ -432,8 +438,19 @@ export async function adminOverview() {
               LIMIT 500`
         ),
         databaseSize(),
+        db.any(
+            `SELECT tool, count(*)::int AS runs, count(delivered_at)::int AS sent_to_whatsapp
+               FROM tool_results WHERE created_at > now() - interval '30 days' GROUP BY tool ORDER BY tool`
+        ),
+        // Open alerts per product: demand you can see before it becomes a sale.
+        db.any(
+            `SELECT p.id, p.name, a.kind, count(*)::int AS people
+               FROM product_alerts a JOIN products p ON p.id = a.product_id
+              WHERE a.notified_at IS NULL AND a.unsubscribed_at IS NULL
+              GROUP BY p.id, p.name, a.kind ORDER BY people DESC, p.name LIMIT 10`
+        ),
     ]);
-    return { totals, channels, landings, products, leads, storage };
+    return { totals, channels, landings, products, leads, storage, tools, waiting };
 }
 
 /**
@@ -481,6 +498,11 @@ export async function updateLead(leadId, { status, admin_notes }) {
 export async function deleteLead(leadId) {
     if (!isUuid(leadId)) return false;
     return db.tx(async (tx) => {
+        // Alerts are kept by address, not only by lead: an erased person's
+        // email must not survive in them.
+        await tx.none(
+            `DELETE FROM product_alerts WHERE lead_id = $1
+                 OR lower(email) = (SELECT lower(email) FROM leads WHERE id = $1)`, [leadId]);
         await tx.none('DELETE FROM visitors WHERE lead_id = $1 AND user_id IS NULL', [leadId]);
         const res = await tx.result('DELETE FROM leads WHERE id = $1', [leadId]);
         if (res.rowCount) logEvent('lead_deleted', { leadId });
@@ -512,8 +534,31 @@ export async function runLeadMaintenance({ alert } = {}) {
         'DELETE FROM visitor_events WHERE created_at < now() - make_interval(days => $1)',
         [EVENT_RETENTION_DAYS]
     );
+    // Each later step fails alone (logged), so one problem -- say, code
+    // deployed before migration 016 -- never skips the storage check below.
+    const step = async (name, sql, params) => {
+        try {
+            return (await db.result(sql, params)).rowCount;
+        } catch (err) {
+            logFault('lead_maintenance_step_failed', { step: name, error: err.message });
+            return null;
+        }
+    };
+    // Tool results nobody sent to WhatsApp are only useful while the code is fresh.
+    const toolResultsDeleted = await step('tool_results',
+        `DELETE FROM tool_results WHERE lead_id IS NULL AND created_at < now() - make_interval(days => $1)`,
+        [ANON_RETENTION_DAYS]);
+    // Alerts: unconfirmed after a week, closed for 180 days, or open for 180
+    // days (a product that never came back) -- an address is not kept forever.
+    const alertsDeleted = await step('product_alerts',
+        `DELETE FROM product_alerts
+          WHERE (confirmed_at IS NULL AND created_at < now() - interval '7 days')
+             OR COALESCE(notified_at, unsubscribed_at, failed_at, created_at) < now() - make_interval(days => $1)`,
+        [EVENT_RETENTION_DAYS]);
     const storage = await databaseSize();
-    const result = { visitorsDeleted: anon.rowCount, eventsDeleted: old.rowCount, ...storage };
+    const result = {
+        visitorsDeleted: anon.rowCount, eventsDeleted: old.rowCount, toolResultsDeleted, alertsDeleted, ...storage,
+    };
     logEvent('lead_maintenance', result);
 
     // Postgres does not hand space back after deletes, so once over the line

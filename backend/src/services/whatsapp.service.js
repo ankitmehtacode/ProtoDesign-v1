@@ -144,10 +144,13 @@ export const verifyToken = (given, expected) => Boolean(expected) && typeof give
 // logged-in owner is ever shown it (GET /api/whatsapp/link), so a stranger
 // cannot subscribe to someone else's order by guessing an id prefix.
 
-const KIND_PREFIX = { order: 'O', quote: 'Q' };
-const PREFIX_KIND = { O: 'order', Q: 'quote' };
+// 'advice' is a printer advisor or filament estimator result (tools.service.js),
+// whose code is shown to whoever ran the tool.
+const KIND_PREFIX = { order: 'O', quote: 'Q', advice: 'A' };
+const PREFIX_KIND = { O: 'order', Q: 'quote', A: 'advice' };
+const REF_TABLES = { order: 'orders', quote: 'quotes', advice: 'tool_results' };
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-export const REF_PATTERN = /\b([OQ])-([0-9A-F]{8})-([A-Z2-7]{8})\b/i;
+export const REF_PATTERN = /\b([OQA])-([0-9A-F]{8})-([A-Z2-7]{8})\b/i;
 
 function signRef(kind, id, secret) {
     const mac = createHmac('sha256', secret).update(`whatsapp-link:${kind}:${String(id).toLowerCase()}`).digest();
@@ -170,9 +173,8 @@ export function parseRef(text) {
 
 /** Resolves a parsed reference to the order/quote it was signed for, or null. */
 export async function resolveRef(ref, secret) {
-    const table = ref.kind === 'order' ? 'orders' : 'quotes';
     const candidates = await db.any(
-        `SELECT id, user_id FROM ${table} WHERE id::text LIKE $1 LIMIT 20`,
+        `SELECT id${ref.kind === 'advice' ? '' : ', user_id'} FROM ${REF_TABLES[ref.kind]} WHERE id::text LIKE $1 LIMIT 20`,
         [`${ref.prefix}%`]
     );
     return candidates.find((row) => safeEqual(signRef(ref.kind, row.id, secret), ref.sig)) ?? null;
