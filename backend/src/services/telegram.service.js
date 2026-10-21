@@ -1,7 +1,7 @@
 /**
  * Shop alerts over a Telegram bot: new paid and cash-on-delivery orders,
  * failed payments, unpaid checkouts cancelled to free stock, new quotes,
- * refunds needed and WhatsApp alerts, sent to the chats in
+ * refunds needed, sign-ins and new accounts, and WhatsApp alerts, sent to the chats in
  * TELEGRAM_ADMIN_CHAT_IDS. Customers are not served here; their updates go
  * out on WhatsApp and email.
  *
@@ -155,6 +155,16 @@ export async function alertStaleHoldsReleased(orderIds) {
     if (orderIds.length === 0) return;
     await notifyAdmin(`♻️ Cancelled ${orderIds.length} unpaid checkout${orderIds.length === 1 ? '' : 's'} to free stock: `
         + orderIds.map((id) => `#${shortId(id)}`).join(', ') + adminLink('orders'));
+}
+
+// Name and email are typed by the customer: flattened to one line so they
+// cannot draw a fake alert of their own below this one.
+const oneLine = (value, max) => String(value).replace(/\s+/g, ' ').trim().slice(0, max);
+
+/** The shop's alert for a sign-in, or a new account (isNew). Never throws. */
+export async function alertSignIn({ name, email, method, isNew = false, role = 'user' }) {
+    const who = `${oneLine(name || 'Customer', 100)} (${oneLine(email, 254)})${role === 'admin' ? ' · ADMIN' : ''}`;
+    await notifyAdmin(isNew ? `🆕 New account via ${method}: ${who}` : `👤 Signed in via ${method}: ${who}`);
 }
 
 /** The shop's alert for a new quote request. */

@@ -24,6 +24,7 @@ const { default: db, pgp } = await import('../src/config/database.js');
 const telegram = await import('../src/services/telegram.service.js');
 const { settlePayment, releaseStaleHolds } = await import('../src/services/order.service.js');
 const { phonePeService } = await import('../src/services/phonepe.service.js');
+const { OAuth2Client } = await import('google-auth-library');
 
 const realConsole = { log: console.log, warn: console.warn, error: console.error };
 for (const level of ['log', 'warn', 'error']) console[level] = () => {};
@@ -177,5 +178,56 @@ describe('shop alerts', () => {
             process.env.TELEGRAM_ADMIN_CHAT_IDS = saved;
         }
         assert.equal(sent.length, 0);
+    });
+});
+
+describe('sign-in alerts', () => {
+    it('alerts on a new email account, a sign-in, and not on a wrong password', async () => {
+        const body = { email: 'Ravi@Test.local', password: 'correct-horse', fullName: 'Ravi Kumar' };
+        assert.equal((await call('POST', '/api/auth/signup', { body })).status, 201);
+        assert.deepEqual(to(900), ['🆕 New account via email: Ravi Kumar (ravi@test.local)']);
+
+        sent = [];
+        assert.equal((await call('POST', '/api/auth/login', { body: { email: body.email, password: body.password } })).status, 200);
+        assert.deepEqual(to(900), ['👤 Signed in via email: Ravi Kumar (ravi@test.local)']);
+
+        sent = [];
+        assert.equal((await call('POST', '/api/auth/login', { body: { email: body.email, password: 'wrong-password' } })).status, 401);
+        assert.equal(sent.length, 0);
+    });
+
+    it('keeps a signed-up name on one line, so it cannot fake an alert', async () => {
+        const fullName = 'Ravi\n\n🛒 New paid order #AB12CD34\nPhone: 9999999999';
+        const body = { email: 'fake@test.local', password: 'correct-horse', fullName };
+        assert.equal((await call('POST', '/api/auth/signup', { body })).status, 201);
+        assert.deepEqual(to(900), ['🆕 New account via email: Ravi 🛒 New paid order #AB12CD34 Phone: 9999999999 (fake@test.local)']);
+    });
+
+    it('signs in within one send timeout when Telegram hangs', async () => {
+        const body = { email: 'slow@test.local', password: 'correct-horse', fullName: 'Slow Net' };
+        assert.equal((await call('POST', '/api/auth/signup', { body })).status, 201);
+        reply = () => 'hang';
+        const started = Date.now();
+        const res = await call('POST', '/api/auth/login', { body: { email: body.email, password: body.password } });
+        const took = Date.now() - started;
+        assert.equal(res.status, 200);
+        assert.ok(res.body.token || res.body.data?.token, 'login returns a token');
+        assert.ok(took < 3000, `login took ${took} ms`);
+    });
+
+    it('alerts on a Google sign-in, new account first, and marks an admin', async () => {
+        const realVerify = OAuth2Client.prototype.verifyIdToken;
+        OAuth2Client.prototype.verifyIdToken = async () => ({ getPayload: () => ({ email: 'meera@test.local', name: 'Meera Shah' }) });
+        try {
+            assert.equal((await call('POST', '/api/auth/google', { body: { token: 'google-id-token' } })).status, 200);
+            assert.deepEqual(to(900), ['🆕 New account via Google: Meera Shah (meera@test.local)']);
+
+            await db.none(`UPDATE user_roles SET role = 'admin' WHERE user_id = (SELECT id FROM users WHERE email = 'meera@test.local')`);
+            sent = [];
+            assert.equal((await call('POST', '/api/auth/google', { body: { token: 'google-id-token' } })).status, 200);
+            assert.deepEqual(to(900), ['👤 Signed in via Google: Meera Shah (meera@test.local) · ADMIN']);
+        } finally {
+            OAuth2Client.prototype.verifyIdToken = realVerify;
+        }
     });
 });
