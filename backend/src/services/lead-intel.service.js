@@ -103,7 +103,7 @@ const SIGNALS_SQL = `
                   count(*) FILTER (WHERE e.name = 'tool_use') AS tools,
                   count(*) FILTER (WHERE e.name = 'alert_signup') AS alerts,
                   -- Days in India: a late-evening session is one day, not two UTC dates.
-                  count(DISTINCT (e.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date)
+                  count(DISTINCT (e.created_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date)
                       FILTER (WHERE e.created_at > now() - interval '14 days') AS active_days,
                   max(e.created_at) AS last_event_at
              FROM visitors v

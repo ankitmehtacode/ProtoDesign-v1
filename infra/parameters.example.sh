@@ -48,6 +48,7 @@ TelegramBotToken=
 TelegramWebhookSecret=
 TelegramAdminChatIds=
 SearchConsoleSiteUrl=
+AdsFeedSecret=
 PARAMS
 )
 export PARAMETER_OVERRIDES

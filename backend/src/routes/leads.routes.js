@@ -6,8 +6,9 @@ import isAdmin from '../middleware/isAdmin.js';
 import { alertNewLead } from '../services/telegram.service.js';
 import {
     adminLeadDetail, adminOverview, captureLead, deleteLead, forgetVisitor, identifyVisitor, ipHash, parseBeacon,
-    recordEvents, updateLead, validateLead,
+    recordEvents, setVisitorAdsConsent, updateLead, validateLead,
 } from '../services/leads.service.js';
+import { adsStatus, conversionsFeed, customerMatchCsv, customerMatchRows, feedAuthorized } from '../services/ads.service.js';
 import { reorderPredictions } from '../services/lead-intel.service.js';
 import { SEARCH_PERIODS, runSearchConsoleSync, searchDemand } from '../services/search-console.service.js';
 
@@ -48,6 +49,13 @@ trackRouter.post('/forget', express.text({ type: 'text/plain', limit: '1kb' }), 
     res.status(204).end();
 }));
 
+// The ad-measurement choice changed (consent notice reopened from the footer).
+trackRouter.post('/ads', express.text({ type: 'text/plain', limit: '1kb' }), handle(async (req, res) => {
+    const body = parseBeacon(req.body);
+    await setVisitorAdsConsent(body.visitorId, body.granted === true, body.version);
+    res.status(204).end();
+}));
+
 trackRouter.post('/identify', authMiddleware, handle(async (req, res) => {
     await identifyVisitor({ visitorId: req.body?.visitorId, userId: req.userId });
     res.status(204).end();
@@ -78,6 +86,18 @@ leadsRouter.post('/', optionalAuthMiddleware, handle(async (req, res) => {
 
 leadsRouter.get('/admin', authMiddleware, isAdmin, handle(async (req, res) => {
     res.json(await adminOverview());
+}));
+
+// Google Ads (docs/google-ads.md): feed status and opt-in counts.
+leadsRouter.get('/ads', authMiddleware, isAdmin, handle(async (req, res) => {
+    res.json(await adsStatus());
+}));
+
+// Hashed Customer Match audience, optionally one interest.
+leadsRouter.get('/ads/customer-match.csv', authMiddleware, isAdmin, handle(async (req, res) => {
+    const interest = ['printer', 'filament', 'resin', 'service', 'other'].includes(req.query.interest) ? req.query.interest : undefined;
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' })
+        .send(customerMatchCsv(await customerMatchRows({ interest })));
 }));
 
 // Filament buyers likely to run out soon (docs/lead-intel.md).
@@ -117,4 +137,20 @@ leadsRouter.patch('/admin/:id', authMiddleware, isAdmin, handle(async (req, res)
 leadsRouter.delete('/admin/:id', authMiddleware, isAdmin, handle(async (req, res) => {
     if (!(await deleteLead(req.params.id))) return res.status(404).json({ error: 'Lead not found' });
     res.status(204).end();
+}));
+
+/*
+ * /api/ads/conversions.csv: the offline-conversion file Google Ads fetches on
+ * a schedule. Not admin-session auth: Google sends the feed secret instead
+ * (Basic auth or ?key=). 404 while ADS_FEED_SECRET is unset.
+ */
+export const adsFeedRouter = express.Router();
+
+adsFeedRouter.get('/conversions.csv', handle(async (req, res) => {
+    if (!feedAuthorized(req, process.env.ADS_FEED_SECRET || '')) {
+        if ((process.env.ADS_FEED_SECRET || '').length < 24) return res.status(404).json({ error: 'Route not found' });
+        console.warn(JSON.stringify({ event: 'ads_feed_unauthorized' }));
+        return res.status(401).set('WWW-Authenticate', 'Basic realm="ProtoDesign conversions"').json({ error: 'Unauthorized' });
+    }
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' }).send(await conversionsFeed());
 }));

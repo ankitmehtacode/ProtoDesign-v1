@@ -368,8 +368,9 @@ export const buyingIntent = (query) => BUYING.test(query);
 const TOP3_CTR = 0.10;
 const OPPORTUNITY_MIN_IMPRESSIONS = 20;
 
-// Search Console's days are Pacific time; visitors.first_seen_at is UTC.
-const PACIFIC_DAY = "(first_seen_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles')::date";
+// Search Console's days are Pacific time. first_seen_at is a plain TIMESTAMP
+// in the session's zone (UTC on Neon); ::timestamptz reads it as such.
+const PACIFIC_DAY = "(first_seen_at::timestamptz AT TIME ZONE 'America/Los_Angeles')::date";
 
 const ctr = (clicks, impressions) => (impressions > 0 ? clicks / impressions : 0);
 

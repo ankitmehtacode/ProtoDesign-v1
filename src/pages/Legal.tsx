@@ -130,6 +130,7 @@ export const PrivacyPage = () => (
             <li><strong>Enquiry Data:</strong> When you use an "Ask an expert" form: your name, WhatsApp number or email, your message, and the product you asked about.</li>
             <li><strong>Tool and Alert Data:</strong> Your answers to the printer advisor or filament calculator and the result. If you send the result to our WhatsApp, your WhatsApp number and name. If you ask for a stock or price alert, your email address and the product.</li>
             <li><strong>Usage Data (only if you allow analytics):</strong> The pages and products you view on this site, items you add to your cart, and how you first arrived (for example a search engine, an ad, or a link), stored against a random ID kept in your browser.</li>
+            <li><strong>Advertising Choices (only if you opt in):</strong> Whether you allowed ad measurement, and whether you asked to see ProtoDesign offers in Google ads, with the wording you agreed to and when.</li>
         </ul>
 
         <h3>2. How We Use Your Data</h3>
@@ -142,8 +143,20 @@ export const PrivacyPage = () => (
             <li>Sending order updates, invoices, and support communications.</li>
             <li>Replying to your enquiry. If you allowed analytics, the pages you viewed are linked to your enquiry, and to your account when you sign in, so we can answer with the right product.</li>
             <li>Sending you a stock or price alert you asked for. Each alert is sent once, by email, with an unsubscribe link.</li>
-            <li>Understanding which pages and channels bring visitors, so we can improve the shop. Usage data is not sold or used to show you ads.</li>
+            <li>Understanding which pages and channels bring visitors, so we can improve the shop. Usage data is not sold, and is not used for ads unless you opt in as described below.</li>
         </ul>
+
+        <h3>Google Ads (only if you opt in)</h3>
+        <p>
+            Two separate, optional choices. Neither is part of allowing analytics or sending an enquiry, and both boxes start unticked.
+        </p>
+        <ul>
+            <li><strong>Ad measurement:</strong> if you arrived from a Google ad and tick the box we show for that visit, we tell Google Ads when that ad visit led to an enquiry or an order, and the order value. We share only the ad click ID Google created, never your name, phone, email or address. This helps us stop paying for ads that do not work.</li>
+            <li><strong>Google ads audience (Customer Match):</strong> if you tick the box on an enquiry form, we may give Google your phone number and email in hashed (scrambled, one-way) form, so Google can show you ProtoDesign offers. We only share a number or email you showed is yours after ticking the box: by messaging us on WhatsApp from that number, or confirming an email alert, within 14 days. Someone else typing your number cannot add you. Google uses it to match against its own accounts.</li>
+        </ul>
+        <p>
+            To withdraw ad measurement, open "Analytics preferences" at the bottom of any page and choose again. To withdraw from Google ads audiences, write to help@protodesignstudio.com; you are removed from the next audience upload. Google's handling of this data is described in Google's own privacy policy.
+        </p>
 
         <h3>Analytics and your choices</h3>
         <p>
