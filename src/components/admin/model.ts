@@ -10,14 +10,15 @@
  * yet collected); `cancelled` is excluded everywhere.
  */
 
-import { FileText, LayoutDashboard, MessageCircle, Package, ShoppingBag } from "lucide-react";
+import { FileText, LayoutDashboard, Magnet, MessageCircle, Package, ShoppingBag } from "lucide-react";
 
-export type AdminSection = "overview" | "orders" | "quotes" | "products" | "whatsapp";
+export type AdminSection = "overview" | "orders" | "quotes" | "leads" | "products" | "whatsapp";
 
 export const SECTIONS: { key: AdminSection; label: string; icon: typeof LayoutDashboard }[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "orders", label: "Orders", icon: ShoppingBag },
     { key: "quotes", label: "Quotes", icon: FileText },
+    { key: "leads", label: "Leads", icon: Magnet },
     { key: "products", label: "Products", icon: Package },
     { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
 ];
@@ -104,6 +105,14 @@ export const QUOTE_STATUSES: { value: string; label: string; tone: Tone }[] = [
     { value: "paid", label: "Paid", tone: "violet" },
     { value: "completed", label: "Completed", tone: "green" },
     { value: "rejected", label: "Rejected", tone: "red" },
+];
+
+export const LEAD_STATUSES: { value: string; label: string; tone: Tone }[] = [
+    { value: "new", label: "New", tone: "amber" },
+    { value: "contacted", label: "Contacted", tone: "blue" },
+    { value: "qualified", label: "Qualified", tone: "violet" },
+    { value: "won", label: "Won", tone: "green" },
+    { value: "lost", label: "Lost", tone: "red" },
 ];
 
 /** Dot colour per tone (badges, pills, the status bar). */
@@ -272,7 +281,7 @@ export const formatDate = (iso: string) =>
 export function downloadCsv(filename: string, header: string[], rows: (string | number)[][]) {
     const cell = (v: string | number) => {
         let s = String(v ?? "");
-        if (/^[=+\-@]/.test(s)) s = `'${s}`; // no formula injection when opened in Excel/Sheets
+        if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // no formula injection when opened in Excel/Sheets
         return `"${s.replace(/"/g, '""')}"`;
     };
     const csv = [header, ...rows].map((r) => r.map(cell).join(",")).join("\n");

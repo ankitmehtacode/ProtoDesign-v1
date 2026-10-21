@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import { TermsPage, PrivacyPage, RefundPage, ReturnPage, ShippingPage, ContactPage } from "@/pages/Legal.tsx";
 import { Footer } from "@/components/Footer"; 
 import ScrollToTop from "@/components/ScrollToTop";
+import { AnalyticsConsent } from "@/components/AnalyticsConsent";
 
 
 // Split out of the main bundle: the quote page pulls in three.js (~1 MB) and
@@ -45,6 +46,7 @@ const App = () => (
                 <BrowserRouter>
                     <ScrollToTop />
                     <RouteSeo />
+                    <AnalyticsConsent />
                     {/* Main Layout Wrapper */}
                     <div className="flex flex-col min-h-screen">
                         <Navigation />

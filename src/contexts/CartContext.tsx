@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { apiService } from '@/services/api.service';
+import { track } from '@/lib/analytics';
 import { CartItem, CartContextType } from '@/types/cart';
 
 const AUTH_CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -52,6 +53,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const addToCart = async (productId: string, quantity: number = 1): Promise<boolean> => {
         try {
             await apiService.addToCart(productId, quantity);
+            track('add_to_cart', { productId });
             await loadCart(true); // Silent update
             toast.success('Added to cart!');
             return true;

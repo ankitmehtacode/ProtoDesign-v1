@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
@@ -8,6 +9,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { Overview } from "@/components/admin/Overview";
 import { OrdersSection } from "@/components/admin/OrdersSection";
 import { QuotesSection } from "@/components/admin/QuotesSection";
+import { LeadsSection } from "@/components/admin/LeadsSection";
 import { ProductsSection } from "@/components/admin/ProductsSection";
 import { PageHeader } from "@/components/admin/ui";
 import { AdminOrder, AdminProduct, AdminQuote, AdminSection, SECTIONS, TO_FULFIL, stockState } from "@/components/admin/model";
@@ -23,6 +25,7 @@ const unwrap = <T,>(res: unknown): T => ((res as { data?: T })?.data ?? res) as 
 
 export default function AdminDashboard() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [params, setParams] = useSearchParams();
     const tab = params.get("tab");
     const section: AdminSection = SECTIONS.some((s) => s.key === tab) ? (tab as AdminSection) : "overview";
@@ -38,6 +41,8 @@ export default function AdminDashboard() {
 
     const load = useCallback(async () => {
         setRefreshing(true);
+        // Leads load inside their section; Refresh reloads them too.
+        void queryClient.invalidateQueries({ queryKey: ["leads-overview"] });
         try {
             const [o, q, p] = await Promise.all([
                 apiService.getAdminOrders(),
@@ -55,7 +60,7 @@ export default function AdminDashboard() {
         } finally {
             setRefreshing(false);
         }
-    }, []);
+    }, [queryClient]);
 
     // Admins only: anyone else is sent away before any data loads.
     useEffect(() => {
@@ -114,6 +119,7 @@ export default function AdminDashboard() {
                     onChanged={(id, status) => setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)))}
                 />
             )}
+            {section === "leads" && <LeadsSection key={filter} initialFilter={filter} />}
             {section === "products" && <ProductsSection key={filter} products={products} initialFilter={filter} onChanged={load} />}
             {section === "whatsapp" && (
                 <>

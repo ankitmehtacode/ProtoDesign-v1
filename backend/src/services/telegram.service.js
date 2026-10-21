@@ -167,6 +167,18 @@ export async function alertNewQuote({ quoteId, fileName, price, contact }) {
     ].filter(Boolean).join('\n') + adminLink('quotes'));
 }
 
+/** The shop's alert for a new lead (a repeat enquiry from a known lead is not alerted). */
+export async function alertNewLead(lead, productName) {
+    await notifyAdmin([
+        `🧲 New ${lead.interest} lead: ${lead.name || 'No name given'}`,
+        productName ? `Interested in: ${productName}` : null,
+        lead.phone ? `Phone: +${lead.phone}` : null,
+        lead.email ? `Email: ${lead.email}` : null,
+        lead.source ? `Came from: ${lead.source} / ${lead.medium}` : null,
+        lead.message ? `“${lead.message.slice(0, 200)}”` : null,
+    ].filter(Boolean).join('\n') + adminLink('leads'));
+}
+
 // ---------------------------------------------------------------------------
 // Bot webhook
 // ---------------------------------------------------------------------------

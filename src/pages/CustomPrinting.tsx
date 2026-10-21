@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, holdQuote, modelFileProblem, quotePrice, takeHeldQuote } from "@/lib/quote";
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
+import { track } from "@/lib/analytics";
 
 export default function CustomPrinting() {
     // --- STATE ---
@@ -129,6 +130,7 @@ export default function CustomPrinting() {
             // recorded against the returned key. The API never carries the file,
             // so model size is not bounded by the request limit.
             setUploadProgress(0);
+            track("quote_start");
             const fileKey = await apiService.uploadModel(file, setUploadProgress);
 
             const result = await apiService.sendQuoteRequest({
