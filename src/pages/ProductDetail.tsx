@@ -43,6 +43,7 @@ import { CATEGORY_LABELS, dealBadge, dealPrice, isMadeToOrder } from '@/componen
 import { ProductPromises } from '@/components/shop/ProductPromises';
 import { FestivalPriceNote } from '@/components/shop/FestivalPriceNote';
 import { INTEREST_FOR_CATEGORY, LeadCapture } from '@/components/LeadCapture';
+import { ProductAlert } from '@/components/ProductAlert';
 import { track } from '@/lib/analytics';
 
 // --- INTERFACES ---
@@ -977,6 +978,10 @@ const ProductDetail = () => {
                             </Button>
                             <Button variant="outline" className="h-12 w-12 p-0" onClick={shareProduct} aria-label="Share this product"><Share2 className="w-5 h-5"/></Button>
                         </div>
+
+                        {!isEditing && INTEREST_FOR_CATEGORY[product.category] && (
+                            <div className="mb-6"><ProductAlert productId={product.id} inStock={inStock} /></div>
+                        )}
 
                         <ProductPromises product={product} />
                     </div>

@@ -215,6 +215,22 @@ Parameters:
     NoEcho: true
     Default: ''
 
+  # ── Search Console (docs/search-demand.md) ──────────────────────────────
+  # The property, as Search Console names it: sc-domain:example.com for a
+  # domain property, or https://www.example.com/ for a URL-prefix one. Empty
+  # turns the daily sync off.
+  SearchConsoleSiteUrl:
+    Type: String
+    Default: ''
+  # SSM SecureString holding the service account's JSON key. Not an
+  # environment variable: the key alone is ~2.3 KB and Lambda allows 4 KB for
+  # all of them together. A standard parameter encrypted with the AWS-managed
+  # aws/ssm key is free.
+  SearchConsoleKeyParameter:
+    Type: String
+    Default: /protodesign/search-console-key
+    AllowedPattern: '^/[A-Za-z0-9/_.-]+$'
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -251,6 +267,20 @@ Resources:
           Properties:
             Schedule: cron(30 22 * * ? *)
             Input: '{"source":"protodesign.lead-maintenance"}'
+        # Emails back-in-stock and price-drop alerts that have come true
+        # (backend/src/services/product-alerts.service.js). Every hour.
+        ProductAlertsSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+            Input: '{"source":"protodesign.product-alerts"}'
+        # Copies Search Console's newest final days
+        # (backend/src/services/search-console.service.js). Every day at 06:30 IST.
+        SearchConsoleSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 1 * * ? *)
+            Input: '{"source":"protodesign.search-console"}'
         # Rebuild the prerendered site when a festival sale changes printer
         # prices (backend/src/services/festival.js). One-off: the year field
         # pins each to 2026. 18:31 UTC is 00:01 IST the next day.
@@ -313,6 +343,8 @@ Resources:
           TELEGRAM_WEBHOOK_SECRET: !Ref TelegramWebhookSecret
           TELEGRAM_ADMIN_CHAT_IDS: !Ref TelegramAdminChatIds
           VERCEL_DEPLOY_HOOK_URL: !Ref VercelDeployHookUrl
+          GSC_SITE_URL: !Ref SearchConsoleSiteUrl
+          GSC_KEY_PARAMETER: !Ref SearchConsoleKeyParameter
           # AWS_REGION is deliberately not set here: it is a reserved Lambda
           # runtime variable that AWS populates automatically to the function's
           # actual region, and CloudFormation rejects any attempt to set it
@@ -354,6 +386,14 @@ Resources:
               Effect: Allow
               Action: lambda:InvokeFunction
               Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}'
+        - Statement:
+            # The Search Console key, and nothing else in SSM. Decrypting with
+            # the AWS-managed aws/ssm key needs no KMS statement: that key's
+            # own policy allows it for SSM calls from this account.
+            - Sid: ReadSearchConsoleKey
+              Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SearchConsoleKeyParameter}'
 
   # Explicit log group so retention is bounded. Without this, Lambda
   # auto-creates one on first invoke with NO expiry -- logs (and their storage

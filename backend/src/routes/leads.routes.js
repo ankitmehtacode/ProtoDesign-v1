@@ -8,16 +8,17 @@ import {
     adminLeadDetail, adminOverview, captureLead, deleteLead, forgetVisitor, identifyVisitor, ipHash, parseBeacon,
     recordEvents, updateLead, validateLead,
 } from '../services/leads.service.js';
+import { SEARCH_PERIODS, runSearchConsoleSync, searchDemand } from '../services/search-console.service.js';
 
 /*
  * /api/track: visit events from browsers that accepted analytics.
- * /api/leads: the public enquiry form, and the admin Leads section.
+ * /api/leads: the public enquiry form, and the admin Leads and Search demand sections.
  * See docs/lead-tracking.md.
  */
 
 // An input problem gets its message; anything else goes to errorHandler, which
 // logs it and hides the details.
-const handle = (fn) => async (req, res, next) => {
+export const handle = (fn) => async (req, res, next) => {
     try {
         await fn(req, res);
     } catch (err) {
@@ -28,7 +29,7 @@ const handle = (fn) => async (req, res, next) => {
 
 // Under Lambda, serverless-http sets the socket address from AWS's sourceIp,
 // which a client cannot forge with a header.
-const clientIp = (req) => ipHash(req.socket?.remoteAddress);
+export const clientIp = (req) => ipHash(req.socket?.remoteAddress);
 
 export const trackRouter = express.Router();
 
@@ -76,6 +77,23 @@ leadsRouter.post('/', optionalAuthMiddleware, handle(async (req, res) => {
 
 leadsRouter.get('/admin', authMiddleware, isAdmin, handle(async (req, res) => {
     res.json(await adminOverview());
+}));
+
+// Search demand (docs/search-demand.md). Registered before /admin/:id.
+leadsRouter.get('/search-demand', authMiddleware, isAdmin, handle(async (req, res) => {
+    const days = Number(req.query.days);
+    res.json(await searchDemand({ days: SEARCH_PERIODS.includes(days) ? days : 28 }));
+}));
+
+// "Sync now": the same run as the daily schedule, inside this request, so it
+// stops early enough to answer before the 20-second function timeout. No
+// Telegram alert: the admin who pressed it sees the outcome.
+leadsRouter.post('/search-demand/sync', authMiddleware, isAdmin, handle(async (req, res) => {
+    const deadline = Date.now() + 14_000;
+    const result = await runSearchConsoleSync({ remainingMs: () => deadline - Date.now() });
+    const status = { failed: 502, busy: 409, not_configured: 409 }[result.status] ?? 200;
+    // `error` is what the admin client shows for a non-2xx answer.
+    res.status(status).json(status === 200 ? result : { ...result, error: result.detail });
 }));
 
 leadsRouter.get('/admin/:id', authMiddleware, isAdmin, handle(async (req, res) => {

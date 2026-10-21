@@ -3,7 +3,9 @@ import { Readable } from 'stream';
 import path from 'path';
 import db from '../config/database.js';
 import { emailService } from './email.service.js';
-import { notifyAdmin } from './telegram.service.js';
+import { alertNewLead, notifyAdmin } from './telegram.service.js';
+import { CONSENT_TEXTS, captureLead } from './leads.service.js';
+import { loadResult } from './tools.service.js';
 import { isModelFilename, storageService } from './storage.service.js';
 import {
     GraphError,
@@ -256,7 +258,7 @@ async function handleInbound(config, { message, contact: profile }) {
     if (STATUS_WORDS.has(command)) return replyWithStatus(contact);
 
     const ref = parseRef(text);
-    if (ref) return linkReference(config, contact, ref);
+    if (ref) return ref.kind === 'advice' ? deliverToolResult(config, contact, ref) : linkReference(config, contact, ref);
 
     if (['image', 'video', 'audio', 'sticker'].includes(message.type)) {
         return reply(contact, 'Thanks! To get a 3D printing quote, please send your model as a document (STL, OBJ, 3MF or STEP), or upload it on our website.');
@@ -344,6 +346,43 @@ async function linkReference(config, contact, ref) {
     const current = await describe(ref.kind, target.id);
     await reply(contact, `You're all set! We'll send updates for ${label} here. Current status: ${current}. `
         + 'Send STATUS any time for the latest, or STOP to opt out.');
+}
+
+/**
+ * A printer advisor or filament estimator code: reply with the stored result
+ * (free, inside the window the customer just opened) and record them as a
+ * lead. Their number is verified by WhatsApp, unlike a typed one.
+ */
+async function deliverToolResult(config, contact, ref) {
+    const target = await resolveRef(ref, config.linkSecret);
+    const row = target && await loadResult(target.id);
+    if (!row) {
+        logEvent('whatsapp_tool_code_rejected', { contactId: contact.id });
+        return reply(contact, "Sorry, we couldn't find that result. Please run the printer advisor or filament calculator on our website again.");
+    }
+    await reply(contact, row.result.summary);
+
+    // A lead needs a 10-15 digit number (leads.phone); a few countries' are shorter.
+    if (!/^[1-9][0-9]{9,14}$/.test(contact.wa_id)) return;
+    const captured = await captureLead({
+        name: contact.profile_name ? String(contact.profile_name).slice(0, 120) : null,
+        phone: contact.wa_id,
+        email: null,
+        interest: row.tool === 'printer_advisor' ? 'printer' : 'filament',
+        form: row.tool,
+        message: String(row.result.headline || '').slice(0, 1000),
+        productId: row.result.picks?.[0]?.id ?? row.result.pick?.id ?? null,
+        // A wa.me link can be forwarded. Only the first number to send the code
+        // is taken as the person who ran the tool and given their visit history.
+        visitorId: row.lead_id ? null : row.visitor_id,
+        consentText: CONSENT_TEXTS['whatsapp-tool-v1'],
+    }, {});
+    if (!captured) return; // daily lead cap, already logged
+    await db.none(
+        `UPDATE tool_results SET lead_id = COALESCE(lead_id, $2), delivered_at = COALESCE(delivered_at, now()) WHERE id = $1`,
+        [row.id, captured.lead.id]);
+    logEvent('whatsapp_tool_result_delivered', { contactId: contact.id, resultId: row.id, leadId: captured.lead.id });
+    if (captured.alert) await alertNewLead(captured.lead, row.result.picks?.[0]?.name ?? row.result.pick?.name);
 }
 
 async function describe(kind, id) {

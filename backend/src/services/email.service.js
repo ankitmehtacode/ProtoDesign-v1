@@ -136,6 +136,38 @@ export const emailService = {
         return transporter.sendMail(mailOptions);
     },
 
+    /** Asks the owner of the address to confirm a product alert (double opt-in, product-alerts.service.js). */
+    async sendAlertConfirmation(to, { productName, kind, price, productUrl, confirmUrl, unsubscribeUrl }) {
+        const what = kind === 'back_in_stock'
+            ? `when ${productName} is back in stock`
+            : `if the price of ${productName} drops below ₹${Number(price).toLocaleString('en-IN')}`;
+        return transporter.sendMail({
+            from: `"ProtoDesign" <${process.env.EMAIL_USER}>`,
+            to,
+            subject: `Confirm your alert for ${productName}`,
+            text: `Someone, hopefully you, asked us to email this address ${what}.\n\n`
+                + `To turn the alert on, confirm here: ${confirmUrl}\n\n`
+                + `If it wasn't you, ignore this email and nothing more will be sent. `
+                + `To be sure, you can also cancel it: ${unsubscribeUrl}\n\n${productUrl}\n\nProtoDesign`,
+        });
+    },
+
+    /** The alert itself: back in stock, or a lower price. */
+    async sendProductAlert(to, { productName, kind, price, was, productUrl, unsubscribeUrl }) {
+        const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+        const backInStock = kind === 'back_in_stock';
+        return transporter.sendMail({
+            from: `"ProtoDesign" <${process.env.EMAIL_USER}>`,
+            to,
+            subject: backInStock ? `${productName} is back in stock` : `${productName} is now ${inr(price)}`,
+            text: (backInStock
+                ? `Good news: ${productName} is back in stock at ${inr(price)}.`
+                : `${productName} has dropped from ${inr(was)} to ${inr(price)}.`)
+                + `\n\n${productUrl}\n\nQuestions? Reply to this email or WhatsApp us.\n\n`
+                + `This was a one-time alert you asked for. Unsubscribe: ${unsubscribeUrl}\n\nProtoDesign`,
+        });
+    },
+
     /**
      * Plain-text alert to the shop's own inbox (EMAIL_USER), e.g. a new
      * WhatsApp conversation or a model file sent in chat.

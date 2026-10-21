@@ -10,15 +10,16 @@
  * yet collected); `cancelled` is excluded everywhere.
  */
 
-import { FileText, LayoutDashboard, Magnet, MessageCircle, Package, ShoppingBag } from "lucide-react";
+import { FileText, LayoutDashboard, Magnet, MessageCircle, Package, Search, ShoppingBag } from "lucide-react";
 
-export type AdminSection = "overview" | "orders" | "quotes" | "leads" | "products" | "whatsapp";
+export type AdminSection = "overview" | "orders" | "quotes" | "leads" | "search" | "products" | "whatsapp";
 
 export const SECTIONS: { key: AdminSection; label: string; icon: typeof LayoutDashboard }[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "orders", label: "Orders", icon: ShoppingBag },
     { key: "quotes", label: "Quotes", icon: FileText },
     { key: "leads", label: "Leads", icon: Magnet },
+    { key: "search", label: "Search demand", icon: Search },
     { key: "products", label: "Products", icon: Package },
     { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
 ];

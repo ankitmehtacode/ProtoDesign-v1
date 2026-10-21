@@ -47,6 +47,7 @@ WhatsAppTestRecipients=
 TelegramBotToken=
 TelegramWebhookSecret=
 TelegramAdminChatIds=
+SearchConsoleSiteUrl=
 PARAMS
 )
 export PARAMETER_OVERRIDES

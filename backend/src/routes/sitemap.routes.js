@@ -27,7 +27,7 @@ const escapeXml = (unsafe) => {
 // Indexable pages that do not come from the database. Keep in step with
 // src/seo/site.js (the pages the frontend prerenders without noindex).
 const STATIC_PATHS = [
-    '/', '/custom', '/shop', '/printers', '/printables', '/filaments', '/resins',
+    '/', '/custom', '/printer-advisor', '/filament-calculator', '/shop', '/printers', '/printables', '/filaments', '/resins',
     '/accessories', '/spare-parts', '/contact', '/shipping-policy', '/return-policy',
     '/refund-policy', '/privacy-policy', '/terms-and-conditions',
 ];
