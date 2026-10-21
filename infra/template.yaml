@@ -185,16 +185,12 @@ Parameters:
     Type: String
     Default: ''
 
-  # ── Telegram bot (docs/telegram-updates.md) ─────────────────────────────
-  # Off until the token, username and webhook secret are all set.
+  # ── Telegram shop alerts (docs/telegram-updates.md) ─────────────────────
+  # Off until the token and webhook secret are both set.
   TelegramBotToken:
     Type: String
     NoEcho: true
     Default: ''
-  TelegramBotUsername:
-    Type: String
-    Default: ''
-    Description: The bot's username without the @, e.g. ProtoDesignOrdersBot.
   TelegramWebhookSecret:
     Type: String
     NoEcho: true
@@ -202,7 +198,7 @@ Parameters:
   TelegramAdminChatIds:
     Type: String
     Default: ''
-    Description: Comma-separated chat ids that get shop alerts. The bot shows a chat its id on /start.
+    Description: Comma-separated chat ids that get shop alerts. The bot shows any chat its id.
 
   # Daily import of trending, commercially licensed Printables models as
   # made-to-order products (backend/src/services/catalog.sync.js). DISABLED
@@ -307,7 +303,6 @@ Resources:
           WHATSAPP_TEMPLATE_LANGUAGE: !Ref WhatsAppTemplateLanguage
           WHATSAPP_TEST_RECIPIENTS: !Ref WhatsAppTestRecipients
           TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
-          TELEGRAM_BOT_USERNAME: !Ref TelegramBotUsername
           TELEGRAM_WEBHOOK_SECRET: !Ref TelegramWebhookSecret
           TELEGRAM_ADMIN_CHAT_IDS: !Ref TelegramAdminChatIds
           VERCEL_DEPLOY_HOOK_URL: !Ref VercelDeployHookUrl

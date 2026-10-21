@@ -4,7 +4,7 @@ import authMiddleware from '../middleware/auth.js';
 import isAdmin from '../middleware/isAdmin.js';
 import { emailService } from '../services/email.service.js';
 import { phonePeService } from '../services/phonepe.service.js';
-import { notifyOrder } from '../services/notify.js';
+import { notifyOrder } from '../services/whatsapp.service.js';
 import { alertNewOrder } from '../services/telegram.service.js';
 import {
     PENDING_STATUSES,

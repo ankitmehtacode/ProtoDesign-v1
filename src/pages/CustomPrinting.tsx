@@ -12,7 +12,7 @@ import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { useNavigate } from "react-router-dom";
 import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, holdQuote, modelFileProblem, quotePrice, takeHeldQuote } from "@/lib/quote";
-import { ChatUpdatesButton } from "@/components/ChatUpdatesButton";
+import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
 
 export default function CustomPrinting() {
@@ -230,10 +230,7 @@ export default function CustomPrinting() {
                         Our team will verify your file and send the payment link{sentTo && <> to <strong>{sentTo}</strong></>} shortly.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        {quoteId && <>
-                            <ChatUpdatesButton channel="whatsapp" kind="quote" id={quoteId} size="default" />
-                            <ChatUpdatesButton channel="telegram" kind="quote" id={quoteId} size="default" />
-                        </>}
+                        {quoteId && <WhatsAppUpdatesButton kind="quote" id={quoteId} size="default" />}
                         <Button onClick={() => window.location.reload()}>Submit Another</Button>
                     </div>
                 </div>

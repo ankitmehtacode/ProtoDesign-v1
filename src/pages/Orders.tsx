@@ -36,7 +36,7 @@ import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
 import { motion } from "framer-motion";
-import { ChatUpdatesButton } from "@/components/ChatUpdatesButton";
+import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 
 // --- TYPES ---
 interface OrderItem {
@@ -296,10 +296,7 @@ export default function Orders() {
                                             {order.total_quantity} Item{order.total_quantity !== 1 && 's'}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                        {order.status !== 'cancelled' && <>
-                                            <ChatUpdatesButton channel="whatsapp" kind="order" id={order.id} className="hidden sm:inline-flex" />
-                                            <ChatUpdatesButton channel="telegram" kind="order" id={order.id} className="hidden sm:inline-flex" />
-                                        </>}
+                                        {order.status !== 'cancelled' && <WhatsAppUpdatesButton kind="order" id={order.id} className="hidden sm:inline-flex" />}
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -316,10 +313,7 @@ export default function Orders() {
                                     {expandedOrderId === order.id && (
                                         <div className="mt-6 pt-6 border-t border-border/50 animate-in slide-in-from-top-2 fade-in duration-300">
                                             {/* On phones the toggle bar is too narrow for this; show it here instead. */}
-                                            {order.status !== 'cancelled' && <div className="sm:hidden flex flex-col gap-2 mb-6 empty:hidden">
-                                                <ChatUpdatesButton channel="whatsapp" kind="order" id={order.id} className="w-full" />
-                                                <ChatUpdatesButton channel="telegram" kind="order" id={order.id} className="w-full" />
-                                            </div>}
+                                            {order.status !== 'cancelled' && <WhatsAppUpdatesButton kind="order" id={order.id} className="sm:hidden w-full mb-6" />}
 
                                             <div className="grid md:grid-cols-2 gap-8 mb-8">
                                                 {/* CUSTOMER DETAILS */}
