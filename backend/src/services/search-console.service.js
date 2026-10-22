@@ -1,5 +1,5 @@
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
-import { JWT } from 'google-auth-library';
+import { ExternalAccountClient, JWT } from 'google-auth-library';
 import db from '../config/database.js';
 
 /**
@@ -12,9 +12,12 @@ import db from '../config/database.js';
  * tracking (leads.service.js), it shows which searches turn into leads.
  *
  * Access is a Google service account added as a Restricted user on the
- * Search Console property. Its JSON key is ~2.3 KB, too big for a Lambda
- * environment variable (4 KB for all of them together), so it lives in an SSM
- * SecureString parameter and is read once per sync.
+ * Search Console property. The function signs in as it either keylessly, with
+ * workload identity federation (its own AWS role, exchanged for a Google token),
+ * or with the account's JSON key where Google Cloud still allows keys. Either
+ * credential file lives in one SSM SecureString parameter, read once per sync:
+ * a key (~2.3 KB) is too big for a Lambda environment variable (4 KB for all of
+ * them together), and one parameter keeps both setups identical in the stack.
  */
 
 export const SEARCH_CONSOLE_EVENT_SOURCE = 'protodesign.search-console';
@@ -60,7 +63,7 @@ export class SyncError extends Error {
 // Google
 // ---------------------------------------------------------------------------
 
-async function loadKey(parameter) {
+async function loadCredential(parameter) {
     let value;
     try {
         // Bounded: the whole sync must finish inside the function's 20 seconds.
@@ -70,35 +73,66 @@ async function loadKey(parameter) {
     } catch (err) {
         if (err.name === 'ParameterNotFound') {
             // The parameter's name stays in the log (via cause), not the admin's message.
-            throw new SyncError('No Search Console key is stored in the configured SSM parameter.', err);
+            throw new SyncError('No Google credential is stored in the configured SSM parameter.', err);
         }
         if (err.name === 'AccessDeniedException') {
-            throw new SyncError('This function is not allowed to read the Search Console key parameter.', err);
+            throw new SyncError('This function is not allowed to read the Google credential parameter.', err);
         }
-        throw new SyncError('Could not read the Search Console key from SSM.', err);
+        throw new SyncError('Could not read the Google credential from SSM.', err);
     }
-    let key;
-    try { key = JSON.parse(value); } catch (err) { throw new SyncError('The stored Search Console key is not valid JSON.', err); }
-    if (!key?.client_email || !key?.private_key) {
-        throw new SyncError('The stored Search Console key is not a service-account JSON key.');
-    }
-    return key;
+    try { return JSON.parse(value); } catch (err) { throw new SyncError('The stored Google credential is not valid JSON.', err); }
 }
 
-/** Google's answer as something the admin can act on; the raw text goes to the log only. */
-export function describeGoogleError(err, { siteUrl, account }) {
+/**
+ * A Google client for the stored credential, the service account it acts as,
+ * and whether it is keyless. A federation config (`gcloud iam
+ * workload-identity-pools create-cred-config --aws`) signs in with the AWS
+ * credentials Lambda puts in the environment and then acts as the service
+ * account named in it, the identity Search Console has as a user.
+ */
+export function googleCredential(stored) {
+    if (stored?.type === 'external_account') {
+        const match = /\/serviceAccounts\/([^/:]+):generateAccessToken$/.exec(stored.service_account_impersonation_url ?? '');
+        if (!match) {
+            throw new SyncError('The stored Google federation config names no service account to act as; create it with --service-account.');
+        }
+        if (stored.credential_source?.environment_id !== 'aws1') {
+            throw new SyncError('The stored Google federation config is not an AWS one; create it with --aws.');
+        }
+        try {
+            return { client: ExternalAccountClient.fromJSON({ ...stored, scopes: [SCOPE] }), account: decodeURIComponent(match[1]), keyless: true };
+        } catch (err) {
+            throw new SyncError('The stored Google federation config is malformed; create it again with gcloud iam workload-identity-pools create-cred-config.', err);
+        }
+    }
+    if (stored?.client_email && stored?.private_key) {
+        return { client: new JWT({ email: stored.client_email, key: stored.private_key, scopes: [SCOPE] }), account: stored.client_email, keyless: false };
+    }
+    throw new SyncError('The stored Google credential is neither a service-account key nor a federation config.');
+}
+
+/**
+ * Google's answer as something the admin can act on; the raw text goes to the
+ * log only. `signingIn` marks a failure to get the access token.
+ */
+export function describeGoogleError(err, { siteUrl, account, keyless = false, signingIn = false }) {
     const status = err.status ?? err.response?.status;
     const text = `${err.message} ${JSON.stringify(err.response?.data ?? '')}`;
-    if (/SERVICE_DISABLED|has not been used|is disabled/i.test(text)) {
-        return 'The Google Search Console API is not enabled in the service account\'s Google Cloud project.';
+    if (/SERVICE_DISABLED|has not been used|API [^.]* is disabled/i.test(text)) {
+        return keyless
+            ? 'A Google API this sync needs is not enabled in the Google Cloud project: Search Console, Security Token Service, or IAM Service Account Credentials.'
+            : 'The Google Search Console API is not enabled in the service account\'s Google Cloud project.';
     }
-    if (status === 401 || /invalid_grant|invalid_client/i.test(text)) {
+    if (status === 429) return 'Google\'s quota was used up. The next run tries again.';
+    if (keyless && signingIn && status >= 400 && status < 500) {
+        return `Google refused this function's AWS sign-in. Check the workload identity provider and that its AWS role may act as ${account} (Workload Identity User).`;
+    }
+    if (!keyless && (status === 401 || /invalid_grant|invalid_client/i.test(text))) {
         return 'Google rejected the service-account key. It may have been deleted; store a new one.';
     }
     if (status === 403) {
         return `${account} cannot read ${siteUrl}. Add it in Search Console → Settings → Users and permissions (Restricted).`;
     }
-    if (status === 429) return 'Google\'s Search Console quota was used up. The next run tries again.';
     return `The Search Console request failed${status ? ` (HTTP ${status})` : ''}. The next run tries again.`;
 }
 
@@ -109,20 +143,20 @@ const within = (promise, ms, message) => {
 };
 
 /**
- * Fetches rows from the Search Console API with the stored service account.
+ * Fetches rows from the Search Console API as the stored service account.
  * `query` takes `dimensions` (default date, query, page) and a `timeoutMs`
  * the caller sizes to the time it has left.
  */
 export async function googleFetcher({ siteUrl, keyParameter }) {
-    const key = await loadKey(keyParameter);
-    const client = new JWT({ email: key.client_email, key: key.private_key, scopes: [SCOPE] });
-    const fail = (err) => {
-        throw err instanceof SyncError ? err : new SyncError(describeGoogleError(err, { siteUrl, account: key.client_email }), err);
+    const { client, account, keyless } = googleCredential(await loadCredential(keyParameter));
+    const failWith = (signingIn) => (err) => {
+        throw err instanceof SyncError ? err : new SyncError(describeGoogleError(err, { siteUrl, account, keyless, signingIn }), err);
     };
+    const fail = failWith(false);
     // The token request ignores per-request timeouts, so it is fetched (and
     // cached by the client) here, under its own limit.
-    await within(client.authorize(), TOKEN_TIMEOUT_MS, 'Google did not issue an access token in time. The next run tries again.')
-        .catch(fail);
+    await within(client.getAccessToken(), TOKEN_TIMEOUT_MS, 'Google did not issue an access token in time. The next run tries again.')
+        .catch(failWith(true));
     const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`;
     return {
         async query({ startDate, endDate, startRow = 0, dimensions = ['date', 'query', 'page'], timeoutMs = REQUEST_TIMEOUT_MS }) {
@@ -270,7 +304,9 @@ export async function runSearchConsoleSync({ remainingMs = () => Infinity, now =
     // Problems that are not Google's, e.g. the database, are logged and
     // alerted here too, and the run ends without throwing.
     const failed = async (detail, err) => {
-        logFault('search_console_sync_failed', { detail, error: err?.cause?.message ?? err?.message });
+        // Google's answer body, not the whole error: its request config holds
+        // the signed AWS identity proof during a keyless sign-in.
+        logFault('search_console_sync_failed', { detail, error: err?.cause?.message ?? err?.message, google: err?.cause?.response?.data });
         await alert?.(`⚠️ Search Console sync failed: ${detail}`);
     };
     const UNEXPECTED = 'The sync failed unexpectedly. Details are in the function log.';

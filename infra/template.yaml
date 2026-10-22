@@ -222,10 +222,12 @@ Parameters:
   SearchConsoleSiteUrl:
     Type: String
     Default: ''
-  # SSM SecureString holding the service account's JSON key. Not an
-  # environment variable: the key alone is ~2.3 KB and Lambda allows 4 KB for
-  # all of them together. A standard parameter encrypted with the AWS-managed
-  # aws/ssm key is free.
+  # SSM SecureString holding the Google credential for Search Console: a
+  # keyless workload identity federation config (no secret in it), or the
+  # service account's JSON key. Not an environment variable: a key alone is
+  # ~2.3 KB and Lambda allows 4 KB for all of them together. A standard
+  # parameter encrypted with the AWS-managed aws/ssm key is free.
+  # (The parameter keeps its old "-key" name so existing stacks need no change.)
   SearchConsoleKeyParameter:
     Type: String
     Default: /protodesign/search-console-key
@@ -421,7 +423,7 @@ Resources:
               Action: lambda:InvokeFunction
               Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}'
         - Statement:
-            # The Search Console key, and nothing else in SSM. Decrypting with
+            # The Search Console credential, and nothing else in SSM. Decrypting with
             # the AWS-managed aws/ssm key needs no KMS statement: that key's
             # own policy allows it for SSM calls from this account.
             - Sid: ReadSearchConsoleKey

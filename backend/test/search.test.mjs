@@ -10,6 +10,7 @@ import { after, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
+import http from 'node:http';
 import { startTempPostgres } from './helpers/temp-postgres.mjs';
 
 const pg = await startTempPostgres();
@@ -283,6 +284,95 @@ describe('Google errors', () => {
             response: { status: 400, data: { error: 'invalid_grant' } } }, ctx), /rejected/);
         assert.match(sc.describeGoogleError({ status: 500, message: 'backend error at 10.1.2.3' }, ctx), /HTTP 500/);
         assert.doesNotMatch(sc.describeGoogleError({ status: 500, message: 'backend error at 10.1.2.3' }, ctx), /10\.1/);
+    });
+    it('blame the federation, not a key, when keyless sign-in is refused', () => {
+        const keyless = { ...ctx, keyless: true };
+        // Shapes google-auth-library throws for a refused token exchange and a
+        // missing Workload Identity User grant.
+        assert.match(sc.describeGoogleError({ status: 403, message: 'Error code unauthorized_client: denied' }, { ...keyless, signingIn: true }),
+            /AWS sign-in.*sa@p\.iam.*Workload Identity User/);
+        assert.match(sc.describeGoogleError({ status: 403, message: "Permission 'iam.serviceAccounts.getAccessToken' denied" }, { ...keyless, signingIn: true }),
+            /AWS sign-in/);
+        assert.match(sc.describeGoogleError({ status: 403, message: 'IAM Service Account Credentials API has not been used in project 1' },
+            { ...keyless, signingIn: true }), /Security Token Service, or IAM Service Account Credentials/);
+        // Signed in, but not a user on the property: the same advice as with a key.
+        assert.match(sc.describeGoogleError({ status: 403, message: 'User does not have sufficient permission' }, keyless), /Restricted/);
+        assert.doesNotMatch(sc.describeGoogleError({ status: 401, message: 'invalid_grant' }, keyless), /key/);
+        // Rate limits are temporary, wherever they happen.
+        assert.match(sc.describeGoogleError({ status: 429, message: 'Quota exceeded' }, { ...keyless, signingIn: true }), /next run/);
+        // A disabled service account is not a disabled API.
+        assert.doesNotMatch(sc.describeGoogleError({ status: 403, message: 'Service account sa@p.iam.gserviceaccount.com is disabled.' },
+            { ...keyless, signingIn: true }), /not enabled/);
+    });
+});
+
+describe('Google credential', () => {
+    const federation = (port, account = 'sa@p.iam.gserviceaccount.com') => ({
+        type: 'external_account',
+        audience: '//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/aws/providers/lambda',
+        subject_token_type: 'urn:ietf:params:aws:token-type:aws4_request',
+        token_url: `http://127.0.0.1:${port}/sts`,
+        service_account_impersonation_url: `http://127.0.0.1:${port}/v1/projects/-/serviceAccounts/${account}:generateAccessToken`,
+        credential_source: {
+            environment_id: 'aws1',
+            region_url: 'http://169.254.169.254/latest/meta-data/placement/availability-zone',
+            url: 'http://169.254.169.254/latest/meta-data/iam/security-credentials',
+            regional_cred_verification_url: 'https://sts.{region}.amazonaws.com?Action=GetCallerIdentity&Version=2011-06-15',
+        },
+    });
+
+    it('takes a service-account key or an AWS federation config, and nothing else', () => {
+        const key = sc.googleCredential({ client_email: 'sa@p.iam.gserviceaccount.com', private_key: 'unused' });
+        assert.deepEqual([key.account, key.keyless], ['sa@p.iam.gserviceaccount.com', false]);
+        const fed = sc.googleCredential(federation(1, 'sa%40p.iam.gserviceaccount.com'));
+        assert.deepEqual([fed.account, fed.keyless], ['sa@p.iam.gserviceaccount.com', true]);
+
+        const noAccount = { ...federation(1) };
+        delete noAccount.service_account_impersonation_url;
+        assert.throws(() => sc.googleCredential(noAccount), /--service-account/);
+        assert.throws(() => sc.googleCredential({ ...federation(1), credential_source: { file: '/tmp/token' } }), /--aws/);
+        assert.throws(() => sc.googleCredential({ hello: 'world' }), /neither/);
+        assert.throws(() => sc.googleCredential(null), /neither/);
+        // Hand-edited configs the library itself rejects still say what to do.
+        const broken = federation(1);
+        delete broken.credential_source.regional_cred_verification_url;
+        assert.throws(() => sc.googleCredential(broken), (err) => err instanceof sc.SyncError && /create-cred-config/.test(err.message));
+        assert.throws(() => sc.googleCredential(federation(1, 'sa%E0%A4@p')), (err) => err instanceof sc.SyncError);
+    });
+
+    it('signs in keylessly with the AWS credentials Lambda provides, then acts as the service account', async () => {
+        const seen = [];
+        const server = http.createServer((req, res) => {
+            let body = '';
+            req.on('data', (c) => { body += c; });
+            req.on('end', () => {
+                seen.push({ url: req.url, auth: req.headers.authorization, body });
+                res.setHeader('content-type', 'application/json');
+                res.end(JSON.stringify(req.url === '/sts'
+                    ? { access_token: 'federated', issued_token_type: 'urn:ietf:params:oauth:token-type:access_token', token_type: 'Bearer', expires_in: 3600 }
+                    : { accessToken: 'as-service-account', expireTime: new Date(Date.now() + 3_600_000).toISOString() }));
+            });
+        });
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const aws = { AWS_REGION: 'ap-southeast-1', AWS_ACCESS_KEY_ID: 'AKIATEST', AWS_SECRET_ACCESS_KEY: 'test-secret', AWS_SESSION_TOKEN: 'test-session' };
+        const saved = Object.fromEntries(Object.keys(aws).map((k) => [k, process.env[k]]));
+        Object.assign(process.env, aws);
+        try {
+            const { client } = sc.googleCredential(federation(server.address().port));
+            assert.equal((await client.getAccessToken()).token, 'as-service-account');
+        } finally {
+            for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+            server.close();
+        }
+        const [exchange, impersonate] = seen;
+        // The AWS identity proof is a signed GetCallerIdentity request, never the secret itself.
+        const subject = decodeURIComponent(new URLSearchParams(exchange.body).get('subject_token'));
+        assert.match(subject, /GetCallerIdentity/);
+        assert.match(subject, /AKIATEST/);
+        assert.doesNotMatch(subject, /test-secret/);
+        assert.equal(impersonate.auth, 'Bearer federated');
+        assert.match(impersonate.url, /serviceAccounts\/sa@p\.iam\.gserviceaccount\.com:generateAccessToken$/);
+        assert.deepEqual(JSON.parse(impersonate.body).scope, ['https://www.googleapis.com/auth/webmasters.readonly']);
     });
 });
 
