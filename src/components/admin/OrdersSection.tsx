@@ -211,11 +211,24 @@ function OrderSheet({ order, onClose, onChanged }: { order: AdminOrder | null; o
     const setStatus = async (next: string) => {
         if (!order || next === order.status) return;
         if (next === "cancelled" && !window.confirm("Cancel this order? The customer will see it as cancelled.")) return;
+        let restock = false;
+        if (next === "refunded") {
+            if (!window.confirm(
+                `Refunds here are for the whole order: ₹${money(order.total_amount).toLocaleString("en-IN")}. Mark it refunded only after you have sent that back `
+                + "(PhonePe dashboard, or by UPI/bank for cash on delivery). For a partial refund, don't use this status: email the customer yourself.\n\n"
+                + "The customer is emailed that it reaches them within 5-7 working days. This cannot be undone.")) return;
+            // Shipped or delivered: only the admin knows whether the parcel came back.
+            restock = ["shipped", "delivered", "completed"].includes(order.status)
+                && window.confirm("Did the items come back to you in sellable condition?\n\nOK puts them back in stock. Cancel leaves stock as it is.");
+        }
         setSaving(true);
         try {
-            await apiService.updateOrderStatus(order.id, next);
+            const res = await apiService.updateOrderStatus(order.id, next, restock);
             onChanged(order.id, next);
             toast.success(`Order #${shortId(order.id)} is now ${statusMeta(ORDER_STATUSES, next).label.toLowerCase()}`);
+            if (res?.customerEmailed === false) {
+                toast.warning("The refund email to the customer failed. Let them know yourself.");
+            }
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Could not update the order");
         } finally {

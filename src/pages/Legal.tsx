@@ -183,7 +183,7 @@ export const PrivacyPage = () => (
 
 // --- 3. REFUND POLICY ---
 export const RefundPage = () => (
-    <LegalPageLayout title="Refund Policy" lastUpdated="January 12, 2026">
+    <LegalPageLayout title="Refund Policy" lastUpdated="October 22, 2026">
         <div className="p-4 bg-primary/10 border-l-4 border-primary rounded-r-md mb-6">
             <p className="font-medium text-foreground">
                 <strong>Standard Returns:</strong> We accept returns for manufacturing defects reported within 7 days.
@@ -198,7 +198,7 @@ export const RefundPage = () => (
             <li>Cancellations will only be considered if the request is made within 7 days of placing the order. However, cancellation requests may not be accepted once we have shipped the order or it is out for delivery. In such an event, you may choose to reject the product at the doorstep.</li>
             <li>In case of receipt of damaged or defective items, please report to our customer service team. The request will be accepted once we have inspected the item and confirmed the damage or defect. This should be reported within 7 days of receipt of products. If the product received is different from its description on the site, you must bring it to the notice of our customer service within 7 days of receiving the product. The customer service team after looking into your complaint will take an appropriate decision.</li>
             <li>In case of complaints regarding the products that come with a warranty from the manufacturers, please refer the issue to them.</li>
-            <li>In case of any refunds approved by ProtoDesign, it will take 7 days for the refund to be processed to you.</li>
+            <li>In case of any refunds approved by ProtoDesign, the refund will reach you within 5 to 7 working days of us initiating it.</li>
             <li>If any damaged/defective/replacement products are inspected and accepted then it will be delivered within 5 to 7 business days </li>
         </ul>
 

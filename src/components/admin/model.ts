@@ -7,7 +7,7 @@
  * PhonePe's status API confirms payment (backend order.service.js), and moves
  * on to shipped/delivered/completed from there. `pending` and
  * `pending_payment` are the open pipeline (unpaid, or cash on delivery not
- * yet collected); `cancelled` is excluded everywhere.
+ * yet collected); `cancelled` and `refunded` are excluded everywhere.
  */
 
 import { FileText, LayoutDashboard, Magnet, MessageCircle, Package, Search, ShoppingBag } from "lucide-react";
@@ -98,6 +98,7 @@ export const ORDER_STATUSES: { value: string; label: string; tone: Tone }[] = [
     { value: "delivered", label: "Delivered", tone: "green" },
     { value: "completed", label: "Completed", tone: "green" },
     { value: "cancelled", label: "Cancelled", tone: "red" },
+    { value: "refunded", label: "Refunded", tone: "neutral" },
 ];
 
 export const QUOTE_STATUSES: { value: string; label: string; tone: Tone }[] = [

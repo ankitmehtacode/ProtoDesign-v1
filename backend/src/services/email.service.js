@@ -27,6 +27,80 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     }));
 }
 
+// The shop's address for links in emails. FRONTEND_URL is what the stack
+// sets (infra/template.yaml); CLIENT_URL is the older local-dev name.
+const siteUrl = () => (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://www.protodesignstudio.com').replace(/\/+$/, '');
+
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const orderRef = (orderId) => `#${orderId.slice(0, 8).toUpperCase()}`;
+
+/**
+ * The refund email: tells the customer their money is on its way back. Sent
+ * once, when an admin marks the order refunded (order.service.js refundOrder),
+ * which they do after starting the refund with PhonePe or paying it back by
+ * hand. Always the whole order total. 5-7 working days is the Refund Policy's
+ * promise (src/pages/Legal.tsx); keep the two the same.
+ */
+export function refundEmail(fullName, order) {
+    const ref = orderRef(order.id);
+    const amount = inr(order.total_amount);
+    const firstName = String(fullName ?? '').trim().split(/\s+/)[0] || 'there';
+    const placed = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+    const cash = String(order.payment_gateway ?? '').toLowerCase() === 'cod';
+    // The admin marks an order refunded only after sending the money
+    // (OrdersSection.tsx): by PhonePe to the original method, or for cash on
+    // delivery to the UPI ID or bank account the customer gave.
+    const where = cash
+        ? 'to the UPI ID or bank account you gave us.'
+        : 'to the UPI app, card or bank account you paid with. You do not need to do anything.';
+    const ordersUrl = `${siteUrl()}/orders`;
+
+    const text = [
+        `Hi ${firstName},`,
+        '',
+        `We've initiated a refund of ${amount} for your ProtoDesign order ${ref}.`,
+        '',
+        `When: it will reach you within 5-7 working days. Many banks show it sooner.`,
+        `Where: ${where}`,
+        '',
+        `Order: ${ref}, placed ${placed}`,
+        `Refund amount: ${amount}`,
+        '',
+        `If it hasn't arrived after 7 working days, reply to this email with your order number and we'll send you the refund's transaction reference to check with your bank.`,
+        '',
+        `Your orders: ${ordersUrl}`,
+        '',
+        'Thank you for your patience,',
+        'ProtoDesign',
+    ].join('\n');
+
+    const row = (label, value) => `<tr><td style="padding: 6px 0; color: #666;">${label}</td><td style="padding: 6px 0; text-align: right;"><strong>${value}</strong></td></tr>`;
+    const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #222;">
+                <h2 style="color: #333;">Hello ${escapeHtml(firstName)},</h2>
+                <p>We've initiated a refund of <strong>${amount}</strong> for your order <strong>${ref}</strong>.</p>
+
+                <div style="background: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        ${row('Order', ref)}
+                        ${row('Placed', placed)}
+                        ${row('Refund amount', amount)}
+                        ${row('Expected', 'Within 5–7 working days')}
+                    </table>
+                </div>
+
+                <p><strong>Where it goes:</strong> ${where}</p>
+                <p>Many banks show the refund sooner. If it hasn't arrived after 7 working days, reply to this email with your order number and we'll send you the refund's transaction reference to check with your bank.</p>
+
+                <p>See your orders in your <a href="${ordersUrl}">Dashboard</a>.</p>
+                <p>Thank you for your patience,<br/>ProtoDesign</p>
+            </div>
+        `;
+
+    return { subject: `Refund of ${amount} initiated for order ${ref}`, text, html };
+}
+
 export const emailService = {
     /**
      * Send Welcome Email
@@ -38,11 +112,11 @@ export const emailService = {
             subject: 'Welcome to ProtoDesign! 🚀',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Welcome, ${fullName}!</h2>
+                    <h2 style="color: #333;">Welcome, ${escapeHtml(fullName)}!</h2>
                     <p>We are thrilled to have you on board. ProtoDesign is your one-stop shop for high-quality 3D printed parts.</p>
                     <p>Start browsing our catalog or upload your custom models today!</p>
                     <br/>
-                    <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Store</a>
+                    <a href="${siteUrl()}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Store</a>
                 </div>
             `
         };
@@ -54,7 +128,7 @@ export const emailService = {
      */
     async sendPasswordResetEmail(email, token) {
         // Construct reset link (Frontend URL)
-        const resetLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+        const resetLink = `${siteUrl()}/reset-password?token=${token}`;
 
         const mailOptions = {
             from: `"ProtoDesign Security" <${process.env.EMAIL_USER}>`,
@@ -121,7 +195,7 @@ export const emailService = {
             subject: `${subjectMap[status]} #${orderId.slice(0, 8)}`,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Hello ${fullName},</h2>
+                    <h2 style="color: #333;">Hello ${escapeHtml(fullName)},</h2>
                     <p>${messageMap[status]}</p>
                     
                     <div style="background: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -129,11 +203,16 @@ export const emailService = {
                         <strong>New Status:</strong> <span style="text-transform: capitalize; color: #007bff;">${status}</span>
                     </div>
 
-                    <p>Track your order status in your <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/orders">Dashboard</a>.</p>
+                    <p>Track your order status in your <a href="${siteUrl()}/orders">Dashboard</a>.</p>
                 </div>
             `
         };
         return transporter.sendMail(mailOptions);
+    },
+
+    /** Sends refundEmail(). */
+    async sendRefundEmail(email, fullName, order) {
+        return transporter.sendMail({ from: `"ProtoDesign Orders" <${process.env.EMAIL_USER}>`, to: email, ...refundEmail(fullName, order) });
     },
 
     /** Asks the owner of the address to confirm a product alert (double opt-in, product-alerts.service.js). */
