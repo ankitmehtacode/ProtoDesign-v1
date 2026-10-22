@@ -455,10 +455,21 @@ export function plainText(s = "", max = 160) {
     return `${cut.slice(0, cut.lastIndexOf(" ") > 40 ? cut.lastIndexOf(" ") : cut.length)}…`;
 }
 
-/** Product title for search: name, category hint and region, kept near 60 chars. */
-export const productTitle = (/** @type {string} */ rawName, /** @type {string} */ _categoryName) => {
+/**
+ * Product title for search: name, category hint and region, kept near 60 chars.
+ * During a festival sale a printer's title leads with its sale price, the
+ * number people comparing stores look for in results.
+ */
+export const productTitle = (/** @type {string} */ rawName, /** @type {string} */ _categoryName, /** @type {Partial<SeoProduct>} */ p = {}) => {
     const name = plainText(rawName, 200);
-    for (const candidate of [`${name}: Buy Online in India | ${SITE_NAME}`, `${name} | Buy in India | ${SITE_NAME}`, `${name} | ${SITE_NAME}`]) {
+    const sale = p.festival && p.category === PRINTER_CATEGORY && Number(p.price) > 0
+        ? (() => {
+            const price = `₹${Math.round(Number(p.price)).toLocaleString("en-IN")}`;
+            const label = plainText(p.festival.name, 40);
+            return [`${name} at ${price}: ${label} | ${SITE_NAME}`, `${name} at ${price} | ${label}`, `${name} at ${price} | ${SITE_NAME}`, `${name} at ${price}`];
+        })()
+        : [];
+    for (const candidate of [...sale, `${name}: Buy Online in India | ${SITE_NAME}`, `${name} | Buy in India | ${SITE_NAME}`, `${name} | ${SITE_NAME}`]) {
         if (candidate.length <= 65) return candidate;
     }
     return `${plainText(name, 50)} | ${SITE_NAME}`;

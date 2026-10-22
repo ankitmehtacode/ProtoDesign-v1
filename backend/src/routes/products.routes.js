@@ -496,14 +496,14 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
         const subCategory = parseSubCategory(sub_category);
         const compareAtPrice = parseCompareAtPrice(compare_at_price);
 
-        const existing = await db.oneOrNone('SELECT slug, price, category FROM products WHERE id = $1', [req.params.id]);
+        const existing = await db.oneOrNone('SELECT id, slug, price, category FROM products WHERE id = $1', [req.params.id]);
         if (!existing) return res.status(404).json({ error: 'Product not found' });
 
         // An editor loaded before list_price existed shows the festival price as
         // the price; saving it would make the discount permanent. That exact
         // drop, during a sale, is refused until the page is reloaded.
         const sale = activeSale();
-        if (sale && existing.category === sale.category && Number(price) !== Number(existing.price)
+        if (sale && Number(price) !== Number(existing.price)
             && Number(price) === Number(festivalPrice(existing).price)) {
             return res.status(409).json({ error: 'This editor shows festival sale prices. Reload the admin page, then save again.' });
         }

@@ -18,13 +18,14 @@ const IS_PRINTER = /\bprinter\b/i;
 const hasStoredDeal = (p: Product) => Number(p.list_compare_at_price) > Number(p.list_price ?? p.price);
 
 /**
- * Printers a first-time buyer can afford, in stock, with a photo: our own
- * deals first, then the cheapest, so the sale reads as a reason to buy now
- * rather than a list of flagships.
+ * Printers in the sale a first-time buyer can afford, in stock, with a photo:
+ * our own deals first, then the cheapest, so the sale reads as a reason to buy
+ * now rather than a list of flagships. A fixed-price sale covers only some
+ * printers, so only those are shown under its name.
  */
 function pickDeals(products: Product[]): Product[] {
     return products
-        .filter((p) => !p.is_archived && p.stock > 0 && IS_PRINTER.test(p.name) && productImageUrls(p).length > 0)
+        .filter((p) => p.festival && !p.is_archived && p.stock > 0 && IS_PRINTER.test(p.name) && productImageUrls(p).length > 0)
         .sort((a, b) => Number(hasStoredDeal(b)) - Number(hasStoredDeal(a)) || Number(a.price) - Number(b.price))
         .slice(0, SHOWN);
 }

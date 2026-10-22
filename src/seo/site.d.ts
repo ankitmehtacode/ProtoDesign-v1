@@ -25,7 +25,7 @@ export function productLd(p: ProductInput, categoryName: string, categoryPath: s
 export function productUrl(p: { slug?: string; id: string }): string;
 export function specMap(specs: unknown): Record<string, string>;
 export function plainText(s?: string, max?: number): string;
-export function productTitle(name: string, categoryName: string): string;
+export function productTitle(name: string, categoryName: string, p?: Partial<Pick<ProductInput, "price" | "category" | "festival">>): string;
 export function productDescription(p: Pick<ProductInput, "name" | "price" | "short_description" | "description" | "category" | "festival">): string;
 export const PRINTER_CATEGORY: string;
 export function itemListLd(products: ProductInput[]): object;

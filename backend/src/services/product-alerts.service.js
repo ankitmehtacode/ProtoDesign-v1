@@ -168,9 +168,12 @@ export async function unsubscribe(token) {
 /** Whether an alert has come true for the product as customers now see it. */
 export function alertDue(alert, product) {
     if (product.is_archived || !(Number(product.stock) > 0)) return null;
-    const now = Number(festivalPrice(product).price);
-    if (alert.kind === 'back_in_stock') return { price: now };
-    return now < Number(alert.baseline_price) - 0.5 ? { price: now, was: Number(alert.baseline_price) } : null;
+    const shown = festivalPrice(product);
+    const now = Number(shown.price);
+    // A sale price lasts only until the sale ends; the email says so.
+    const saleEnds = shown.festival?.ends_at ?? null;
+    if (alert.kind === 'back_in_stock') return { price: now, saleEnds };
+    return now < Number(alert.baseline_price) - 0.5 ? { price: now, was: Number(alert.baseline_price), saleEnds } : null;
 }
 
 /**
@@ -212,7 +215,7 @@ export async function runProductAlerts({ remainingMs = () => Infinity } = {}) {
         if (!claimed) continue;
         try {
             await emailService.sendProductAlert(a.email, {
-                productName: a.name, kind: a.kind, price: due.price, was: due.was ?? null,
+                productName: a.name, kind: a.kind, price: due.price, was: due.was ?? null, saleEnds: due.saleEnds,
                 productUrl: productLink(product), unsubscribeUrl: alertLink('unsubscribe', a.token),
             });
             await db.none('UPDATE product_alerts SET notified_at = now(), claimed_at = NULL WHERE id = $1', [a.id]);
