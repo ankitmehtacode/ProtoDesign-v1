@@ -240,7 +240,7 @@ const ONLINE_SHIPPING_INR = 199;
  * @typedef {{ name: string, slug?: string, id: string, description?: string, short_description?: string,
  *             price: number | string, list_price?: number | string, stock: number, image_url?: string | null,
  *             images?: string[], category?: string, specifications?: unknown,
- *             festival?: { name: string, ends_at: string } | null }} SeoProduct
+ *             festival?: { name: string, ends_at: string, gift?: { label: string } } | null }} SeoProduct
  */
 
 /**
@@ -480,7 +480,8 @@ export const productDescription = (/** @type {SeoProduct} */ p) => {
     const name = plainText(p.name, 200);
     if (p.category === PRINTER_CATEGORY) {
         // The full price to the door, so it compares straight against other stores.
-        const sale = p.festival ? ` in our ${p.festival.name}, until ${saleLastDay(p.festival.ends_at)}` : "";
+        const gift = p.festival?.gift ? ` with a ${plainText(p.festival.gift.label, 60).replace(/^Free /, "free ")}` : "";
+        const sale = p.festival ? ` in our ${p.festival.name}${gift}, until ${saleLastDay(p.festival.ends_at)}` : "";
         const body = plainText(p.short_description || p.description || "", 90);
         return plainText(`${name} at ${price}${sale}, GST included, free shipping across India. ${body}`, 160);
     }

@@ -72,6 +72,8 @@ export interface AdminOrder {
     subtotal_amount?: number;
     tax_amount?: number;
     shipping_amount?: number;
+    /** Card payment fee; part of total_amount. */
+    convenience_fee?: number | string;
     status: string;
     created_at: string;
     user_id: string;
@@ -83,6 +85,8 @@ export interface AdminOrder {
     user_email?: string;
     user_name?: string;
     payment_gateway?: string | null;
+    /** 'upi', 'net_banking', 'debit_card', 'credit_card' or 'cod'; null before 2026-10-22. */
+    payment_method?: string | null;
     payment_status?: string | null;
 }
 

@@ -302,13 +302,14 @@ class ApiService {
 
     // The server prices the order (subtotal, GST, shipping); it takes no amounts from here.
     /** expectedSubtotal: what checkout showed; the server refuses with 409 if prices moved. */
-    async createOrder(items: any[], shippingAddress: any, paymentGateway: string, expectedSubtotal?: number) {
+    async createOrder(items: any[], shippingAddress: any, paymentGateway: string, expectedSubtotal?: number, paymentMethod?: string) {
         return this.request('/orders', {
             method: 'POST',
             body: JSON.stringify({
                 items,
                 shippingAddress,
                 paymentGateway,
+                paymentMethod,
                 expectedSubtotal
             }),
         });

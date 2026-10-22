@@ -64,7 +64,7 @@ const LegalPageLayout = ({ title, lastUpdated, children }: { title: string, last
 
 // --- 1. TERMS & CONDITIONS ---
 export const TermsPage = () => (
-    <LegalPageLayout title="Terms & Conditions" lastUpdated="January 12, 2026">
+    <LegalPageLayout title="Terms & Conditions" lastUpdated="October 22, 2026">
         <h3>1. Introduction</h3>
         <p>
             Welcome to <strong>ProtoDesign</strong>. By accessing our website and using our services, you agree to be bound by these Terms and Conditions.
@@ -90,6 +90,10 @@ export const TermsPage = () => (
         <p>
             We provide 3D printers, filaments, accessories, and custom 3D printing services. We strive to display product colors and specifications accurately; however,
             we do not guarantee that your device's display will accurately reflect the actual color of the products.
+        </p>
+        <p>
+            Prices include GST. Paying by UPI or net banking carries no convenience fee. Paying by debit card adds a 1.5% convenience fee, and by credit card a 2.5% convenience fee,
+            on the order total. The fee is shown in rupees at checkout before you pay. Free gifts offered with a product are subject to stock.
         </p>
 
         <h3>5. User Obligations</h3>
@@ -199,6 +203,7 @@ export const RefundPage = () => (
             <li>In case of receipt of damaged or defective items, please report to our customer service team. The request will be accepted once we have inspected the item and confirmed the damage or defect. This should be reported within 7 days of receipt of products. If the product received is different from its description on the site, you must bring it to the notice of our customer service within 7 days of receiving the product. The customer service team after looking into your complaint will take an appropriate decision.</li>
             <li>In case of complaints regarding the products that come with a warranty from the manufacturers, please refer the issue to them.</li>
             <li>In case of any refunds approved by ProtoDesign, the refund will reach you within 5 to 7 working days of us initiating it.</li>
+            <li>A refund of a whole order includes any card convenience fee you paid on it.</li>
             <li>If any damaged/defective/replacement products are inspected and accepted then it will be delivered within 5 to 7 business days </li>
         </ul>
 

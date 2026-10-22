@@ -50,6 +50,15 @@ export const GST_RATE = 0.18;
 export const gstIncludedPaise = (grossPaise) => grossPaise - Math.round(grossPaise / (1 + GST_RATE));
 
 const ALLOWED_GATEWAYS = ['phonepe', 'cod'];
+
+// How an online (PhonePe) order is paid, and its convenience fee in basis
+// points of items + shipping, rounded to whole rupees. UPI (any app or QR)
+// and net banking are free; net banking is also the free way to pay above
+// the banks' UPI limits. src/lib/payment-fees.ts shows the same rates at
+// checkout, and PhonePe is told to offer only the chosen method.
+export const PAYMENT_FEE_BPS = Object.freeze({ upi: 0, net_banking: 0, debit_card: 150, credit_card: 250 });
+export const convenienceFeePaise = (basePaise, method) =>
+    Math.round((basePaise * (PAYMENT_FEE_BPS[method] ?? 0)) / 1_000_000) * 100;
 const MAX_LINE_ITEMS = 50;
 const MAX_QUANTITY = 1000;
 
@@ -183,6 +192,36 @@ function classifyGatewayState(data) {
 const announcePaymentFailed = (orderId) => Promise.all([notifyOrder(orderId, 'cancelled'), alertPaymentFailed(orderId)]);
 
 /**
+ * How a completed PhonePe payment was made, from a status-API answer: 'upi',
+ * 'net_banking', 'credit_card', 'debit_card', 'card' (type not given) or
+ * another mode in lower case; null when it does not say. paymentDetails lists
+ * every attempt, so the completed one is used.
+ */
+export function paidMethod(data) {
+    const details = data?.paymentDetails ?? data?.data?.paymentDetails;
+    if (!Array.isArray(details) || details.length === 0) return null;
+    const paid = details.find((d) => d?.state === 'COMPLETED') ?? (details.length === 1 ? details[0] : null);
+    const mode = paid?.paymentMode;
+    if (typeof mode !== 'string' || !mode) return null;
+    if (/^UPI/i.test(mode)) return 'upi';
+    if (/NET_?BANKING/i.test(mode)) return 'net_banking';
+    if (/CARD/i.test(mode)) {
+        const text = JSON.stringify(paid);
+        if (/CREDIT_CARD/.test(text)) return 'credit_card';
+        if (/DEBIT_CARD/.test(text)) return 'debit_card';
+        return 'card';
+    }
+    return mode.toLowerCase();
+}
+
+/** True when a payment's method is known and is not the one the order chose (and was charged for). */
+export function methodMismatch(chosen, paidWith) {
+    if (!chosen || chosen === 'cod' || !paidWith) return false;
+    if (paidWith === 'card') return !chosen.endsWith('_card');
+    return chosen !== paidWith;
+}
+
+/**
  * announce: false leaves telling the customer and the shop about a failed
  * payment to the caller (releaseStaleHolds batches them).
  */
@@ -190,7 +229,7 @@ export async function settlePayment(orderId, gatewayData, { announce = true } = 
     const outcome = classifyGatewayState(gatewayData);
     if (outcome === 'pending') return 'pending';
 
-    const order = await db.oneOrNone('SELECT id, total_amount FROM orders WHERE id = $1', [orderId]);
+    const order = await db.oneOrNone('SELECT id, total_amount, payment_method, convenience_fee FROM orders WHERE id = $1', [orderId]);
     if (!order) {
         logFault('payment_unknown_order', { orderId });
         return 'unknown_order';
@@ -216,7 +255,18 @@ export async function settlePayment(orderId, gatewayData, { announce = true } = 
         [orderId, PENDING_STATUSES]
     );
     if (settled) {
-        logEvent('order_paid', { orderId });
+        const paidWith = paidMethod(gatewayData);
+        logEvent('order_paid', { orderId, method: order.payment_method, paidWith });
+        // PhonePe is told to offer only the method whose fee was charged. If it
+        // ever let another through, the fee was wrong one way or the other.
+        if (methodMismatch(order.payment_method, paidWith)) {
+            logFault('payment_method_mismatch', { orderId, method: order.payment_method, paidWith });
+            const feeCharged = Number(order.convenience_fee) > 0;
+            await notifyAdmin(`⚠️ Order #${orderId.slice(0, 8).toUpperCase()} chose ${order.payment_method.replace('_', ' ')} `
+                + `but was paid by ${paidWith.replace('_', ' ')}. `
+                + (feeCharged ? `Refund the ₹${Number(order.convenience_fee)} convenience fee if it should not apply. ` : '')
+                + 'Check that PhonePe limits checkout to the chosen method.');
+        }
         // Only here: after PhonePe's status API confirmed the exact amount, and
         // only for the call that actually flipped the order (so exactly once).
         // Queues the message and returns; it never throws into settlement.
@@ -379,9 +429,7 @@ function shippingPaiseFor({ products, subtotalPaise, gateway }) {
     return COD_SHIPPING_PAISE;
 }
 
-async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway, expectedSubtotalPaise }) {
-    // Ascending id order: concurrent orders lock shared products in the same
-    // order, so they queue instead of deadlocking.
+async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway, method, expectedSubtotalPaise }) {
     const productIds = [...wanted.keys()].sort();
 
     return db.tx(async (t) => {
@@ -414,52 +462,95 @@ async function insertOrderAndReserveStock({ userId, wanted, shippingAddress, gat
             throw Object.assign(httpError(409, 'Prices have changed since you opened checkout. Please review your order.'), { code: 'PRICE_CHANGED' });
         }
         const shippingPaise = shippingPaiseFor({ products, subtotalPaise, gateway });
-        const gstPaise = gstIncludedPaise(subtotalPaise);
-        const totalPaise = subtotalPaise + shippingPaise;
+        const feePaise = convenienceFeePaise(subtotalPaise + shippingPaise, method);
+        // The fee is part of what is sold, so its GST is recorded too.
+        const gstPaise = gstIncludedPaise(subtotalPaise + feePaise);
+        const totalPaise = subtotalPaise + shippingPaise + feePaise;
+
+        // Free gifts with sale items (festival.js), by product id.
+        const gifts = new Map();
+        const giftLabels = new Map();
+        for (const line of lines) {
+            const gift = festivalPrice(byId.get(line.productId), now).festival?.gift;
+            if (!gift) continue;
+            gifts.set(gift.product_id, (gifts.get(gift.product_id) ?? 0) + gift.quantity * line.quantity);
+            giftLabels.set(gift.product_id, gift.label);
+        }
 
         const order = await t.one(
             `INSERT INTO orders
-                 (user_id, subtotal_amount, tax_amount, shipping_amount, total_amount, shipping_address, payment_gateway, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+                 (user_id, subtotal_amount, tax_amount, shipping_amount, convenience_fee, total_amount,
+                  shipping_address, payment_gateway, payment_method, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
              RETURNING *`,
-            [userId, fromPaise(subtotalPaise), fromPaise(gstPaise), fromPaise(shippingPaise),
-                fromPaise(totalPaise), JSON.stringify(shippingAddress ?? null), gateway]
+            [userId, fromPaise(subtotalPaise), fromPaise(gstPaise), fromPaise(shippingPaise), fromPaise(feePaise),
+                fromPaise(totalPaise), JSON.stringify(shippingAddress ?? null), gateway, method]
         );
 
-        for (const line of lines) {
-            // The guard in the WHERE clause is the oversell protection: two
-            // buyers racing for the last unit cannot both pass it, whatever the
-            // earlier SELECT saw.
-            const reserved = await t.oneOrNone(
-                'UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1 RETURNING id',
-                [line.quantity, line.productId]
-            );
-            if (!reserved) {
+        // Stock is reserved in ascending product id order, gifts included, so
+        // concurrent orders lock shared products in the same order and queue
+        // instead of deadlocking. The guard in the WHERE clause is the oversell
+        // protection: two buyers racing for the last unit cannot both pass it.
+        const reserve = (productId, quantity) => t.oneOrNone(
+            'UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1 RETURNING id', [quantity, productId]);
+        const giftLines = [];
+        const giftsShort = [];
+        for (const productId of [...new Set([...productIds, ...gifts.keys()])].sort()) {
+            const paid = wanted.get(productId) ?? 0;
+            const free = gifts.get(productId) ?? 0;
+            if (free > 0) {
+                if (await reserve(productId, paid + free)) {
+                    giftLines.push({ productId, quantity: free, label: giftLabels.get(productId) });
+                    continue;
+                }
+                // A gift is while stocks last: it never costs the customer their order.
+                giftsShort.push({ productId, quantity: free, label: giftLabels.get(productId) });
+                logFault('free_gift_out_of_stock', { orderId: order.id, productId, quantity: free });
+            }
+            if (paid > 0 && !(await reserve(productId, paid))) {
+                const line = lines.find((l) => l.productId === productId);
                 throw httpError(409, `Not enough stock for ${line.name}`, { code: 'OUT_OF_STOCK', productIds });
             }
+        }
+
+        for (const line of lines) {
             await t.none(
                 `INSERT INTO order_items (order_id, product_id, quantity, price, line_total)
                  VALUES ($1, $2, $3, $4, $5)`,
                 [order.id, line.productId, line.quantity, fromPaise(line.unitPaise), fromPaise(line.unitPaise * line.quantity)]
             );
         }
+        for (const gift of giftLines) {
+            // Price 0 marks a free gift on the order, the invoice and in emails.
+            await t.none(
+                `INSERT INTO order_items (order_id, product_id, quantity, price, line_total) VALUES ($1, $2, $3, 0, 0)`,
+                [order.id, gift.productId, gift.quantity]
+            );
+            lines.push({ productId: gift.productId, name: gift.label, quantity: gift.quantity, unitPaise: 0,
+                product_name: gift.label, price: fromPaise(0) });
+        }
 
-        return { order, totalPaise, lines };
+        return { order, totalPaise, lines, giftsShort };
     });
 }
 
 /**
- * Creates a pending order and reserves its stock.
- * Prices, GST, shipping and the total are computed here from the database; the
- * client supplies only product ids, quantities and an address.
+ * Creates a pending order and reserves its stock, free gifts included.
+ * Prices, GST, shipping, the convenience fee and the total are computed here
+ * from the database; the client supplies only product ids, quantities, an
+ * address and how it will pay.
  *
- * @returns {Promise<{order: object, totalPaise: number, lines: object[]}>}
+ * @returns {Promise<{order: object, totalPaise: number, lines: object[], giftsShort: object[]}>}
+ *          giftsShort: free gifts that were out of stock and left off the order.
  */
-export async function createOrder({ userId, items, shippingAddress, paymentGateway, expectedSubtotal }) {
+export async function createOrder({ userId, items, shippingAddress, paymentGateway, paymentMethod, expectedSubtotal }) {
     const wanted = normalizeItems(items);
 
     const gateway = String(paymentGateway || 'phonepe').toLowerCase();
     if (!ALLOWED_GATEWAYS.includes(gateway)) throw httpError(400, 'Unsupported payment gateway');
+    // A checkout loaded before payment methods existed sends none: UPI, the free one.
+    const method = gateway === 'cod' ? 'cod' : String(paymentMethod || 'upi').toLowerCase();
+    if (gateway !== 'cod' && !Object.hasOwn(PAYMENT_FEE_BPS, method)) throw httpError(400, 'Unsupported payment method');
 
     let expectedSubtotalPaise = null;
     if (expectedSubtotal != null) {
@@ -467,7 +558,7 @@ export async function createOrder({ userId, items, shippingAddress, paymentGatew
         if (!Number.isFinite(n) || n < 0) throw httpError(400, 'expectedSubtotal must be a non-negative amount');
         expectedSubtotalPaise = toPaise(n);
     }
-    const attempt = () => insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway, expectedSubtotalPaise });
+    const attempt = () => insertOrderAndReserveStock({ userId, wanted, shippingAddress, gateway, method, expectedSubtotalPaise });
     try {
         return await attempt();
     } catch (err) {

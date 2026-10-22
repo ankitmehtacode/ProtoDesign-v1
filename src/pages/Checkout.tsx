@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { PaymentGatewaySelector } from '@/components/PaymentGatewaySelector';
+import { PaymentGatewaySelector, type PaymentChoice } from '@/components/PaymentGatewaySelector';
 import { formatINR, gstIncluded } from '@/lib/currency';
+import { convenienceFee, feePercent } from '@/lib/payment-fees';
 import { toast } from 'sonner';
 import { Loader2, Truck, CheckCircle2, MapPin } from 'lucide-react';
 import { apiService } from '@/services/api.service';
@@ -41,7 +42,8 @@ const Checkout = () => {
     const [fetchingPincode, setFetchingPincode] = useState(false);
 
     // Default to Online Payment
-    const [selectedGateway, setSelectedGateway] = useState('phonepe');
+    // How the customer pays: a PhonePe method (UPI is free, cards carry a fee) or cash on delivery.
+    const [selectedGateway, setSelectedGateway] = useState<PaymentChoice>('upi');
 
     // Address State
     const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -84,12 +86,16 @@ const Checkout = () => {
 
     const shipping = getShippingCharge();
     const gst = gstIncluded(subtotal);
-    const finalTotal = subtotal + shipping;
+    // The same fee the server charges (order.service.js), on items + shipping.
+    const fee = selectedGateway === 'cod' ? 0 : convenienceFee(subtotal + shipping, selectedGateway);
+    const finalTotal = subtotal + shipping + fee;
+    // Free gifts with sale items; the server adds them to the order.
+    const gifts = items.filter((item) => item.product.festival?.gift);
 
     // Failsafe: If they somehow had COD selected but their cart crosses limit and has no override, force it back to PhonePe
     useEffect(() => {
         if (!isEligibleForCOD && selectedGateway === 'cod') {
-            setSelectedGateway('phonepe');
+            setSelectedGateway('upi');
         }
     }, [isEligibleForCOD, selectedGateway]);
 
@@ -215,7 +221,8 @@ const Checkout = () => {
                 quantity: item.quantity,
             }));
 
-            const response = await apiService.createOrder(orderItems, formData, selectedGateway, subtotal);
+            const response = await apiService.createOrder(orderItems, formData,
+                selectedGateway === 'cod' ? 'cod' : 'phonepe', subtotal, selectedGateway === 'cod' ? undefined : selectedGateway);
 
             if (response && response.redirectUrl) {
                 toast.loading('Redirecting to Payment Gateway...');
@@ -321,7 +328,7 @@ const Checkout = () => {
                         {/* Payment Gateway Section */}
                         <Card className="p-6 shadow-sm border-t-4 border-t-primary">
                             <PaymentGatewaySelector
-                                amount={finalTotal}
+                                amount={subtotal + shipping}
                                 onSelect={setSelectedGateway}
                                 selected={selectedGateway}
                                 showCOD={isEligibleForCOD} // ✅ Dynamically blocked for items >= 999 unless Admin overridden
@@ -342,6 +349,14 @@ const Checkout = () => {
                                         <span className="font-medium">{formatINR(item.product.price * item.quantity)}</span>
                                     </div>
                                 ))}
+                                {gifts.map((item) => (
+                                    <div key={`gift-${item.product_id}`} className="flex justify-between text-sm gap-4">
+                                        <span className="text-[hsl(var(--festive))] line-clamp-1 flex-1">
+                                            {item.product.festival!.gift!.label} <span className="font-bold">×{item.product.festival!.gift!.quantity * item.quantity}</span>
+                                        </span>
+                                        <span className="font-bold text-green-300">FREE</span>
+                                    </div>
+                                ))}
                             </div>
 
                             <Separator className="my-4" />
@@ -359,6 +374,14 @@ const Checkout = () => {
                                         {shipping === 0 ? "FREE" : formatINR(shipping)}
                                     </span>
                                 </div>
+                                {selectedGateway !== 'cod' && (
+                                    <div className="flex justify-between text-sm">
+                                        <span>
+                                            Convenience fee {fee > 0 ? `(${selectedGateway === 'credit_card' ? 'credit' : 'debit'} card, ${feePercent(selectedGateway)})` : `(${selectedGateway === 'net_banking' ? 'net banking' : 'UPI'})`}
+                                        </span>
+                                        <span className={fee === 0 ? "text-green-300 font-bold" : "font-medium"}>{fee === 0 ? "₹0" : formatINR(fee)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-sm">
                                     <span>Includes GST (18%)</span>
                                     <span className="font-medium">{formatINR(gst)}</span>

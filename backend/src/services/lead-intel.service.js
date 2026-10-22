@@ -309,7 +309,8 @@ export async function reorderPredictions({ now = new Date() } = {}) {
                JOIN order_items oi ON oi.order_id = o.id
                JOIN products p ON p.id = oi.product_id
                JOIN users u ON u.id = o.user_id
-              WHERE o.status IN ($1:csv) AND p.category = 'filament' AND o.created_at > now() - interval '400 days'
+              -- A free gift (price 0) is not a purchase, so it predicts no reorder.
+              WHERE o.status IN ($1:csv) AND p.category = 'filament' AND oi.line_total > 0 AND o.created_at > now() - interval '400 days'
               ORDER BY o.created_at DESC`,
             [CONFIRMED_ORDER_STATUSES]
         ),

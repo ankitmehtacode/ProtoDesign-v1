@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, Heart, Loader2, Plus, Star } from 'lucide-react';
 import { formatINR } from '@/lib/currency';
 import { CATEGORY_LABELS, Product, dealBadge, dealPrice, isMadeToOrder, productImageUrls as imageUrls, sizedImage, sizedSrcSet } from './product';
+import { FreeGiftNote } from './FreeGiftNote';
 
 // Only genuinely scarce stock earns the badge; flagging most of the catalog would make it noise.
 const LOW_STOCK_THRESHOLD = 3;
@@ -168,6 +169,7 @@ export const ProductCard = forwardRef<HTMLElement, ProductCardProps>(function Pr
                         <span className="text-base font-bold tabular-nums text-foreground md:text-lg">
                             {was !== null && <span className="sr-only">Now </span>}{formatINR(product.price)}
                         </span>
+                        <FreeGiftNote product={product} className="mt-0.5 text-xs" />
                     </span>
 
                     <motion.button
