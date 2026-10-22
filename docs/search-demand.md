@@ -46,7 +46,7 @@ as the catalogue grows.
 
 A daily EventBridge schedule (06:30 IST) runs `runSearchConsoleSync`:
 
-1. It reads the service account's JSON key from SSM.
+1. It reads the Google credential from SSM and signs in as the service account.
 2. It asks the Search Console API for every day after the newest stored one:
    Search Console's own daily totals (which include the anonymised searches,
    so the headline numbers match its reports) and the rows per search and page.
@@ -70,40 +70,90 @@ for 120 days, counted back from the newest stored day: about 30 MB at worst, and
 Daily maintenance prunes older rows and sync records older than 60 days.
 Search Console itself keeps 16 months if older figures are ever needed.
 
-## Setup (once, about 10 minutes)
+## Setup (once, about 15 minutes)
 
-1. **Google Cloud**: in any project (a new one is fine), enable the
-   *Google Search Console API*. Create a service account with no roles,
-   then under *Keys* add a JSON key and download it.
+The function signs in to Google **without a key**, by workload identity
+federation: Google checks a request signed with the function's own AWS role
+and lets that role act as a service account. Nothing secret is stored, and
+Google Cloud projects that forbid service-account keys (the default for new
+ones, `iam.disableServiceAccountKeyCreation`) work unchanged.
+
+1. **Google Cloud**: in any project, create a service account with **no
+   roles**, e.g. `search-console-sync`.
 2. **Search Console**: open the property, go to *Settings → Users and
    permissions → Add user*, enter the service account's email
    (`...@...iam.gserviceaccount.com`), and give it **Restricted** access.
-   Restricted is read-only.
-3. **AWS SSM**: store the key in the stack's region, then delete the
-   downloaded file:
+   Restricted is read-only. Note the property's exact name for step 5:
+   `sc-domain:protodesignstudio.com` for a domain property, or
+   `https://www.protodesignstudio.com/` for a URL-prefix one.
+3. **Federation**, in Google Cloud Shell (it has `gcloud`; the AWS commands
+   below run on your own machine). `ROLE` is the function's AWS role:
+
+   ```sh
+   aws cloudformation describe-stack-resource --region ap-southeast-1 \
+     --stack-name protodesign-api --logical-resource-id ApiFunctionRole \
+     --query StackResourceDetail.PhysicalResourceId --output text
+   ```
+
+   Then, in Cloud Shell:
+
+   ```sh
+   PROJECT=<project id>
+   SA=search-console-sync@$PROJECT.iam.gserviceaccount.com
+   AWS_ACCOUNT=<12-digit AWS account id>
+   ROLE=<ApiFunctionRole physical id>
+   NUM=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
+
+   gcloud services enable --project=$PROJECT \
+     searchconsole.googleapis.com sts.googleapis.com iamcredentials.googleapis.com
+   gcloud iam workload-identity-pools create aws-lambda --project=$PROJECT \
+     --location=global --display-name="AWS Lambda"
+   # Only this AWS account, and only the function's role, can sign in.
+   gcloud iam workload-identity-pools providers create-aws protodesign-api --project=$PROJECT \
+     --location=global --workload-identity-pool=aws-lambda --account-id=$AWS_ACCOUNT \
+     --attribute-mapping="google.subject=assertion.arn.extract('assumed-role/{role}/'),attribute.aws_role=assertion.arn.extract('assumed-role/{role}/')" \
+     --attribute-condition="attribute.aws_role=='$ROLE'"
+   gcloud iam service-accounts add-iam-policy-binding $SA --project=$PROJECT \
+     --role=roles/iam.workloadIdentityUser \
+     --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/aws-lambda/attribute.aws_role/$ROLE"
+   gcloud iam workload-identity-pools create-cred-config \
+     projects/$NUM/locations/global/workloadIdentityPools/aws-lambda/providers/protodesign-api \
+     --service-account=$SA --aws --output-file=search-console-federation.json
+   cat search-console-federation.json
+   ```
+
+   The printed config has no secret in it: it names the pool, the service
+   account and Google's endpoints. `google.subject` is the role name, not the
+   full ARN, so it always fits Google's 127-byte limit.
+4. **AWS SSM**, on your machine: save the printed JSON as a file and store it
+   in the stack's region (add `--overwrite` if the parameter already holds a
+   key):
 
    ```sh
    aws ssm put-parameter --region ap-southeast-1 \
      --name /protodesign/search-console-key --type SecureString \
-     --value file://path/to/key.json
-   rm path/to/key.json
+     --value file://search-console-federation.json
    ```
 
-   The key cannot be a Lambda environment variable: it is about 2.3 KB, and
-   Lambda allows 4 KB for all variables together. A standard SecureString
-   using the AWS-managed `aws/ssm` key is free, and the function's role may
-   read only this one parameter.
-4. **Deploy**: in `infra/parameters.sh`, set `SearchConsoleSiteUrl` to the
-   property exactly as Search Console names it: `sc-domain:protodesign.in`
-   for a domain property, or `https://www.example.com/` for a URL-prefix one.
-   Apply `backend/migrations/017_search_console.sql` in Neon, then run
+   The parameter is read once per sync, and the function's role may read only
+   this one parameter. (It keeps its `-key` name from when it held a key.)
+5. **Deploy**: in `infra/parameters.sh`, set `SearchConsoleSiteUrl` to the
+   property's name from step 2. Apply
+   `backend/migrations/017_search_console.sql` in Neon, then run
    `sam build && sam deploy`.
-5. Open **Admin → Search demand** and press **Sync now**. The first sync may
+6. Open **Admin → Search demand** and press **Sync now**. The first sync may
    take two or three presses (each stops early to stay inside the
-   function's 20-second limit), or you can leave it to the daily run.
+   function's 20-second limit), or you can leave it to the daily run. A
+   refused sign-in says so and names what to check.
 
-To rotate the key, add a new key to the service account, overwrite the
-parameter with `--overwrite`, and delete the old key in Google Cloud.
+If the stack is ever recreated, its role gets a new name: update the
+provider's condition and the service account's binding to it.
+
+**With a key instead**: where Google Cloud allows keys, add a JSON key to the
+service account and store that file in the same parameter instead of the
+config (then `rm` the downloaded file). The sync accepts either. To rotate a
+key, add a new one, overwrite the parameter with `--overwrite`, and delete the
+old key in Google Cloud.
 
 ## Rollback
 

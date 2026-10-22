@@ -111,11 +111,11 @@ export function SearchDemandSection() {
         return (
             <>
                 {header}
-                <Panel title="Connect Search Console" description="One-time setup, about 10 minutes. Full steps: docs/search-demand.md.">
+                <Panel title="Connect Search Console" description="One-time setup, about 15 minutes. Full steps: docs/search-demand.md.">
                     <ol className="list-decimal space-y-2 px-10 py-5 text-sm">
-                        <li>In Google Cloud, enable the <b>Google Search Console API</b>, create a service account and download its JSON key.</li>
+                        <li>In Google Cloud, enable the <b>Search Console</b>, <b>Security Token Service</b> and <b>IAM Service Account Credentials</b> APIs, and create a service account with no roles.</li>
                         <li>In Search Console → Settings → Users and permissions, add the service account's email as a <b>Restricted</b> user.</li>
-                        <li>Store the key in AWS SSM as a SecureString named <code className="font-mono text-xs">/protodesign/search-console-key</code>, then delete the downloaded file.</li>
+                        <li>Let this function sign in as it without a key (workload identity federation), and store the resulting config in AWS SSM as a SecureString named <code className="font-mono text-xs">/protodesign/search-console-key</code>.</li>
                         <li>Set <code className="font-mono text-xs">SearchConsoleSiteUrl</code> (e.g. <code className="font-mono text-xs">sc-domain:yourshop.in</code>) in the deploy parameters and run <code className="font-mono text-xs">sam deploy</code>.</li>
                         <li>Come back here and press <b>Sync now</b>.</li>
                     </ol>
