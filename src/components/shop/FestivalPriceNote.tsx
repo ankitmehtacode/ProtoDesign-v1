@@ -20,9 +20,9 @@ export function FestivalPriceNote({ product }: { product: PricedProduct }) {
     const next = status?.next;
     const list = Number(product.list_price);
     // Only a sale still to come: a status fetched before a boundary can name one that has already started.
-    const nextPrice = next && next.category === product.category && list > 0
+    const nextPrice = next && next.percent_off !== null && next.category === product.category && list > 0
         && Date.parse(next.starts_at) > serverNow() && next.id !== product.festival.id
-        ? Math.round(list * (100 - next.percent_off) / 100)
+        ? Math.round(list * (100 - next.percent_off!) / 100)
         : null;
 
     return (

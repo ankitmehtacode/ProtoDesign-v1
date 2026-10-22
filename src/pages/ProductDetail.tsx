@@ -643,7 +643,7 @@ const ProductDetail = () => {
     return (
         <>
             <Seo
-                title={productTitle(product.name, categoryName)}
+                title={productTitle(product.name, categoryName, product)}
                 description={productDescription(product)}
                 canonicalPath={new URL(productUrl(product)).pathname}
                 image={productImages[0]}

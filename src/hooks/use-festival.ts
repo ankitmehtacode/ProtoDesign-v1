@@ -4,8 +4,12 @@ import { apiService } from '@/services/api.service';
 export interface FestivalSale {
     id: string;
     name: string;
-    percent_off: number;
+    /** Null for a fixed-price sale, whose discount differs by product. */
+    percent_off: number | null;
     category: string;
+    /** A fixed-price sale's banner words, in place of "N% off". */
+    headline: string | null;
+    short: string | null;
     starts_at: string;
     ends_at: string;
 }

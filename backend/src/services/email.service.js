@@ -232,16 +232,20 @@ export const emailService = {
     },
 
     /** The alert itself: back in stock, or a lower price. */
-    async sendProductAlert(to, { productName, kind, price, was, productUrl, unsubscribeUrl }) {
+    async sendProductAlert(to, { productName, kind, price, was, saleEnds = null, productUrl, unsubscribeUrl }) {
         const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
         const backInStock = kind === 'back_in_stock';
+        // The last day of a sale whose end is exclusive midnight, in IST.
+        const until = saleEnds
+            ? ` This is a sale price, until ${new Date(Date.parse(saleEnds) - 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}.`
+            : '';
         return transporter.sendMail({
             from: `"ProtoDesign" <${process.env.EMAIL_USER}>`,
             to,
             subject: backInStock ? `${productName} is back in stock` : `${productName} is now ${inr(price)}`,
             text: (backInStock
-                ? `Good news: ${productName} is back in stock at ${inr(price)}.`
-                : `${productName} has dropped from ${inr(was)} to ${inr(price)}.`)
+                ? `Good news: ${productName} is back in stock at ${inr(price)}.${until}`
+                : `${productName} has dropped from ${inr(was)} to ${inr(price)}.${until}`)
                 + `\n\n${productUrl}\n\nQuestions? Reply to this email or WhatsApp us.\n\n`
                 + `This was a one-time alert you asked for. Unsubscribe: ${unsubscribeUrl}\n\nProtoDesign`,
         });

@@ -322,10 +322,11 @@ Resources:
           Properties:
             Schedule: cron(31 18 20 10 ? 2026)
             Input: '{"source":"protodesign.festival-rebuild"}'
+        # The Pre-Diwali sale (diwali-pre-2026) ends with 7 Nov.
         DiwaliEndsRebuild:
           Type: Schedule
           Properties:
-            Schedule: cron(31 18 11 11 ? 2026)
+            Schedule: cron(31 18 7 11 ? 2026)
             Input: '{"source":"protodesign.festival-rebuild"}'
       FunctionUrlConfig:
         AuthType: NONE

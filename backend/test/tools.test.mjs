@@ -293,6 +293,22 @@ describe('product alerts', () => {
         assert.equal((await alerts.runProductAlerts()).sent, 0, 'each alert is sent once');
     });
 
+    it('tells a price-drop subscriber when a sale price ends', async () => {
+        const { schedule } = await import('../src/services/festival.js');
+        const saved = schedule.sales;
+        schedule.sales = [{ id: 't', name: 'Test Sale', category: '3d_printer', prices: { x: 900 },
+            startsAt: '2000-01-01T00:00:00Z', endsAt: '2999-01-01T00:00:00Z' }];
+        try {
+            const printer = { id: 'x', price: '1000', category: '3d_printer', stock: 1, is_archived: false };
+            assert.deepEqual(alerts.alertDue({ kind: 'price_drop', baseline_price: 1000 }, printer),
+                { price: 900, was: 1000, saleEnds: '2999-01-01T00:00:00Z' });
+            assert.deepEqual(alerts.alertDue({ kind: 'price_drop', baseline_price: 1000 }, { ...printer, id: 'y', price: '950' }),
+                { price: 950, was: 1000, saleEnds: null });
+        } finally {
+            schedule.sales = saved;
+        }
+    });
+
     it('gives up on an address after three failures, so it cannot hold up others', async () => {
         const id = await product({ name: 'Sold Out Ultra', price: 20000, stock: 0 });
         await sub({ productId: id, kind: 'back_in_stock' });

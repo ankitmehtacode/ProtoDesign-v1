@@ -72,8 +72,8 @@ export function FestivalBar() {
                 className="group flex h-full items-center justify-center gap-2 pl-3 pr-10 text-xs font-semibold sm:px-10 sm:text-sm"
             >
                 <span className="truncate">
-                    <span className="hidden sm:inline"><span className="text-[hsl(var(--festive-on-dark))]">{sale.name}</span>: extra {sale.percent_off}% off every 3D printer</span>
-                    <span className="sm:hidden"><span className="text-[hsl(var(--festive-on-dark))]">{sale.name.replace(/ Sale$/, '')}</span>: {sale.percent_off}% off printers</span>
+                    <span className="hidden sm:inline"><span className="text-[hsl(var(--festive-on-dark))]">{sale.name}</span>: {sale.percent_off !== null ? `extra ${sale.percent_off}% off every 3D printer` : sale.headline}</span>
+                    <span className="sm:hidden"><span className="text-[hsl(var(--festive-on-dark))]">{sale.name.replace(/ Sale$/, '')}</span>: {sale.percent_off !== null ? `${sale.percent_off}% off printers` : sale.short}</span>
                     <span className="mx-2 opacity-60" aria-hidden="true">·</span>
                     <span className="tabular-nums"><span className="hidden sm:inline">ends in </span>{shortLeft(left)}<span className="sm:hidden"> left</span></span>
                 </span>

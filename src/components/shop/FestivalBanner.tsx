@@ -24,7 +24,8 @@ export function FestivalBanner({ showShopLink }: { showShopLink?: boolean }) {
     if (!sale || !left) return null;
 
     const next = status?.next;
-    const priceRises = next && next.category === sale.category && next.percent_off < sale.percent_off
+    const priceRises = next && next.category === sale.category && next.percent_off !== null && sale.percent_off !== null
+        && next.percent_off < sale.percent_off
         && Date.parse(next.starts_at) > serverNow();
     const art = festivalArt(sale.id);
 
@@ -53,10 +54,14 @@ export function FestivalBanner({ showShopLink }: { showShopLink?: boolean }) {
                 <div className="max-w-xl">
                     <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.24em] ${GOLD}`}>{sale.name}</p>
                     <p className="mt-2 text-2xl font-bold leading-tight tracking-tight md:text-3xl">
-                        Extra <span className={GOLD}>{sale.percent_off}% off</span> every 3D printer
+                        {sale.percent_off !== null
+                            ? <>Extra <span className={GOLD}>{sale.percent_off}% off</span> every 3D printer</>
+                            : sale.headline}
                     </p>
                     <p className="mt-2 text-sm text-white/75 md:text-base">
-                        On top of our deal prices, with free shipping.{' '}
+                        {sale.percent_off !== null
+                            ? 'On top of our deal prices, with free shipping. '
+                            : 'Lower prices on selected models, GST included, with free shipping. '}
                         {priceRises
                             ? `Ends ${lastDay(sale.ends_at)}. From ${saleDay(next.starts_at)} it drops to ${next.percent_off}% off, so prices go up.`
                             : `Ends ${lastDay(sale.ends_at)}. Prices return to normal after that.`}

@@ -180,7 +180,7 @@ for (const p of products) {
     const url = productUrl(p);
     await write(new URL(url).pathname, render(template,
         head({
-            title: productTitle(p.name, categoryName),
+            title: productTitle(p.name, categoryName, p),
             description: productDescription(p),
             canonical: url,
             image: p.images[0] ?? p.image_url ?? DEFAULT_IMAGE,
@@ -235,7 +235,7 @@ function llmsTxt(list, festival) {
         return [`### ${name} (${SITE_URL}${path})`, ...items.map((p) => `- [${md(plainText(p.name, 120))}](${productUrl(p)}): ${priceText(p)}, GST included`), ""];
     }).flat();
     const sales = [festival?.active, festival?.next].filter(Boolean).map((s) =>
-        `- ${s.name}: ${s.percent_off}% off every 3D printer, ${istDay(s.starts_at)} to ${saleLastDay(s.ends_at)} (IST).`);
+        `- ${s.name}: ${s.percent_off === null ? s.headline : `${s.percent_off}% off every 3D printer`}, ${istDay(s.starts_at)} to ${saleLastDay(s.ends_at)} (IST).`);
     return [
         `# ${SITE_NAME}`,
         "",
