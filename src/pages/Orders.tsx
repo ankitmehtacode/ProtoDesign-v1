@@ -81,6 +81,7 @@ const STATUS_COLORS: Record<string, string> = {
     delivered: "bg-green-500",
     completed: "bg-green-600",
     cancelled: "bg-red-500",
+    refunded: "bg-slate-500",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -91,6 +92,7 @@ const STATUS_LABELS: Record<string, string> = {
     delivered: "Delivered",
     completed: "Completed",
     cancelled: "Cancelled",
+    refunded: "Refunded",
 };
 
 export default function Orders() {
@@ -296,7 +298,7 @@ export default function Orders() {
                                             {order.total_quantity} Item{order.total_quantity !== 1 && 's'}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                        {order.status !== 'cancelled' && <WhatsAppUpdatesButton kind="order" id={order.id} className="hidden sm:inline-flex" />}
+                                        {!['cancelled', 'refunded'].includes(order.status) && <WhatsAppUpdatesButton kind="order" id={order.id} className="hidden sm:inline-flex" />}
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -313,7 +315,7 @@ export default function Orders() {
                                     {expandedOrderId === order.id && (
                                         <div className="mt-6 pt-6 border-t border-border/50 animate-in slide-in-from-top-2 fade-in duration-300">
                                             {/* On phones the toggle bar is too narrow for this; show it here instead. */}
-                                            {order.status !== 'cancelled' && <WhatsAppUpdatesButton kind="order" id={order.id} className="sm:hidden w-full mb-6" />}
+                                            {!['cancelled', 'refunded'].includes(order.status) && <WhatsAppUpdatesButton kind="order" id={order.id} className="sm:hidden w-full mb-6" />}
 
                                             <div className="grid md:grid-cols-2 gap-8 mb-8">
                                                 {/* CUSTOMER DETAILS */}

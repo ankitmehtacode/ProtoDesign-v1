@@ -358,7 +358,8 @@ const QUOTE_EVENTS = {
 /** Human labels for status replies (STATUS command, link confirmation). */
 export const ORDER_STATUS_LABELS = {
     pending: 'Awaiting payment', pending_payment: 'Awaiting payment', processing: 'Being prepared',
-    shipped: 'Shipped', delivered: 'Delivered', completed: 'Completed', cancelled: 'Cancelled'
+    shipped: 'Shipped', delivered: 'Delivered', completed: 'Completed', cancelled: 'Cancelled',
+    refunded: 'Refunded'
 };
 export const QUOTE_STATUS_LABELS = {
     pending: 'Received, awaiting review', contacted: 'In review', paid: 'Paid',

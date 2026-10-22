@@ -23,7 +23,7 @@ process.env.PHONEPE_WEBHOOK_PASSWORD = 'hook-pass';
 const { default: db, pgp } = await import('../src/config/database.js');
 const orders = await import('../src/services/order.service.js');
 const { phonePeService } = await import('../src/services/phonepe.service.js');
-const { emailService } = await import('../src/services/email.service.js');
+const { emailService, refundEmail } = await import('../src/services/email.service.js');
 const festival = await import('../src/services/festival.js');
 const { TEST_SALES } = await import('./helpers/festival-schedule.mjs');
 festival.schedule.sales = TEST_SALES;
@@ -56,6 +56,12 @@ phonePeService.initiatePayment = async () => {
 // ---- email boundary stub (no SMTP in tests) -------------------------------
 emailService.sendOrderConfirmation = async () => {};
 emailService.sendOrderStatusEmail = async () => {};
+const refundEmails = [];
+let failRefundEmail = false;
+emailService.sendRefundEmail = async (email, fullName, order) => {
+    if (failRefundEmail) throw new Error('smtp down');
+    refundEmails.push({ email, fullName, order });
+};
 
 const gatewayState = (orderId, state, amountPaise) => gateway.responses.set(orderId, { state, amount: amountPaise });
 const gatewayCompleted = (order) => gatewayState(order.id, 'COMPLETED', Math.round(Number(order.total_amount) * 100));
@@ -706,7 +712,7 @@ describe('admin order updates', () => {
         const [user, admin] = [await seedUser(), await seedUser({ admin: true })];
         const product = await seedProduct({ stock: 5 });
         const order = await place(user, [[product, 2]]);
-        return { order, product, token: tokenFor(admin), put: (id, status, token) => call('PUT', `/api/orders/${id}`, { token, body: { status } }) };
+        return { order, product, token: tokenFor(admin), put: (id, status, token, extra = {}) => call('PUT', `/api/orders/${id}`, { token, body: { status, ...extra } }) };
     };
 
     it('returns stock when an admin cancels', async () => {
@@ -736,4 +742,155 @@ describe('admin order updates', () => {
         assert.equal((await put(randomUUID(), 'shipped', token)).status, 404);
         assert.equal((await put('not-a-uuid', 'shipped', token)).status, 404);
     });
+
+    describe('refunds', () => {
+        const paid = (id, status = 'processing') => db.none(`UPDATE orders SET status = $2, payment_status = 'paid' WHERE id = $1`, [id, status]);
+        const emailsFor = (id) => refundEmails.filter((e) => e.order.id === id);
+
+        it('refunds a paid order once, and emails the customer once', async () => {
+            const { order, product, token, put } = await setup();
+            await paid(order.id, 'shipped');
+            const res = await put(order.id, 'refunded', token);
+            assert.equal(res.status, 200);
+            assert.equal(res.body.customerEmailed, true);
+            assert.equal((await orderRow(order.id)).status, 'refunded');
+            const [sent] = emailsFor(order.id);
+            assert.match(sent.email, /@test\.local$/);
+            assert.equal(Number(sent.order.total_amount), Number(order.total_amount));
+            assert.equal(await stockOf(product), 3); // shipped: out of the shop, not restocked
+
+            const again = await put(order.id, 'refunded', token);
+            assert.equal(again.status, 409);
+            assert.match(again.body.error, /already refunded/);
+            assert.equal((await put(order.id, 'delivered', token)).status, 409); // terminal
+            assert.equal(emailsFor(order.id).length, 1);
+        });
+
+        it('returns the stock of a paid order that never left the shop', async () => {
+            const { order, product, token, put } = await setup();
+            await paid(order.id, 'processing');
+            assert.equal((await put(order.id, 'refunded', token)).status, 200);
+            assert.equal(await stockOf(product), 5);
+        });
+
+        it('pays back a paid order that was cancelled, without restocking it twice', async () => {
+            const { order, product, token, put } = await setup();
+            await paid(order.id, 'processing');
+            assert.equal((await put(order.id, 'cancelled', token)).status, 200);
+            assert.equal((await put(order.id, 'processing', token)).status, 409);
+            assert.equal((await put(order.id, 'refunded', token)).status, 200);
+            assert.equal(await stockOf(product), 5);
+            assert.equal(emailsFor(order.id).length, 1);
+        });
+
+        it('refuses an order nobody paid for', async () => {
+            const { order, token, put } = await setup(); // pending, unpaid
+            const res = await put(order.id, 'refunded', token);
+            assert.equal(res.status, 409);
+            assert.match(res.body.error, /never paid/);
+
+            // Cash on delivery: shipped but not yet collected, then collected on delivery.
+            await db.none(`UPDATE orders SET status = 'shipped', payment_gateway = 'cod' WHERE id = $1`, [order.id]);
+            assert.match((await put(order.id, 'refunded', token)).body.error, /nothing to refund/);
+            await db.none(`UPDATE orders SET status = 'delivered' WHERE id = $1`, [order.id]);
+            assert.equal((await put(order.id, 'refunded', token)).status, 200);
+            assert.equal(emailsFor(order.id).length, 1);
+        });
+
+        it('puts a returned parcel back in stock only when the admin says it came back', async () => {
+            const kept = await setup();
+            await paid(kept.order.id, 'shipped');
+            assert.equal((await kept.put(kept.order.id, 'refunded', kept.token)).status, 200);
+            assert.equal(await stockOf(kept.product), 3);
+
+            const back = await setup();
+            await paid(back.order.id, 'shipped');
+            assert.equal((await back.put(back.order.id, 'refunded', back.token, { restock: true })).status, 200);
+            assert.equal(await stockOf(back.product), 5);
+
+            // A cancelled order was restocked when it was cancelled; never twice.
+            const cancelled = await setup();
+            await paid(cancelled.order.id, 'processing');
+            await cancelled.put(cancelled.order.id, 'cancelled', cancelled.token);
+            await cancelled.put(cancelled.order.id, 'refunded', cancelled.token, { restock: true });
+            assert.equal(await stockOf(cancelled.product), 5);
+        });
+
+        it('does not tell the customer "shipped" when another tab changed the order meanwhile', async () => {
+            const { order, token, put } = await setup();
+            await paid(order.id, 'processing');
+            const statusEmails = [];
+            const real = emailService.sendOrderStatusEmail;
+            emailService.sendOrderStatusEmail = async (...args) => { statusEmails.push(args); };
+            // The other tab's refund lands between this request's read and its
+            // write: the guarded write then changes no row (simulated by a
+            // trigger that skips it, as the status filter would).
+            await db.none(`CREATE FUNCTION skip_ship() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`);
+            await db.none(`CREATE TRIGGER skip_ship BEFORE UPDATE ON orders FOR EACH ROW WHEN (NEW.status = 'shipped') EXECUTE FUNCTION skip_ship()`);
+            try {
+                const res = await put(order.id, 'shipped', token);
+                assert.equal(res.status, 409);
+                assert.match(res.body.error, /meanwhile/);
+            } finally {
+                emailService.sendOrderStatusEmail = real;
+                await db.none('DROP TRIGGER skip_ship ON orders; DROP FUNCTION skip_ship()');
+            }
+            assert.equal(statusEmails.length, 0);
+            assert.equal((await orderRow(order.id)).status, 'processing');
+        });
+
+        it('still records the refund when the email fails, and says so', async () => {
+            const { order, token, put } = await setup();
+            await paid(order.id, 'delivered');
+            failRefundEmail = true;
+            try {
+                const res = await put(order.id, 'refunded', token);
+                assert.equal(res.status, 200);
+                assert.equal(res.body.customerEmailed, false);
+            } finally {
+                failRefundEmail = false;
+            }
+            assert.equal((await orderRow(order.id)).status, 'refunded');
+            assert.ok(logged('email_failed'));
+        });
+
+        it('refunds once when two admins press it at the same time', async () => {
+            const { order, token, put } = await setup();
+            await paid(order.id, 'processing');
+            const results = await Promise.all([put(order.id, 'refunded', token), put(order.id, 'refunded', token)]);
+            assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+            assert.equal(emailsFor(order.id).length, 1);
+        });
+    });
 });
+
+describe('refund email', () => {
+    const order = { id: 'ab12cd34-0000-4000-8000-000000000000', total_amount: '45999.00', payment_gateway: 'phonepe',
+        created_at: new Date('2026-10-20T20:15:00Z') };
+
+    it('says how much, when and where, in India time and rupees', () => {
+        const mail = refundEmail('Asha Rao', order);
+        assert.equal(mail.subject, 'Refund of ₹45,999.00 initiated for order #AB12CD34');
+        for (const part of [mail.text, mail.html]) {
+            assert.match(part, /Asha/);
+            assert.match(part, /₹45,999\.00/);
+            assert.match(part, /5.7 working days/);
+            assert.match(part, /21 October 2026/); // 20:15 UTC is the 21st in India
+            assert.match(part, /UPI app, card or bank account you paid with/);
+            assert.doesNotMatch(part, /localhost/);
+        }
+    });
+
+    it('asks a cash-on-delivery customer where to send it', () => {
+        const mail = refundEmail('Ravi', { ...order, payment_gateway: 'cod' });
+        assert.match(mail.text, /UPI ID or bank account you gave us/);
+    });
+
+    it('cannot be used to inject markup through a customer name', () => {
+        const mail = refundEmail('<img/src=x/onerror=alert(1)>', order);
+        assert.doesNotMatch(mail.html, /<img/);
+        assert.match(mail.html, /&lt;img\/src=x\/onerror=alert\(1\)&gt;/);
+        assert.match(refundEmail('', order).text, /^Hi there,/);
+    });
+});
+

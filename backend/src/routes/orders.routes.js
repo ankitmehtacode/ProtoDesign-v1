@@ -13,9 +13,18 @@ import {
     createOrder,
     isUuid,
     reconcilePendingOrder,
-    reconcilePendingOrders
+    reconcilePendingOrders,
+    refundOrder
 } from '../services/order.service.js';
 const router = express.Router();
+
+const REFUND_REFUSALS = {
+    not_found: 'Order not found',
+    already_refunded: 'This order is already refunded.',
+    unpaid: 'This order was never paid, so there is nothing to refund.',
+    cash_not_collected: 'Cash on delivery has not been collected for this order, so there is nothing to refund.',
+    not_refundable: 'This order cannot be refunded.',
+};
 
 // ==========================================
 // 🚨 ADMIN ROUTE (MUST BE FIRST)
@@ -252,13 +261,17 @@ router.post('/payment/callback', async (req, res) => {
 /**
  * PUT /api/orders/:id  (admin)
  * 'cancelled' goes through cancelOrder so reserved stock is returned, and is
- * terminal: a cancelled order cannot be revived (its stock has been released).
+ * terminal except for 'refunded': a cancelled order cannot be revived (its
+ * stock has been released), but a paid one can be paid back. 'refunded' goes
+ * through refundOrder, only for an order the shop was paid for, and emails the
+ * customer when the money will arrive. `customerEmailed` in the answer says
+ * whether that email went out (null when the status sends none).
  */
 router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { status } = req.body ?? {};
-        const validStatuses = ['pending', 'pending_payment', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
+        const { status, restock } = req.body ?? {};
+        const validStatuses = ['pending', 'pending_payment', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'];
 
         if (!isUuid(id)) return res.status(404).json({ error: 'Order not found' });
         if (!status || !validStatuses.includes(status)) {
@@ -267,8 +280,29 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
 
         const current = await db.oneOrNone('SELECT status FROM orders WHERE id = $1', [id]);
         if (!current) return res.status(404).json({ error: 'Order not found' });
-        if (current.status === 'cancelled') {
-            return res.status(409).json({ error: 'A cancelled order cannot be changed' });
+        if (current.status === 'refunded') {
+            return res.status(409).json({ error: status === 'refunded' ? REFUND_REFUSALS.already_refunded : 'A refunded order cannot be changed' });
+        }
+        if (current.status === 'cancelled' && status !== 'refunded') {
+            return res.status(409).json({ error: 'A cancelled order can only be marked refunded' });
+        }
+
+        if (status === 'refunded') {
+            const { order: refunded, refused } = await refundOrder(id, { restock: restock === true });
+            if (refused) return res.status(refused === 'not_found' ? 404 : 409).json({ error: REFUND_REFUSALS[refused] });
+            const user = await db.oneOrNone('SELECT email, full_name FROM users WHERE id = $1', [refunded.user_id]);
+            let customerEmailed = false;
+            if (user?.email) {
+                try {
+                    await emailService.sendRefundEmail(user.email, user.full_name, refunded);
+                    customerEmailed = true;
+                } catch (err) {
+                    console.error(JSON.stringify({ event: 'email_failed', type: 'order_refunded', orderId: id, error: err.message }));
+                }
+            } else {
+                console.error(JSON.stringify({ event: 'email_failed', type: 'order_refunded', orderId: id, error: 'no customer email' }));
+            }
+            return res.json({ message: 'Order refunded', data: refunded, customerEmailed });
         }
 
         if (status === 'cancelled') {
@@ -276,7 +310,11 @@ router.put('/:id', authMiddleware, isAdmin, async (req, res, next) => {
                 return res.status(409).json({ error: `An order that is ${current.status} cannot be cancelled` });
             }
         } else {
-            await db.none(`UPDATE orders SET status = $1 WHERE id = $2 AND status <> 'cancelled'`, [status, id]);
+            // Another tab may have cancelled or refunded it since it was read:
+            // then nothing changes and the customer must not be told otherwise.
+            const updated = await db.oneOrNone(
+                `UPDATE orders SET status = $1 WHERE id = $2 AND status NOT IN ('cancelled', 'refunded') RETURNING id`, [status, id]);
+            if (!updated) return res.status(409).json({ error: 'The order was cancelled or refunded meanwhile. Reload it.' });
         }
 
         const order = await db.one('SELECT * FROM orders WHERE id = $1', [id]);

@@ -5,7 +5,7 @@ import { alertNewOrder, alertPaymentFailed, alertStaleHoldsReleased, notifyAdmin
 import { clock, festivalPrice } from './festival.js';
 
 /**
- * Order lifecycle: creation, payment settlement, cancellation.
+ * Order lifecycle: creation, payment settlement, cancellation, refunds.
  *
  * Every transition that touches money or stock lives here so each rule exists
  * exactly once. The invariants:
@@ -17,11 +17,17 @@ import { clock, festivalPrice } from './festival.js';
  *  - An order is only marked paid after PhonePe's own status API says
  *    COMPLETED for the exact amount we charged. Webhook bodies are never
  *    trusted for state.
- *  - 'cancelled' is terminal. Nothing here moves an order out of it.
+ *  - 'cancelled' is terminal except for 'refunded': a paid order that was
+ *    cancelled still has to be paid back. 'refunded' is terminal.
+ *  - Only an order the shop was paid for can be refunded: paid online, or cash
+ *    collected on delivery.
  */
 
 export const PENDING_STATUSES = ['pending', 'pending_payment'];
 export const CANCELLABLE_STATUSES = [...PENDING_STATUSES, 'processing'];
+export const REFUNDABLE_STATUSES = ['processing', 'shipped', 'delivered', 'completed', 'cancelled'];
+// Cash on delivery is collected on delivery; before that there is nothing to refund.
+const CASH_COLLECTED_STATUSES = ['delivered', 'completed'];
 
 // Shipping, cash-on-delivery and GST rules. src/pages/Cart.tsx and Checkout.tsx
 // display the same rules; the server owns them and must never accept a total or
@@ -96,25 +102,60 @@ export async function cancelOrder(orderId, { from = CANCELLABLE_STATUSES, userId
             [orderId, from, paymentStatus, userId]
         );
         if (!flipped) return false;
-
-        // Lock in a fixed order so this cannot deadlock with createOrder, which
-        // also locks products in id order.
-        await t.any(
-            `SELECT id FROM products
-              WHERE id IN (SELECT product_id FROM order_items WHERE order_id = $1)
-              ORDER BY id FOR UPDATE`,
-            [orderId]
-        );
-        await t.none(
-            `UPDATE products p
-                SET stock = COALESCE(p.stock, 0) + r.qty
-               FROM (SELECT product_id, SUM(quantity)::int AS qty
-                       FROM order_items WHERE order_id = $1 GROUP BY product_id) r
-              WHERE p.id = r.product_id`,
-            [orderId]
-        );
+        await restock(t, orderId);
         logEvent('order_cancelled', { orderId, paymentStatus });
         return true;
+    });
+}
+
+/** Puts an order's items back in stock, inside the caller's transaction. */
+async function restock(t, orderId) {
+    // Lock in a fixed order so this cannot deadlock with createOrder, which
+    // also locks products in id order.
+    await t.any(
+        `SELECT id FROM products
+          WHERE id IN (SELECT product_id FROM order_items WHERE order_id = $1)
+          ORDER BY id FOR UPDATE`,
+        [orderId]
+    );
+    await t.none(
+        `UPDATE products p
+            SET stock = COALESCE(p.stock, 0) + r.qty
+           FROM (SELECT product_id, SUM(quantity)::int AS qty
+                   FROM order_items WHERE order_id = $1 GROUP BY product_id) r
+          WHERE p.id = r.product_id`,
+        [orderId]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Refunds
+// ---------------------------------------------------------------------------
+
+/**
+ * Marks an order refunded after the shop has sent the whole order total back,
+ * at most once, so the customer is told exactly once. Stock: an order that
+ * never left the shop ('processing') always gets it back; a cancelled one
+ * already has; a shipped or delivered one only when `restock` says the parcel
+ * came back sellable (refused at the door, or returned).
+ *
+ * @returns {Promise<{order: object}|{refused: 'not_found'|'already_refunded'|'unpaid'|'cash_not_collected'|'not_refundable'}>}
+ */
+export async function refundOrder(orderId, { restock: returned = false } = {}) {
+    return db.tx(async (t) => {
+        const before = await t.oneOrNone('SELECT status, payment_status FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+        if (!before) return { refused: 'not_found' };
+        if (before.status === 'refunded') return { refused: 'already_refunded' };
+        if (!REFUNDABLE_STATUSES.includes(before.status)) return { refused: PENDING_STATUSES.includes(before.status) ? 'unpaid' : 'not_refundable' };
+        if (before.payment_status !== 'paid' && !CASH_COLLECTED_STATUSES.includes(before.status)) {
+            return { refused: before.status === 'shipped' ? 'cash_not_collected' : 'unpaid' };
+        }
+        const order = await t.one(
+            `UPDATE orders SET status = 'refunded', updated_at = NOW() WHERE id = $1 RETURNING *`, [orderId]);
+        const restocked = before.status === 'processing' || (returned && before.status !== 'cancelled');
+        if (restocked) await restock(t, orderId);
+        logEvent('order_refunded', { orderId, from: before.status, restocked });
+        return { order };
     });
 }
 

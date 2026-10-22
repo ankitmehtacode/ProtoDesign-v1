@@ -173,6 +173,7 @@ describe('conversions feed', () => {
         await order(buyer);
         await order(buyer, { status: 'pending', paid: false });
         await order(buyer, { status: 'cancelled' }); // paid after it was cancelled: a refund, not a sale
+        await order(buyer, { status: 'refunded' }); // paid back: not a sale
         const late = await seedUser();
         await visitor({ gclid: 'ORDER-LATE', userId: late, daysAgo: 95 }); // click over 90 days before the order
         await order(late);

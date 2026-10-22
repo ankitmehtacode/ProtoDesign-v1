@@ -19,7 +19,9 @@ import db from '../config/database.js';
  */
 
 // A sale is a paid order (PhonePe), or a delivered one (cash on delivery,
-// which is not paid until then); never a cancelled one.
+// which is not paid until then); never a cancelled or refunded one. An order
+// refunded after Google already imported it stays counted there: the feed only
+// adds conversions, and retracting one needs a separate adjustment upload.
 const DELIVERED_STATUSES = ['delivered', 'completed'];
 // A Customer Match consent counts only with proof of the contact from after
 // it was given: the person's own WhatsApp message or confirmed email within
@@ -88,7 +90,7 @@ export async function conversions({ days = FEED_DAYS } = {}) {
          order_conv AS (
              SELECT DISTINCT ON (o.id) v.gclid, $2::text AS name, o.created_at AS at, o.total_amount AS value
                FROM orders o JOIN visitors v ON v.user_id = o.user_id
-              WHERE o.status <> 'cancelled' AND (o.payment_status = 'paid' OR o.status IN ($5:csv))
+              WHERE o.status NOT IN ('cancelled', 'refunded') AND (o.payment_status = 'paid' OR o.status IN ($5:csv))
                 AND v.gclid IS NOT NULL AND v.ads_consent_at IS NOT NULL
                 AND COALESCE(o.updated_at, o.created_at) > now() - make_interval(days => $3)
                 AND o.created_at >= COALESCE(v.gclid_at, v.first_seen_at)

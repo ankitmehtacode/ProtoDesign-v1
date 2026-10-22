@@ -325,10 +325,10 @@ class ApiService {
         });
     }
 
-    async updateOrderStatus(id: string, status: string) {
+    async updateOrderStatus(id: string, status: string, restock = false) {
         return this.request(`/orders/${id}`, {
             method: "PUT",
-            body: JSON.stringify({ status }),
+            body: JSON.stringify(restock ? { status, restock } : { status }),
         });
     }
 
