@@ -16,7 +16,10 @@
 // The hook URL is a credential (anyone holding it can trigger builds), so it
 // is validated before use and never logged.
 const DEPLOY_HOOK_RE = /^https:\/\/api\.vercel\.com\/v1\/integrations\/deploy\/[A-Za-z0-9_/-]+$/;
-const REQUEST_TIMEOUT_MS = 5000;
+// Vercel's deploy hook has taken 7 s to answer (2026-10-22), so 5 s failed
+// every rebuild then. Admin saves wait for this inside Lambda's 20 s, which
+// 12 s leaves room for.
+const REQUEST_TIMEOUT_MS = 12_000;
 
 // IndexNow keys are public by design: the protocol proves site ownership by
 // serving this same value at /<key>.txt (public/01a76bc8....txt).
