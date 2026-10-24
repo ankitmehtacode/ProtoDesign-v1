@@ -36,10 +36,10 @@ function productPromises(product: Pick<Product, 'category' | 'specifications'>):
 
 export function ProductPromises({ product }: { product: Pick<Product, 'category' | 'specifications'> }) {
     return (
-        <ul className="grid grid-cols-1 gap-3 rounded-xl border border-border/50 bg-secondary/10 p-4 text-sm text-muted-foreground sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border/60 pt-6 text-sm text-muted-foreground sm:grid-cols-2">
             {productPromises(product).map(({ icon: Icon, text }) => (
-                <li key={text} className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <li key={text} className="flex items-center gap-2.5">
+                    <Icon className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={1.75} aria-hidden="true" />
                     {text}
                 </li>
             ))}
