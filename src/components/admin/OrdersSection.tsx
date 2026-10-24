@@ -84,13 +84,14 @@ export function OrdersSection({ orders, initialFilter, onChanged }: {
 
     const exportCsv = () =>
         downloadCsv(`orders-${new Date().toISOString().slice(0, 10)}.csv`,
-            ["Order", "Date", "Status", "Customer", "Email", "Phone", "City", "State", "Pincode", "Items", "Subtotal", "GST included", "Shipping", "Total"],
+            ["Order", "Date", "Status", "Customer", "Email", "Phone", "City", "State", "Pincode", "Items", "Subtotal", "GST included", "Shipping", "Convenience fee", "Total", "Paid by"],
             rows.map((o) => [
                 o.id, formatDate(o.created_at), statusMeta(ORDER_STATUSES, o.status).label, customerName(o),
                 o.shipping_address?.email || o.user_email || "", o.shipping_address?.phone || "",
                 o.shipping_address?.city || "", o.shipping_address?.state || "", o.shipping_address?.pincode || "",
-                (o.items ?? []).map((i) => `${i.product?.name ?? "Item"} x${i.quantity}`).join("; "),
-                money(o.subtotal_amount), money(o.tax_amount), money(o.shipping_amount), money(o.total_amount),
+                (o.items ?? []).map((i) => `${i.product?.name ?? "Item"} x${i.quantity}${money(i.line_total) === 0 ? " (free)" : ""}`).join("; "),
+                money(o.subtotal_amount), money(o.tax_amount), money(o.shipping_amount), money(o.convenience_fee), money(o.total_amount),
+                PAYMENT_LABELS[o.payment_method ?? ""] ?? o.payment_gateway ?? "",
             ]));
 
     const open = orders.find((o) => o.id === openId) ?? null;
@@ -204,6 +205,8 @@ export function OrdersSection({ orders, initialFilter, onChanged }: {
     );
 }
 
+const PAYMENT_LABELS: Record<string, string> = { upi: "UPI", net_banking: "Net banking", debit_card: "Debit card", credit_card: "Credit card", cod: "Cash on delivery" };
+
 function OrderSheet({ order, onClose, onChanged }: { order: AdminOrder | null; onClose: () => void; onChanged: (id: string, status: string) => void }) {
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -296,7 +299,7 @@ function OrderSheet({ order, onClose, onChanged }: { order: AdminOrder | null; o
                                                 <span className="block truncate font-medium">{it.product?.name ?? "Item"}</span>
                                                 <span className="text-xs text-muted-foreground">Qty {it.quantity}</span>
                                             </span>
-                                            <span className="tabular-nums">{formatINR(it.line_total)}</span>
+                                            <span className={`tabular-nums ${money(it.line_total) === 0 ? "font-semibold text-green-300" : ""}`}>{money(it.line_total) === 0 ? "FREE" : formatINR(it.line_total)}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -304,6 +307,7 @@ function OrderSheet({ order, onClose, onChanged }: { order: AdminOrder | null; o
                                     {order.subtotal_amount !== undefined && <Row label="Subtotal" value={formatINR(money(order.subtotal_amount))} />}
                                     {order.tax_amount !== undefined && <Row label="GST (included)" value={formatINR(money(order.tax_amount))} muted />}
                                     {order.shipping_amount !== undefined && <Row label="Shipping" value={formatINR(money(order.shipping_amount))} />}
+                                    {money(order.convenience_fee) > 0 && <Row label="Convenience fee" value={formatINR(money(order.convenience_fee))} />}
                                     <div className="flex justify-between border-t pt-2 font-semibold">
                                         <dt>Total</dt><dd className="tabular-nums">{formatINR(order.total_amount)}</dd>
                                     </div>
@@ -312,7 +316,7 @@ function OrderSheet({ order, onClose, onChanged }: { order: AdminOrder | null; o
 
                             {(order.payment_gateway || order.payment_status) && (
                                 <section className="text-muted-foreground">
-                                    Payment: {order.payment_gateway ?? "—"}{order.payment_status ? ` · ${order.payment_status}` : ""}
+                                    Payment: {PAYMENT_LABELS[order.payment_method ?? ""] ?? order.payment_gateway ?? "—"}{order.payment_status ? ` · ${order.payment_status}` : ""}
                                 </section>
                             )}
                         </div>

@@ -42,6 +42,7 @@ import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, 
 import { CATEGORY_LABELS, dealBadge, dealPrice, isMadeToOrder } from '@/components/shop/product';
 import { ProductPromises } from '@/components/shop/ProductPromises';
 import { FestivalPriceNote } from '@/components/shop/FestivalPriceNote';
+import { FreeGiftNote } from '@/components/shop/FreeGiftNote';
 import { INTEREST_FOR_CATEGORY, LeadCapture } from '@/components/LeadCapture';
 import { ProductAlert } from '@/components/ProductAlert';
 import { track } from '@/lib/analytics';
@@ -63,7 +64,7 @@ interface Product {
     price: number;
     compare_at_price?: number | string | null;
     list_price?: number | string;
-    festival?: { id: string; name: string; percent_off: number; ends_at: string } | null;
+    festival?: { id: string; name: string; percent_off: number; ends_at: string; gift?: { product_id: string; quantity: number; label: string } } | null;
     stock: number;
     category: string;
     sub_category?: string;
@@ -975,9 +976,10 @@ const ProductDetail = () => {
                                         Inclusive of GST{product.category === '3d_printer' ? ', with free shipping across India' : ''}
                                     </p>
                                     {inStock && <FestivalPriceNote product={product} />}
-                                    <p className={`mt-4 flex items-center gap-2 text-sm font-medium ${inStock ? 'text-primary' : 'text-red-300'}`}>
-                                        {inStock && <Check className="h-4 w-4" />}
-                                        {!inStock ? 'Out of stock' : madeToOrder ? 'Made to order: printed after you order' : product.stock <= 3 ? `Only ${product.stock} left, ready to ship` : 'In stock, ready to ship'}
+                                    {inStock && <FreeGiftNote product={product} className="mt-2" />}
+                                    <p className={`mt-3 text-sm font-medium flex items-center gap-2 ${inStock ? 'text-green-300' : 'text-red-300'}`}>
+                                        {inStock ? <Check className="w-4 h-4"/> : null}
+                                        {!inStock ? 'Out of Stock' : madeToOrder ? 'Made to order: printed after you order' : `${product.stock} In Stock & Ready to Ship`}
                                     </p>
                                 </>
                             )}

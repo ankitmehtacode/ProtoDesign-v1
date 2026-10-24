@@ -102,7 +102,7 @@ async function orderSummary(orderId) {
     );
     if (!order) return null;
     const items = await db.any(
-        `SELECT COALESCE(p.name, 'Product') AS name, oi.quantity
+        `SELECT COALESCE(p.name, 'Product') AS name, oi.quantity, oi.line_total = 0 AS free
            FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
         [orderId]
     );
@@ -111,7 +111,7 @@ async function orderSummary(orderId) {
     const place = [address.city, address.state, address.pincode].filter(Boolean).join(', ');
     return [
         `${name} · ${inr(order.total_amount)}`,
-        ...items.map((i) => `• ${i.quantity} × ${i.name}`),
+        ...items.map((i) => `• ${i.quantity} × ${i.name}${i.free ? ' (FREE gift)' : ''}`),
         address.phone ? `Phone: ${address.phone}` : null,
         order.email ? `Email: ${order.email}` : null,
         place ? `Ship to: ${place}` : null,

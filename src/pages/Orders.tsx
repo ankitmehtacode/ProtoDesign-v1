@@ -65,6 +65,8 @@ interface Order {
     subtotal_amount?: number;
     tax_amount?: number;
     shipping_amount?: number;
+    /** Card payment fee; part of total_amount. */
+    convenience_fee?: number | string;
     status: string;
     created_at: string;
     items: OrderItem[];
@@ -379,10 +381,12 @@ export default function Orders() {
                                                                 </div>
                                                                 <div>
                                                                     <p className="font-medium text-sm text-foreground">{item.product_name || "Product Name"}</p>
-                                                                    <p className="text-xs text-muted-foreground">Qty: {item.quantity} × {formatINR(item.product_price || (item.line_total/item.quantity))}</p>
+                                                                    {Number(item.line_total) === 0
+                                                                        ? <p className="text-xs font-semibold text-green-300">Qty: {item.quantity} · Free gift</p>
+                                                                        : <p className="text-xs text-muted-foreground">Qty: {item.quantity} × {formatINR(item.product_price || (item.line_total/item.quantity))}</p>}
                                                                 </div>
                                                             </div>
-                                                            <span className="font-bold text-sm">{formatINR(item.line_total)}</span>
+                                                            <span className={`font-bold text-sm ${Number(item.line_total) === 0 ? 'text-green-300' : ''}`}>{Number(item.line_total) === 0 ? 'FREE' : formatINR(item.line_total)}</span>
                                                         </div>
                                                     ))}
 
@@ -391,10 +395,16 @@ export default function Orders() {
                                                         <span className="text-sm font-medium text-muted-foreground">Shipping Fee</span>
                                                         <span className="font-bold text-sm">{formatINR(order.shipping_amount || 0)}</span>
                                                     </div>
+                                                    {Number(order.convenience_fee ?? 0) > 0 && (
+                                                        <div className="flex justify-between items-center p-3 bg-muted/30 border border-dashed rounded-lg">
+                                                            <span className="text-sm font-medium text-muted-foreground">Convenience fee (card)</span>
+                                                            <span className="font-bold text-sm">{formatINR(Number(order.convenience_fee))}</span>
+                                                        </div>
+                                                    )}
                                                     <div className="flex justify-between items-center p-3 bg-muted/30 border border-dashed rounded-lg">
                                                         {/* Orders before 2026-09-27 added GST on top; later ones include it in the price. */}
                                                         <span className="text-sm font-medium text-muted-foreground">
-                                                            {Math.abs(Number(order.subtotal_amount ?? 0) + Number(order.shipping_amount ?? 0) - Number(order.total_amount)) < 0.01
+                                                            {Math.abs(Number(order.subtotal_amount ?? 0) + Number(order.shipping_amount ?? 0) + Number(order.convenience_fee ?? 0) - Number(order.total_amount)) < 0.01
                                                                 ? 'Includes GST (18%)' : 'GST (18%)'}
                                                         </span>
                                                         <span className="font-bold text-sm">{formatINR(order.tax_amount || 0)}</span>

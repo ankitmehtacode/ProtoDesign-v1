@@ -88,7 +88,8 @@ export async function conversions({ days = FEED_DAYS } = {}) {
                 AND l.created_at < COALESCE(v.gclid_at, v.first_seen_at) + make_interval(days => $4)
               ORDER BY l.id, COALESCE(v.gclid_at, v.first_seen_at) DESC),
          order_conv AS (
-             SELECT DISTINCT ON (o.id) v.gclid, $2::text AS name, o.created_at AS at, o.total_amount AS value
+             -- The sale's value without a card convenience fee, which recovers a cost.
+             SELECT DISTINCT ON (o.id) v.gclid, $2::text AS name, o.created_at AS at, o.total_amount - o.convenience_fee AS value
                FROM orders o JOIN visitors v ON v.user_id = o.user_id
               WHERE o.status NOT IN ('cancelled', 'refunded') AND (o.payment_status = 'paid' OR o.status IN ($5:csv))
                 AND v.gclid IS NOT NULL AND v.ads_consent_at IS NOT NULL

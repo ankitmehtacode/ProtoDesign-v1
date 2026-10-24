@@ -5,7 +5,7 @@ import isAdmin from '../middleware/isAdmin.js';
 import { emailService } from '../services/email.service.js';
 import { phonePeService } from '../services/phonepe.service.js';
 import { notifyOrder } from '../services/whatsapp.service.js';
-import { alertNewOrder } from '../services/telegram.service.js';
+import { alertNewOrder, notifyAdmin } from '../services/telegram.service.js';
 import {
     PENDING_STATUSES,
     CANCELLABLE_STATUSES,
@@ -34,9 +34,9 @@ router.get('/admin/all', authMiddleware, isAdmin, async (req, res, next) => {
         const orders = await db.any(`
             SELECT
                 o.id, o.created_at, o.status,
-                o.total_amount, o.subtotal_amount, o.tax_amount, o.shipping_amount,
+                o.total_amount, o.subtotal_amount, o.tax_amount, o.shipping_amount, o.convenience_fee,
                 o.shipping_address, o.user_id,
-                o.payment_gateway, o.payment_status,
+                o.payment_gateway, o.payment_method, o.payment_status,
                 u.email as user_email, u.full_name as user_name,
                 COALESCE(json_agg(
                                  json_build_object(
@@ -78,8 +78,8 @@ router.get('/', authMiddleware, async (req, res, next) => {
         const orders = await db.any(`
             SELECT
                 o.id, o.created_at, o.status,
-                o.total_amount, o.subtotal_amount, o.tax_amount, o.shipping_amount,
-                o.shipping_address, o.payment_gateway,
+                o.total_amount, o.subtotal_amount, o.tax_amount, o.shipping_amount, o.convenience_fee,
+                o.shipping_address, o.payment_gateway, o.payment_method,
                 COALESCE(json_agg(
                                  json_build_object(
                                          'product_id', oi.product_id,
@@ -145,20 +145,25 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
  */
 router.post('/', authMiddleware, async (req, res, next) => {
     try {
-        const { items, shippingAddress, paymentGateway, expectedSubtotal } = req.body ?? {};
+        const { items, shippingAddress, paymentGateway, paymentMethod, expectedSubtotal } = req.body ?? {};
 
         if (!items || !items.length) return res.status(400).json({ error: 'No items in order' });
         if (!shippingAddress || typeof shippingAddress !== 'object' || Array.isArray(shippingAddress)) {
             return res.status(400).json({ error: 'Shipping address is required' });
         }
 
-        const { order, totalPaise, lines } = await createOrder({
+        const { order, totalPaise, lines, giftsShort } = await createOrder({
             userId: req.userId,
             items,
             shippingAddress,
             paymentGateway,
+            paymentMethod,
             expectedSubtotal
         });
+        if (giftsShort.length) {
+            await notifyAdmin(`🎁 Order #${order.id.slice(0, 8).toUpperCase()}: ${giftsShort.map((g) => `${g.quantity} × ${g.label}`).join(', ')} `
+                + 'was out of stock, so it is not on the order. If the order is paid, send one with it.');
+        }
 
         if (order.payment_gateway === 'phonepe') {
             try {
@@ -166,7 +171,8 @@ router.post('/', authMiddleware, async (req, res, next) => {
                     order.id,
                     totalPaise / 100,
                     req.userId,
-                    shippingAddress.phone || '9999999999'
+                    shippingAddress.phone || '9999999999',
+                    order.payment_method
                 );
                 return res.status(201).json({ success: true, orderId: order.id, redirectUrl });
             } catch (err) {

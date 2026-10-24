@@ -16,6 +16,8 @@
  * where a listed product sells at exactly that price. A listed price at or above
  * the stored one is ignored: a sale never raises a price. `headline` and `short`
  * are the banner's words for a fixed-price sale, which has no single percentage.
+ * `gift` ({ productId, quantity, label }) comes free with each unit of a product
+ * on sale; checkout adds it to the order (order.service.js) while stock lasts.
  * When a sale starts or ends while the site is up, the prerendered pages need a
  * rebuild (infra/template.yaml, *Rebuild schedules).
  */
@@ -31,8 +33,9 @@ export const schedule = {
             id: 'diwali-pre-2026',
             name: 'Pre-Diwali Sale',
             category: '3d_printer',
-            headline: 'Pre-Diwali prices on Bambu Lab 3D printers',
-            short: 'Bambu Lab printers',
+            headline: 'Pre-Diwali prices on Bambu Lab 3D printers, with a free PLA roll while stocks last',
+            short: 'Bambu Lab + free PLA',
+            gift: Object.freeze({ productId: 'd709994d-f4ba-471c-8fdd-82e8e12de3c7', quantity: 1, label: 'Free 1 kg PLA filament roll' }),
             startsAt: '2026-10-22T00:00:00+05:30',
             endsAt: '2026-11-08T00:00:00+05:30',
             prices: Object.freeze({
@@ -99,6 +102,7 @@ export function festivalPrice(product, now = clock.now()) {
             id: sale.id, name: sale.name, ends_at: sale.endsAt,
             // Off our own price, the claim we fully control.
             percent_off: sale.percentOff ?? Math.round((1 - salePrice / listPrice) * 100),
+            ...(sale.gift && { gift: { product_id: sale.gift.productId, quantity: sale.gift.quantity, label: sale.gift.label } }),
         },
     };
 }
@@ -108,7 +112,7 @@ export function festivalStatus(now = clock.now()) {
     // percent_off is null for a fixed-price sale, whose discount differs by product.
     const pick = (s) => s && {
         id: s.id, name: s.name, percent_off: s.percentOff ?? null, category: s.category,
-        headline: s.headline ?? null, short: s.short ?? null, starts_at: s.startsAt, ends_at: s.endsAt,
+        headline: s.headline ?? null, short: s.short ?? null, gift: s.gift?.label ?? null, starts_at: s.startsAt, ends_at: s.endsAt,
     };
     return { now: new Date(now).toISOString(), active: pick(activeSale(now)), next: pick(nextSale(now)) };
 }

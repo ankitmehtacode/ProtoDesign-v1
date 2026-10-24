@@ -49,7 +49,8 @@ phonePeService.verifyPaymentStatus = async (orderId) => {
     if (!r) throw Object.assign(new Error('order not found'), { response: { status: 404 } });
     return r;
 };
-phonePeService.initiatePayment = async () => {
+phonePeService.initiatePayment = async (...args) => {
+    gateway.initiated = args;
     if (gateway.failInitiate) throw new Error('Payment Gateway Error');
     return 'https://pay.example/redirect';
 };
@@ -891,6 +892,130 @@ describe('refund email', () => {
         assert.doesNotMatch(mail.html, /<img/);
         assert.match(mail.html, /&lt;img\/src=x\/onerror=alert\(1\)&gt;/);
         assert.match(refundEmail('', order).text, /^Hi there,/);
+    });
+});
+
+// ===========================================================================
+describe('payment methods: UPI free, cards with a convenience fee', () => {
+    const post = async (user, productId, body) => call('POST', '/api/orders', {
+        token: tokenFor(user),
+        body: { items: [{ product_id: productId, quantity: 1 }], shippingAddress: { phone: '9000000000' }, paymentGateway: 'phonepe', ...body },
+    });
+
+    it('charges 2.5% for credit, 1.5% for debit and nothing for UPI, on items + shipping, in whole rupees', async () => {
+        const user = await seedUser();
+        const product = await seedProduct({ stock: 10, price: '27099.00', category: '3d_printer' }); // ships free
+        const cases = [['credit_card', '677.00'], ['debit_card', '406.00'], ['upi', '0.00'], ['net_banking', '0.00']];
+        for (const [method, fee] of cases) {
+            const res = await post(user, product, { paymentMethod: method });
+            assert.equal(res.status, 201, method);
+            const row = await orderRow(res.body.orderId);
+            assert.deepEqual([row.payment_method, row.convenience_fee], [method, fee], method);
+            assert.equal(Number(row.total_amount), 27099 + Number(fee), method);
+            // PhonePe is asked for exactly this amount, and told to offer only this method.
+            assert.deepEqual([gateway.initiated[1], gateway.initiated[4]], [Number(row.total_amount), method]);
+        }
+        // On items + shipping: 2.5% of 100 + 199 is 7.475, so ₹7. Its GST is
+        // recorded with the items': 107 includes 16.32 of GST.
+        const small = await seedProduct({ stock: 5, price: '100.00' });
+        const row = await orderRow((await post(user, small, { paymentMethod: 'credit_card' })).body.orderId);
+        assert.deepEqual([row.convenience_fee, row.total_amount, row.tax_amount], ['7.00', '306.00', '16.32']);
+    });
+
+    it('treats a checkout without a method as UPI, refuses unknown methods, and charges no fee on cash on delivery', async () => {
+        const user = await seedUser();
+        const product = await seedProduct({ stock: 5, price: '100.00' });
+        const legacy = await orderRow((await post(user, product, {})).body.orderId);
+        assert.deepEqual([legacy.payment_method, legacy.convenience_fee], ['upi', '0.00']);
+        assert.equal((await post(user, product, { paymentMethod: 'crypto' })).status, 400);
+        const cod = await orderRow((await post(user, product, { paymentGateway: 'cod', paymentMethod: 'credit_card' })).body.orderId);
+        assert.deepEqual([cod.payment_method, cod.convenience_fee, cod.total_amount], ['cod', '0.00', '400.00']);
+    });
+
+    it('reads the completed attempt and flags any method other than the one charged for', () => {
+        const paid = (...modes) => orders.paidMethod({ paymentDetails: modes.map(([paymentMode, state, extra = {}]) => ({ paymentMode, state, ...extra })) });
+        assert.equal(paid(['UPI_QR', 'FAILED'], ['CARD', 'COMPLETED', { instrument: { type: 'CREDIT_CARD' } }]), 'credit_card');
+        assert.equal(paid(['CARD', 'COMPLETED', { cardType: 'DEBIT_CARD' }], ['UPI_INTENT', 'FAILED']), 'debit_card');
+        assert.equal(paid(['NET_BANKING', 'COMPLETED']), 'net_banking');
+        assert.equal(paid(['CARD', 'COMPLETED']), 'card');
+        assert.equal(orders.paidMethod({}), null);
+
+        assert.equal(orders.methodMismatch('upi', 'card'), true);
+        assert.equal(orders.methodMismatch('credit_card', 'upi'), true, 'a fee charged on a UPI payment');
+        assert.equal(orders.methodMismatch('debit_card', 'credit_card'), true);
+        assert.equal(orders.methodMismatch('credit_card', 'card'), false, 'card type unknown: cannot tell');
+        assert.equal(orders.methodMismatch('upi', 'upi'), false);
+        assert.equal(orders.methodMismatch('cod', 'upi'), false);
+        assert.equal(orders.methodMismatch(null, 'card'), false, 'orders from before payment methods');
+    });
+
+    it('flags a UPI order that PhonePe let the customer pay by card', async () => {
+        const user = await seedUser();
+        const product = await seedProduct({ stock: 5, price: '100.00' });
+        const { order } = await orders.createOrder({ userId: user, items: [{ product_id: product, quantity: 1 }],
+            shippingAddress: { phone: '9' }, paymentGateway: 'phonepe', paymentMethod: 'upi' });
+        const amount = Math.round(Number(order.total_amount) * 100);
+        assert.equal(await orders.settlePayment(order.id, { state: 'COMPLETED', amount, paymentDetails: [{ paymentMode: 'CARD' }] }), 'paid');
+        assert.ok(logged('payment_method_mismatch'));
+    });
+});
+
+describe('free gift with sale printers', () => {
+    const during = new Date('2026-10-30T12:00:00+05:30').getTime();
+    const withSale = async (prices, giftId, fn) => {
+        festival.schedule.sales = [{ id: 'gift-test', name: 'Gift Sale', category: '3d_printer', prices,
+            gift: { productId: giftId, quantity: 1, label: 'Free 1 kg PLA filament roll' },
+            startsAt: '2026-10-22T00:00:00+05:30', endsAt: '2026-11-08T00:00:00+05:30' }];
+        festival.clock.now = () => during;
+        try { return await fn(); } finally { festival.schedule.sales = TEST_SALES; festival.clock.now = () => OFF_SEASON; }
+    };
+
+    it('adds one free roll per sale printer at ₹0, reserves it, and returns it on cancel', async () => {
+        const user = await seedUser();
+        const pla = await seedProduct({ stock: 10, price: '699.00' });
+        const printer = await seedProduct({ stock: 5, price: '30000.00', category: '3d_printer' });
+        const other = await seedProduct({ stock: 5, price: '20000.00', category: '3d_printer' }); // not in the sale
+        await withSale({ [printer]: 27099 }, pla, async () => {
+            const { order, lines, giftsShort } = await orders.createOrder({ userId: user,
+                items: [{ product_id: printer, quantity: 2 }, { product_id: other, quantity: 1 }, { product_id: pla, quantity: 1 }],
+                shippingAddress: { phone: '9' }, paymentGateway: 'phonepe' });
+            assert.deepEqual(giftsShort, []);
+            assert.equal(order.subtotal_amount, '74897.00'); // 2 × 27099 + 20000 + 699: the gift adds nothing
+            const items = await db.any('SELECT product_id, quantity, price FROM order_items WHERE order_id = $1 ORDER BY price', [order.id]);
+            assert.deepEqual(items.filter((i) => i.product_id === pla).map((i) => [i.quantity, i.price]), [[2, '0.00'], [1, '699.00']]);
+            assert.ok(lines.some((l) => l.product_name === 'Free 1 kg PLA filament roll' && l.price === '0.00'));
+            assert.equal(await stockOf(pla), 7); // 1 bought + 2 free
+
+            assert.ok(await orders.cancelOrder(order.id));
+            assert.equal(await stockOf(pla), 10);
+            assert.equal(await stockOf(printer), 5);
+        });
+    });
+
+    it('never costs the customer their order when the gift is out of stock', async () => {
+        const user = await seedUser();
+        const pla = await seedProduct({ stock: 0, price: '699.00' });
+        const printer = await seedProduct({ stock: 5, price: '30000.00', category: '3d_printer' });
+        await withSale({ [printer]: 27099 }, pla, async () => {
+            const { order, giftsShort } = await orders.createOrder({ userId: user, items: [{ product_id: printer, quantity: 1 }],
+                shippingAddress: { phone: '9' }, paymentGateway: 'phonepe' });
+            assert.deepEqual(giftsShort.map((g) => [g.productId, g.quantity]), [[pla, 1]]);
+            assert.equal((await db.one('SELECT count(*)::int AS n FROM order_items WHERE order_id = $1', [order.id])).n, 1);
+            assert.equal(await stockOf(pla), 0);
+            assert.ok(logged('free_gift_out_of_stock'));
+        });
+    });
+
+    it('still refuses an order whose paid item is out of stock', async () => {
+        const user = await seedUser();
+        const pla = await seedProduct({ stock: 1, price: '699.00' });
+        const printer = await seedProduct({ stock: 5, price: '30000.00', category: '3d_printer' });
+        await withSale({ [printer]: 27099 }, pla, async () => {
+            // Two rolls bought, one in stock: refused, whatever the gift.
+            await rejectsWith(orders.createOrder({ userId: user, items: [{ product_id: printer, quantity: 1 }, { product_id: pla, quantity: 2 }],
+                shippingAddress: { phone: '9' }, paymentGateway: 'phonepe' }), 409);
+            assert.deepEqual([await stockOf(pla), await stockOf(printer)], [1, 5]);
+        });
     });
 });
 

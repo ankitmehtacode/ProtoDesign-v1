@@ -9,6 +9,7 @@ import { Minus, Plus, Trash2, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { CATEGORY_LABELS } from '@/components/shop/product';
+import { FreeGiftNote } from '@/components/shop/FreeGiftNote';
 
 const Cart = () => {
     const navigate = useNavigate();
@@ -85,6 +86,7 @@ const Cart = () => {
                                             <h3 className="font-semibold text-lg mb-1"><Link to={href} className="hover:text-primary hover:underline underline-offset-2">{item.product.name}</Link></h3>
                                             <p className="text-sm text-muted-foreground mb-2">{CATEGORY_LABELS[item.product.category] ?? 'Product'}</p>
                                             <p className="text-primary font-bold text-lg">{formatINR(item.product.price)} each</p>
+                                            <FreeGiftNote product={item.product} quantity={item.quantity} className="mt-1" />
                                         </div>
                                         <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-4">
                                             <div className="flex items-center gap-2 bg-muted rounded-lg p-1">

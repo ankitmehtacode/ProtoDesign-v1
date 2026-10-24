@@ -21,6 +21,14 @@ const ENDPOINTS = {
     }
 };
 
+// PhonePe Standard Checkout v2 payment-mode filters, by our payment method.
+const PAYMENT_MODES = {
+    upi: [{ type: 'UPI' }],
+    net_banking: [{ type: 'NET_BANKING' }],
+    debit_card: [{ type: 'CARD', types: ['DEBIT_CARD'] }],
+    credit_card: [{ type: 'CARD', types: ['CREDIT_CARD'] }],
+};
+
 const URLS = ENDPOINTS[ENV];
 
 export const phonePeService = {
@@ -54,7 +62,7 @@ export const phonePeService = {
     /**
      * 2. Initiate Payment (V2)
      */
-    async initiatePayment(orderId, amount, userId, mobileNumber) {
+    async initiatePayment(orderId, amount, userId, mobileNumber, paymentMethod = null) {
         try {
             console.log(`🔹 Initiating Payment for Order: ${orderId} (${amount})`);
             const token = await this.getAccessToken();
@@ -73,16 +81,34 @@ export const phonePeService = {
                         redirectUrl: `${process.env.FRONTEND_URL}/orders`,
                         redirectMode: "REDIRECT",
                         callbackUrl: `${process.env.BACKEND_URL}/api/orders/payment/callback`
-                    }
+                    },
+                    // Only the method the customer chose and was charged a fee
+                    // for (order.service.js PAYMENT_FEE_BPS); UPI includes QR.
+                    ...(PAYMENT_MODES[paymentMethod] && {
+                        paymentModeConfig: { version: 'V2', enabledPaymentModes: PAYMENT_MODES[paymentMethod] }
+                    })
                 }
             };
 
-            const response = await axios.post(URLS.pay, payload, {
+            const post = (body) => axios.post(URLS.pay, body, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `O-Bearer ${token}`
                 }
             });
+            let response;
+            try {
+                response = await post(payload);
+            } catch (err) {
+                // An account without payment-mode filtering may refuse it. Checkout
+                // must not die with it: pay unfiltered, and settlePayment flags
+                // any payment made by a method other than the one charged for.
+                if (!payload.paymentFlow.paymentModeConfig || err.response?.status !== 400) throw err;
+                console.error(JSON.stringify({ event: 'phonepe_payment_mode_filter_rejected', orderId, paymentMethod,
+                    detail: err.response?.data?.message ?? null }));
+                delete payload.paymentFlow.paymentModeConfig;
+                response = await post(payload);
+            }
 
             const responseData = response.data;
             console.log("🔹 PhonePe API Response:", JSON.stringify(responseData, null, 2));
