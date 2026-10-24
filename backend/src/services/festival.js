@@ -52,6 +52,12 @@ export const schedule = {
                 '707fa3a9-6a87-4568-a719-195524e74766': 152899, // H2S Combo
                 '0d7c36c0-2053-4a99-9893-5dc917d14634': 176799, // H2D
                 '6ac35214-cc92-403e-ab4d-0ab69349c99a': 267299, // H2C Combo
+                // Added 24 Oct with a margin tiered by price: 5% under ₹50k,
+                // 4% to ₹1.5L, 3% above.
+                '2f1e8908-5bf4-47eb-a3b5-f6f622746613': 19499, // A1 Mini (offer ₹18,499)
+                '95b1b400-8e94-4602-8ba9-3367b7b5353b': 84299, // P2S Combo (offer ₹80,999)
+                '5fe14e9f-13bf-4d94-b632-39bf4b2c91ed': 128999, // H2S (offer ₹1,23,999)
+                '6506f594-d110-467e-9801-ef43eb2d5398': 194699, // H2D Combo (offer ₹1,88,999)
             }),
         }),
     ]),

@@ -107,7 +107,7 @@ describe('live schedule', () => {
             }
         }
         const preDiwali = LIVE_SALES.find((s) => s.id === 'diwali-pre-2026');
-        assert.equal(Object.keys(preDiwali.prices).length, 13);
+        assert.equal(Object.keys(preDiwali.prices).length, 17);
         assert.equal(new Date(preDiwali.endsAt).toISOString(), '2026-11-07T18:30:00.000Z'); // midnight IST after 7 Nov
     });
 });
