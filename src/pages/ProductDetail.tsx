@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { useCart } from "@/hooks/use-cart";
 import { formatINR } from "@/lib/currency";
-import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { motion, AnimatePresence, Reorder, useMotionValueEvent, useReducedMotion, useScroll } from "framer-motion";
 import { useDropzone } from 'react-dropzone';
 import { Seo } from "@/seo/Seo";
 import { CATEGORY_PAGES, SITE_URL, productDescription, productLd, productTitle, productUrl } from "@/seo/site.js";
@@ -141,6 +141,13 @@ const StarRating = ({ rating, interactive = false, onRate, size = 16 }: { rating
     );
 };
 
+/**
+ * The surface product photos sit on, in both themes. Catalogue photos are shot
+ * on white; on this near-white stage, with mix-blend-multiply, their white
+ * melts away instead of showing as a bright box on the dark page.
+ */
+const STAGE = 'bg-[hsl(150_12%_94%)] dark:bg-[hsl(150_9%_86%)]';
+
 const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
     const [showZoom, setShowZoom] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -156,7 +163,7 @@ const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
 
     return (
         <div
-            className="relative w-full h-full overflow-hidden bg-card rounded-2xl border border-border/50 cursor-crosshair flex items-center justify-center group"
+            className="relative w-full h-full overflow-hidden cursor-zoom-in flex items-center justify-center group"
             onMouseEnter={() => setShowZoom(true)}
             onMouseLeave={() => setShowZoom(false)}
             onMouseMove={handleMouseMove}
@@ -165,14 +172,14 @@ const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
                 ref={imgRef}
                 src={src}
                 alt={alt}
-                className={`w-full h-full object-contain p-4 transition-opacity duration-200 ${showZoom ? 'opacity-0' : 'opacity-100'}`}
+                className={`w-full h-full object-contain p-6 sm:p-10 mix-blend-multiply transition-opacity duration-200 ${showZoom ? 'opacity-0' : 'opacity-100'}`}
             />
             {showZoom && (
-                <div className="absolute inset-0 overflow-hidden bg-card pointer-events-none">
+                <div className={`absolute inset-0 overflow-hidden pointer-events-none ${STAGE}`}>
                     <img
                         src={src}
                         alt={`${alt} zoomed`}
-                        className="absolute max-w-none"
+                        className="absolute max-w-none mix-blend-multiply"
                         style={{
                             width: '250%',
                             height: '250%',
@@ -186,6 +193,40 @@ const ImageMagnifier = ({ src, alt }: { src: string, alt: string }) => {
         </div>
     );
 };
+
+/**
+ * Up to this many specs sit in the buy box. A longer list gets its own
+ * Specifications section instead, so no spec is shown twice.
+ */
+const GLANCE_SPECS = 6;
+
+/** What buyers compare first; the buy box leads with these when a list is long. */
+const KEY_SPEC_RE = /build (volume|size)|print(ing)? (size|volume)|technology|speed|filament compat|material|nozzle temp|screen|resolution|precision|layer/i;
+
+/** Brands sold here, for products whose specs do not name one. */
+const KNOWN_BRANDS = ['Bambu Lab', 'ELEGOO', 'Creality', 'Anycubic', 'Phrozen', 'Snapmaker', 'Prusa', 'Flashforge', 'ProtoDesign'];
+const brandFromName = (name: string) => KNOWN_BRANDS.find((b) => name.trim().toLowerCase().startsWith(b.toLowerCase())) ?? null;
+
+/** Specs collapse to this many until "Show all" is pressed. */
+const SPECS_SHOWN = 12;
+
+/**
+ * Specs as tiles divided by hairlines: label above, value below. Each tile
+ * draws its own right and bottom rule; the frame hides the outer ones, so an
+ * odd count leaves plain card, not a grey gap.
+ */
+const SpecTiles = ({ specs, wide = false }: { specs: { key: string; value: string }[]; wide?: boolean }) => (
+    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <dl className={`-mb-px -mr-px grid grid-cols-2 ${wide ? 'sm:grid-cols-3 lg:grid-cols-4' : ''}`}>
+            {specs.map(({ key, value }) => (
+                <div key={key} className="border-b border-r border-border/60 px-4 py-3.5">
+                    <dt className="text-xs text-muted-foreground">{key}</dt>
+                    <dd className="mt-1 text-sm font-semibold leading-snug text-foreground">{value}</dd>
+                </div>
+            ))}
+        </dl>
+    </div>
+);
 
 // --- MAIN PAGE ---
 const ProductDetail = () => {
@@ -615,6 +656,18 @@ const ProductDetail = () => {
     const productImages = allImages.map(toAbsolute);
     const [categoryName, categoryPath] = CATEGORY_PAGES[product?.category ?? ''] ?? ['Shop', '/shop'];
 
+    // Phones: once the Add to cart row scrolls away, a slim bar keeps it in reach.
+    const reduceMotion = useReducedMotion();
+    const [showAllSpecs, setShowAllSpecs] = useState(false);
+    // A callback ref: the row only exists once the product has loaded. React
+    // skips the re-render while the answer stays the same.
+    const [ctaRow, ctaRef] = useState<HTMLDivElement | null>(null);
+    const [ctaPassed, setCtaPassed] = useState(false);
+    const { scrollY } = useScroll();
+    useMotionValueEvent(scrollY, 'change', () => {
+        if (ctaRow) setCtaPassed(ctaRow.getBoundingClientRect().bottom < 0);
+    });
+
     if (loading) return <div className="min-h-screen pt-32 flex justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
     if (!product) return null;
 
@@ -640,6 +693,11 @@ const ProductDetail = () => {
     // Derived from the loaded reviews so it stays in step with the count after a post or delete.
     const averageRating = reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
     const displaySpecs = normalizeSpecs(product.specifications).filter(s => s.key !== 'allow_cod_override');
+    const brand = displaySpecs.find((s) => s.key.trim().toLowerCase() === 'brand')?.value ?? brandFromName(product.name);
+    const tileSpecs = displaySpecs.filter((s) => s.key.trim().toLowerCase() !== 'brand');
+    const specsInBuyBox = tileSpecs.length <= GLANCE_SPECS;
+    const glanceSpecs = specsInBuyBox ? tileSpecs : [...tileSpecs.filter((s) => KEY_SPEC_RE.test(s.key)), ...tileSpecs.filter((s) => !KEY_SPEC_RE.test(s.key))].slice(0, 4);
+    const was = dealPrice(product);
 
     return (
         <>
@@ -679,28 +737,39 @@ const ProductDetail = () => {
                 </div>
             )}
 
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
-                    <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-                    <ChevronRight size={14} />
-                    <Link to="/shop" className="hover:text-primary transition-colors">Shop</Link>
-                    <ChevronRight size={14} />
-                    <span className="font-medium text-foreground truncate">
+            <div className="container mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
+                <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6 lg:mb-8 min-w-0">
+                    <Link to="/" className="hover:text-foreground transition-colors shrink-0">Home</Link>
+                    <ChevronRight size={14} className="shrink-0 opacity-60" />
+                    <Link to={categoryPath} className="hover:text-foreground transition-colors shrink-0">{categoryName}</Link>
+                    <ChevronRight size={14} className="shrink-0 opacity-60" />
+                    <span className="text-foreground/80 truncate">
                         {isEditing ? <span className="italic text-primary">Editing...</span> : product.name}
                     </span>
-                </div>
+                </nav>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24">
-                    <div className="space-y-6 top-24 h-fit">
-                        <div className="w-[85%] mx-auto aspect-[4/5] bg-card rounded-2xl shadow-sm border border-border/50 relative z-10 flex items-center justify-center overflow-hidden">
-                            {activeImage && isVideo(activeImage) ? (
-                                <video src={activeImage} controls autoPlay muted loop className="w-full h-full object-contain" />
-                            ) : (
-                                <ImageMagnifier src={activeImage || allImages[0]} alt={product.name} />
-                            )}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-16 mb-20 lg:mb-28">
+                    <div className={`lg:col-span-7 lg:sticky lg:top-28 self-start ${isEditing ? 'space-y-6' : 'lg:grid lg:grid-cols-[72px_minmax(0,1fr)] lg:gap-4'}`}>
+                        <div className={`aspect-square w-full rounded-3xl ${STAGE} relative overflow-hidden`}>
+                            <AnimatePresence mode="wait" initial={false}>
+                                <motion.div
+                                    key={activeImage || allImages[0]}
+                                    className="absolute inset-0"
+                                    initial={reduceMotion ? false : { opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={reduceMotion ? undefined : { opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                >
+                                    {activeImage && isVideo(activeImage) ? (
+                                        <video src={activeImage} controls autoPlay muted loop className="w-full h-full object-contain bg-black" />
+                                    ) : (
+                                        <ImageMagnifier src={activeImage || allImages[0]} alt={product.name} />
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
                         </div>
 
-                        <div className="flex gap-3 justify-center flex-wrap">
+                        <div className={isEditing ? 'flex gap-3 justify-center flex-wrap' : 'mt-3 -mx-1 flex gap-3 overflow-x-auto p-1 lg:order-first lg:mx-0 lg:mt-0 lg:flex-col lg:overflow-visible lg:p-0'}>
                             {isEditing && editState ? (
                                 <>
                                     <div className="w-full mb-2 p-3 bg-muted/30 rounded-lg border border-dashed flex items-center justify-between gap-4">
@@ -762,16 +831,19 @@ const ProductDetail = () => {
                                 allImages.map((img, idx) => (
                                     <button
                                         key={idx}
+                                        type="button"
                                         onClick={() => setActiveImage(img)}
-                                        className={`w-16 h-16 rounded-lg border-2 overflow-hidden relative bg-card
-                                            ${activeImage === img ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'}`}
+                                        aria-label={`Show ${isVideo(img) ? 'video' : `photo ${idx + 1}`}`}
+                                        aria-pressed={(activeImage || allImages[0]) === img}
+                                        className={`h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl ${STAGE} transition
+                                            ${(activeImage || allImages[0]) === img ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-70 hover:opacity-100'}`}
                                     >
                                         {isVideo(img) ? (
-                                            <div className="w-full h-full flex items-center justify-center bg-black/10">
-                                                <Play size={20} className="text-foreground" />
-                                            </div>
+                                            <span className="flex h-full w-full items-center justify-center bg-neutral-900">
+                                                <Play size={20} className="text-white" />
+                                            </span>
                                         ) : (
-                                            <img src={img} className="w-full h-full object-contain" alt={`${product.name} gallery image ${idx}`} />
+                                            <img src={img} className="h-full w-full object-contain p-1.5 mix-blend-multiply" alt="" />
                                         )}
                                     </button>
                                 ))
@@ -779,8 +851,8 @@ const ProductDetail = () => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col pt-4">
-                        <div className="mb-4 flex flex-wrap items-center gap-3">
+                    <div className="lg:col-span-5 flex flex-col">
+                        <div className="mb-3 flex flex-wrap items-center gap-3">
                             {isEditing && editState ? (
                                 <>
                                     <Select value={editState.category} onValueChange={(val) => updateEditState({ category: val })}>
@@ -818,16 +890,13 @@ const ProductDetail = () => {
                                     </div>
                                 </>
                             ) : (
-                                <>
-                                    <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                                        {CATEGORY_LABELS[product.category] ?? 'Product'}
-                                    </span>
-                                    {product.sub_category && (
-                                        <span className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-                                            {product.sub_category}
-                                        </span>
-                                    )}
-                                </>
+                                <p className="text-sm">
+                                    {brand && <span className="font-semibold text-primary">{brand}</span>}
+                                    {brand && <span className="mx-2 text-muted-foreground/60" aria-hidden="true">/</span>}
+                                    <Link to={categoryPath} className="text-muted-foreground hover:text-foreground">
+                                        {[CATEGORY_LABELS[product.category] ?? 'Product', product.sub_category].filter(Boolean).join(', ')}
+                                    </Link>
+                                </p>
                             )}
                         </div>
 
@@ -838,7 +907,7 @@ const ProductDetail = () => {
                                 className="text-4xl font-extrabold mb-4 h-auto py-2 border-dashed border-2 border-primary/30 bg-primary/5"
                             />
                         ) : (
-                            <h1 className="text-4xl font-extrabold text-foreground mb-4 leading-tight">{product.name}</h1>
+                            <h1 className="font-display text-3xl sm:text-4xl xl:text-[2.75rem] font-bold tracking-tight leading-[1.08] text-foreground text-balance">{product.name}</h1>
                         )}
 
                         {isEditing && editState && (
@@ -851,17 +920,19 @@ const ProductDetail = () => {
                         )}
 
                         {/* A 0.0 rating reads as "nobody buys this"; show nothing until there is a review. */}
-                        {reviews.length > 0 && (
-                            <div className="flex items-center gap-4 mb-8 pb-8 border-b">
-                                <div className="flex items-center gap-2">
-                                    <StarRating rating={averageRating} size={20} />
-                                    <span className="text-base font-bold text-foreground">{averageRating.toFixed(1)}</span>
-                                </div>
-                                <span className="text-sm text-muted-foreground">{reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}</span>
-                            </div>
+                        {!isEditing && product.short_description && (
+                            <p className="mt-4 max-w-[60ch] text-base leading-relaxed text-muted-foreground line-clamp-3">{product.short_description}</p>
                         )}
 
-                        <div className="mb-8">
+                        {reviews.length > 0 && (
+                            <a href="#reviews" className="mt-4 inline-flex items-center gap-2 self-start text-sm">
+                                <StarRating rating={averageRating} size={16} />
+                                <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
+                                <span className="text-muted-foreground underline-offset-4 hover:underline">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</span>
+                            </a>
+                        )}
+
+                        <div className="mt-8 border-t border-border/60 pt-6 mb-8">
                             {isEditing && editState ? (
                                 <div className="flex gap-4 items-center">
                                     <div className="flex items-center gap-2">
@@ -885,15 +956,25 @@ const ProductDetail = () => {
                                 </div>
                             ) : (
                                 <>
-                                    {dealPrice(product) !== null && inStock && (
-                                        <div className="mb-2 flex items-center gap-3">
-                                            <span className="rounded-full bg-[hsl(var(--festive-on-dark))] px-3 py-1 text-xs font-semibold text-neutral-950">{dealBadge(product, dealPrice(product)!)}</span>
-                                            <span className="text-lg tabular-nums text-muted-foreground">
-                                                {product.festival ? <span className="sr-only">Was </span> : 'M.R.P. '}<s>{formatINR(dealPrice(product)!)}</s>
-                                            </span>
-                                        </div>
+                                    {was !== null && inStock && (
+                                        <span className="mb-3 inline-block rounded-full bg-[hsl(var(--festive-on-dark))] px-3 py-1 text-xs font-semibold text-neutral-950">{dealBadge(product, was)}</span>
                                     )}
-                                    <p className="text-5xl font-bold text-foreground">{formatINR(product.price)}</p>
+                                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                        <p className="font-display text-4xl sm:text-5xl font-bold tracking-tight tabular-nums text-foreground">
+                                            {was !== null && inStock && <span className="sr-only">Now </span>}{formatINR(product.price)}
+                                        </p>
+                                        {was !== null && inStock && (
+                                            <p className="text-lg tabular-nums text-muted-foreground">
+                                                {product.festival ? <span className="sr-only">Was </span> : 'M.R.P. '}<s>{formatINR(was)}</s>
+                                            </p>
+                                        )}
+                                    </div>
+                                    {was !== null && inStock && (
+                                        <p className="mt-2 text-sm font-semibold text-primary tabular-nums">You save {formatINR(was - Number(product.price))}</p>
+                                    )}
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Inclusive of GST{product.category === '3d_printer' ? ', with free shipping across India' : ''}
+                                    </p>
                                     {inStock && <FestivalPriceNote product={product} />}
                                     {inStock && <FreeGiftNote product={product} className="mt-2" />}
                                     <p className={`mt-3 text-sm font-medium flex items-center gap-2 ${inStock ? 'text-green-300' : 'text-red-300'}`}>
@@ -904,9 +985,22 @@ const ProductDetail = () => {
                             )}
                         </div>
 
+                        <div ref={ctaRef} className={`flex gap-3 mb-8 ${isEditing ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="flex h-12 shrink-0 items-center rounded-full border border-border bg-background">
+                                <button type="button" onClick={() => setQuantity(q => Math.max(1, q - 1))} aria-label="One fewer" className="flex h-full w-11 items-center justify-center rounded-l-full hover:bg-accent/40 active:scale-95"><Minus size={16}/></button>
+                                <span className="w-8 text-center font-semibold tabular-nums" aria-live="polite">{quantity}</span>
+                                <button type="button" onClick={() => setQuantity(q => Math.min(product.stock, q + 1))} aria-label="One more" className="flex h-full w-11 items-center justify-center rounded-r-full hover:bg-accent/40 active:scale-95"><Plus size={16}/></button>
+                            </div>
+                            <Button onClick={handleAddToCart} disabled={!inStock || isAddingToCart} className="h-12 flex-1 rounded-full text-base font-semibold active:scale-[0.98] transition-transform">
+                                {isAddingToCart ? <Loader2 className="animate-spin mr-2"/> : <ShoppingCart className="mr-2 h-5 w-5"/>}
+                                {isAddingToCart ? 'Adding...' : 'Add to cart'}
+                            </Button>
+                            <Button variant="outline" className="h-12 w-12 shrink-0 rounded-full p-0" onClick={shareProduct} aria-label="Share this product"><Share2 className="w-5 h-5"/></Button>
+                        </div>
+
                         <div className="mb-8">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-semibold">Key Specs</h3>
+                                <h2 className="text-sm font-semibold text-foreground">{specsInBuyBox || isEditing ? 'Specifications' : 'At a glance'}</h2>
                                 {isEditing && (
                                     <Button size="sm" variant="outline" onClick={handleAddSpec} className="h-7 text-xs">
                                         <Plus size={12} className="mr-1"/> Add Spec
@@ -914,7 +1008,7 @@ const ProductDetail = () => {
                                 )}
                             </div>
 
-                            <div className="rounded-lg overflow-hidden border border-border/50">
+                            <div className={isEditing ? 'rounded-lg overflow-hidden border border-border/50' : ''}>
                                 {isEditing && editState ? (
                                     <Reorder.Group
                                         axis="y"
@@ -954,31 +1048,9 @@ const ProductDetail = () => {
                                         ))}
                                     </Reorder.Group>
                                 ) : (
-                                    <table className="w-full text-sm text-left">
-                                        <tbody>
-                                        {displaySpecs.map(({key, value}, idx) => (
-                                            <tr key={idx} className="border-b last:border-0 border-border/50">
-                                                <td className="p-3 font-medium text-muted-foreground w-1/3">{key}</td>
-                                                <td className="p-3 font-medium text-foreground">{value}</td>
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </table>
+                                    <SpecTiles specs={glanceSpecs} />
                                 )}
                             </div>
-                        </div>
-
-                        <div className={`flex flex-col sm:flex-row gap-4 mb-8 mt-auto ${isEditing ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <div className="flex items-center border rounded-lg h-12 w-32 bg-background shadow-sm">
-                                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-3 h-full hover:bg-accent rounded-l-lg"><Minus size={16}/></button>
-                                <span className="flex-1 text-center font-bold">{quantity}</span>
-                                <button onClick={() => setQuantity(q => Math.min(product.stock, q + 1))} className="px-3 h-full hover:bg-accent rounded-r-lg"><Plus size={16}/></button>
-                            </div>
-                            <Button onClick={handleAddToCart} disabled={!inStock || isAddingToCart} className="flex-1 h-12 text-lg shadow-lg hover:-translate-y-0.5 transition-transform">
-                                {isAddingToCart ? <Loader2 className="animate-spin mr-2"/> : <ShoppingCart className="mr-2"/>}
-                                {isAddingToCart ? 'Adding...' : 'Add to Cart'}
-                            </Button>
-                            <Button variant="outline" className="h-12 w-12 p-0" onClick={shareProduct} aria-label="Share this product"><Share2 className="w-5 h-5"/></Button>
                         </div>
 
                         {!isEditing && INTEREST_FOR_CATEGORY[product.category] && (
@@ -989,6 +1061,18 @@ const ProductDetail = () => {
                     </div>
                 </div>
 
+                {!isEditing && !specsInBuyBox && (
+                    <section className="mb-20 lg:mb-28" aria-labelledby="specs-heading">
+                        <h2 id="specs-heading" className="font-display text-2xl sm:text-3xl font-bold tracking-tight mb-6">Specifications</h2>
+                        <SpecTiles specs={showAllSpecs ? tileSpecs : tileSpecs.slice(0, SPECS_SHOWN)} wide />
+                        {tileSpecs.length > SPECS_SHOWN && (
+                            <Button variant="outline" className="mt-4 rounded-full" onClick={() => setShowAllSpecs((v) => !v)} aria-expanded={showAllSpecs}>
+                                {showAllSpecs ? 'Show fewer' : `Show all ${tileSpecs.length} specifications`}
+                            </Button>
+                        )}
+                    </section>
+                )}
+
                 {!isEditing && INTEREST_FOR_CATEGORY[product.category] && (
                     <div className="mb-24">
                         <LeadCapture interest={INTEREST_FOR_CATEGORY[product.category]} form="product_page"
@@ -996,10 +1080,10 @@ const ProductDetail = () => {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-24 items-start">
-                    <div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 mb-24 items-start">
+                    <div id="reviews" className="lg:col-span-5 lg:order-last scroll-mt-28">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold font-display">Customer Reviews</h2>
+                            <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">Reviews</h2>
                             <Select value={reviewFilter} onValueChange={setReviewFilter}>
                                 <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Sort" /></SelectTrigger>
                                 <SelectContent>
@@ -1065,9 +1149,9 @@ const ProductDetail = () => {
                         </div>
                     </div>
 
-                    <div className="h-fit">
-                        <article className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
-                            <h2 className="text-2xl font-bold font-display mb-6">About {product.name}</h2>
+                    <div className="lg:col-span-7 h-fit">
+                        <article className="max-w-[68ch] text-muted-foreground leading-relaxed">
+                            <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-6">About this {product.category === '3d_printer' ? 'printer' : 'product'}</h2>
                             {isEditing && editState ? (
                                 <Textarea
                                     value={editState.description}
@@ -1075,27 +1159,25 @@ const ProductDetail = () => {
                                     className="min-h-[400px] font-sans text-muted-foreground leading-relaxed border-dashed border-primary/30"
                                 />
                             ) : (
-                                <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed">
-                                    <ul className="space-y-3 list-none pl-0 ">
-                                        {product.description.split('\n').filter(line => line.trim() !== '').map((line, i) => (
-                                            <li key={i} className="flex gap-3 items-start">
-                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0 block" />
-                                                <span>{line}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                                <ul className="space-y-4 text-[15px]">
+                                    {product.description.split('\n').filter(line => line.trim() !== '').map((line, i) => (
+                                        <li key={i} className="flex gap-3 items-start">
+                                            <Check className="mt-1 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                                            <span>{line}</span>
+                                        </li>
+                                    ))}
+                                </ul>
                             )}
                         </article>
                     </div>
                 </div>
 
                 {relatedProducts.length > 0 && (
-                    <div className="border-t pt-16">
-                        <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-3xl font-display font-bold">Related Products</h2>
-                            <Button variant="ghost" className="text-primary hover:text-primary/80" onClick={handleExploreCategory}>
-                                Explore Category <ArrowRight className="ml-2 w-4 h-4" />
+                    <div className="border-t border-border/60 pt-16">
+                        <div className="flex justify-between items-center mb-8 gap-4">
+                            <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">You may also like</h2>
+                            <Button variant="ghost" className="shrink-0 text-primary hover:text-primary/80" onClick={handleExploreCategory}>
+                                See all {categoryName.toLowerCase()} <ArrowRight className="ml-2 w-4 h-4" />
                             </Button>
                         </div>
                         <div className="flex overflow-x-auto gap-6 pb-8 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -1103,9 +1185,9 @@ const ProductDetail = () => {
                                 const rating = related.average_rating ? Number(related.average_rating) : 0;
                                 return (
                                     <motion.div key={related.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="min-w-[280px] w-[280px] snap-start">
-                                        <Card onClick={() => navigate(`/product/${related.slug || related.id}`)} className="cursor-pointer hover:shadow-xl transition-all h-full flex flex-col group border-border/60 overflow-hidden rounded-xl">
-                                            <div className="aspect-square bg-black flex items-center justify-center relative overflow-hidden">
-                                                <img src={related.image_url || '/placeholder.svg'} alt={related.name} className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105" />
+                                        <Card onClick={() => navigate(`/product/${related.slug || related.id}`)} className="cursor-pointer transition-colors h-full flex flex-col group border-border/60 hover:border-primary/40 overflow-hidden rounded-2xl">
+                                            <div className={`aspect-square flex items-center justify-center relative overflow-hidden ${STAGE}`}>
+                                                <img src={related.image_url || '/placeholder.svg'} alt={related.name} loading="lazy" className="w-full h-full object-contain p-5 mix-blend-multiply transition-transform duration-500 group-hover:scale-105" />
                                             </div>
                                             <CardContent className="p-4 flex-1 flex flex-col">
                                                 <div className="flex justify-between items-start mb-2 gap-2">
@@ -1123,6 +1205,24 @@ const ProductDetail = () => {
                     </div>
                 )}
             </div>
+
+            {!isAdmin && inStock && (
+                <div
+                    aria-hidden={!ctaPassed}
+                    className={`fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md transition-transform duration-300 lg:hidden ${ctaPassed ? 'translate-y-0' : 'translate-y-full'}`}
+                    style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs text-muted-foreground">{product.name}</p>
+                            <p className="font-display text-lg font-bold tabular-nums">{formatINR(product.price)}</p>
+                        </div>
+                        <Button onClick={handleAddToCart} disabled={isAddingToCart} tabIndex={ctaPassed ? 0 : -1} className="h-11 shrink-0 rounded-full px-6 font-semibold active:scale-[0.98]">
+                            {isAddingToCart ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add to cart'}
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
         </>
     );
