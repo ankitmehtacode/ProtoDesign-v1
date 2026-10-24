@@ -309,10 +309,14 @@ const ProductDetail = () => {
                     setReviews(reviewsData);
                 } catch (e) { console.error("Failed to load reviews"); }
 
+                // Its own try: a failed "You may also like" must not send the visitor away from the product.
                 if (fetchedProduct.category) {
-                    const categoryRes = await apiService.getProducts(fetchedProduct.category);
-                    const catProducts = (categoryRes.data || []).filter((p: Product) => p.id !== fetchedProduct.id);
-                    setRelatedProducts(catProducts.slice(0, 10));
+                    try {
+                        const categoryRes = await apiService.getProducts(fetchedProduct.category);
+                        // GET /products returns a bare array (as ProductCatalog reads it); .data alone left this always empty.
+                        const list: Product[] = Array.isArray(categoryRes) ? categoryRes : (categoryRes.data || []);
+                        setRelatedProducts(list.filter((p: Product) => p.id !== fetchedProduct.id).slice(0, 10));
+                    } catch (e) { console.error("Failed to load related products", e); }
                 }
 
                 window.scrollTo(0, 0);
@@ -1185,7 +1189,9 @@ const ProductDetail = () => {
                                 const rating = related.average_rating ? Number(related.average_rating) : 0;
                                 return (
                                     <motion.div key={related.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="min-w-[280px] w-[280px] snap-start">
-                                        <Card onClick={() => navigate(`/product/${related.slug || related.id}`)} className="cursor-pointer transition-colors h-full flex flex-col group border-border/60 hover:border-primary/40 overflow-hidden rounded-2xl">
+                                        {/* A real link, so crawlers follow it from printer to printer. */}
+                                        <Link to={`/product/${related.slug || related.id}`} className="block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        <Card className="cursor-pointer transition-colors h-full flex flex-col group border-border/60 hover:border-primary/40 overflow-hidden rounded-2xl">
                                             <div className={`aspect-square flex items-center justify-center relative overflow-hidden ${STAGE}`}>
                                                 <img src={related.image_url || '/placeholder.svg'} alt={related.name} loading="lazy" className="w-full h-full object-contain p-5 mix-blend-multiply transition-transform duration-500 group-hover:scale-105" />
                                             </div>
@@ -1195,9 +1201,10 @@ const ProductDetail = () => {
                                                     {rating > 0 && (<div className="flex items-center gap-1 bg-yellow-500/15 px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-300 shrink-0"><Star size={10} className="fill-current" /> {rating.toFixed(1)}</div>)}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground mb-4 line-clamp-2 min-h-[2.5em]">{related.short_description || related.description}</p>
-                                                <div className="mt-auto flex items-center justify-between"><span className="font-bold text-lg text-primary">{formatINR(related.price)}</span><Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-sm"><ShoppingCart size={14} /></Button></div>
+                                                <div className="mt-auto flex items-center justify-between"><span className="font-bold text-lg text-primary">{formatINR(related.price)}</span><span aria-hidden className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-sm"><ShoppingCart size={14} /></span></div>
                                             </CardContent>
                                         </Card>
+                                        </Link>
                                     </motion.div>
                                 );
                             })}

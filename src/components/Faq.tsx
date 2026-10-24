@@ -1,16 +1,23 @@
 import { FAQ } from "@/seo/faq.js";
 
+type FaqProps = {
+    items?: { q: string; a: string }[];
+    heading?: string;
+};
+
 /**
- * Frequently asked questions, shown on /custom and prerendered from this same
- * component (scripts/prerender.mjs), so crawlers read exactly what visitors see.
+ * Frequently asked questions, shown on /custom (and, with printer price
+ * questions, on /printers) and prerendered from the same data
+ * (scripts/prerender.mjs), so crawlers read exactly what visitors see.
  * Native <details> keeps every answer in the HTML without JavaScript.
  */
-export function Faq() {
+export function Faq({ items = FAQ, heading = "Questions about 3D printing with ProtoDesign" }: FaqProps) {
+    if (!items.length) return null;
     return (
         <section id="faq" aria-labelledby="faq-heading" className="mx-auto mt-16 max-w-3xl">
-            <h2 id="faq-heading" className="mb-6 text-2xl font-bold">Questions about 3D printing with ProtoDesign</h2>
+            <h2 id="faq-heading" className="mb-6 text-2xl font-bold">{heading}</h2>
             <div className="divide-y rounded-lg border bg-card">
-                {FAQ.map(({ q, a }) => (
+                {items.map(({ q, a }) => (
                     <details key={q} className="group px-5 py-4">
                         <summary className="cursor-pointer list-none font-medium marker:hidden">
                             <span className="flex items-center justify-between gap-4">

@@ -10,4 +10,8 @@ export const FACTS: {
     returnWindowDays: number;
 };
 export const FAQ: { q: string; a: string }[];
-export function faqLd(): object;
+export function faqLd(entries?: { q: string; a: string }[], path?: string): object;
+export function printerPriceFaq(products: {
+    name: string; price: number | string; stock: number; category?: string; sub_category?: string | null; specifications?: unknown; is_archived?: boolean;
+    festival?: { name: string; ends_at: string; gift?: { label: string } } | null;
+}[]): { q: string; a: string }[];

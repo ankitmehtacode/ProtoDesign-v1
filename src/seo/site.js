@@ -50,6 +50,7 @@ export const ORG = {
  *   title: string,
  *   description: string,
  *   h1?: string,
+ *   heading?: string,
  *   intro?: string,
  *   noindex?: boolean,
  *   crumbs?: Crumb[],
@@ -100,12 +101,17 @@ export const PAGES = {
         intro: "3D printers, filament, resin, accessories and spare parts. In-stock orders are dispatched in 2–3 business days and delivered across India.",
         crumbs: [{ name: "Shop", path: "/shop" }],
     },
+    // "3d printer price in india" and its variants are the most searched
+    // queries this page shows for (Search Console, Oct 2026).
     "/printers": {
-        title: "Buy 3D Printers Online in India: FDM, Resin & Metal | ProtoDesign",
+        title: "3D Printer Price in India: Buy FDM & Resin Printers | ProtoDesign",
         description:
-            "Compare and buy FDM, resin (SLA) and metal 3D printers and 3D pens with prices in rupees. Delivered across India from Indore.",
+            "Compare 3D printer prices in India: Bambu Lab, Creality, ELEGOO, Anycubic and more, GST included, free shipping on every printer. Delivered from Indore.",
         h1: "3D printers",
-        intro: "FDM, resin and metal 3D printers, plus 3D pens, priced in rupees and delivered across India.",
+        // The page's visible heading (CategoryPage title in App.tsx); h1 stays
+        // the category's name in navigation and breadcrumbs.
+        heading: "3D printer prices in India",
+        intro: "FDM and resin 3D printers, plus 3D scanners and laser engravers, priced in rupees with GST included and free shipping across India.",
         crumbs: [{ name: "Shop", path: "/shop" }, { name: "3D printers", path: "/printers" }],
         category: "3d_printer",
     },
@@ -457,19 +463,26 @@ export function plainText(s = "", max = 160) {
 
 /**
  * Product title for search: name, category hint and region, kept near 60 chars.
- * During a festival sale a printer's title leads with its sale price, the
- * number people comparing stores look for in results.
+ * A printer's title says "Price in India" and the price, the words and number
+ * people search printers by ("bambu lab p1s price in india"); during a sale
+ * the sale's name follows when it fits.
  */
 export const productTitle = (/** @type {string} */ rawName, /** @type {string} */ _categoryName, /** @type {Partial<SeoProduct>} */ p = {}) => {
     const name = plainText(rawName, 200);
-    const sale = p.festival && p.category === PRINTER_CATEGORY && Number(p.price) > 0
+    const priced = p.category === PRINTER_CATEGORY && Number(p.price) > 0
         ? (() => {
             const price = `₹${Math.round(Number(p.price)).toLocaleString("en-IN")}`;
-            const label = plainText(p.festival.name, 40);
-            return [`${name} at ${price}: ${label} | ${SITE_NAME}`, `${name} at ${price} | ${label}`, `${name} at ${price} | ${SITE_NAME}`, `${name} at ${price}`];
+            const label = p.festival ? plainText(p.festival.name, 40) : "";
+            return [
+                ...(label ? [`${name} Price in India: ${price} | ${label}`] : []),
+                `${name} Price in India: ${price} | ${SITE_NAME}`,
+                `${name} Price in India: ${price}`,
+                `${name} at ${price} | ${SITE_NAME}`,
+                `${name} at ${price}`,
+            ];
         })()
         : [];
-    for (const candidate of [...sale, `${name}: Buy Online in India | ${SITE_NAME}`, `${name} | Buy in India | ${SITE_NAME}`, `${name} | ${SITE_NAME}`]) {
+    for (const candidate of [...priced, `${name}: Buy Online in India | ${SITE_NAME}`, `${name} | Buy in India | ${SITE_NAME}`, `${name} | ${SITE_NAME}`]) {
         if (candidate.length <= 65) return candidate;
     }
     return `${plainText(name, 50)} | ${SITE_NAME}`;
