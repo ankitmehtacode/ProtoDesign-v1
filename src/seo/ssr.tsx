@@ -28,5 +28,5 @@ export function renderPage(route: string): string | null {
     return page ? render(route, page()) : null;
 }
 
-/** The FAQ section as shown on /custom. */
-export const renderFaq = () => render("/custom", <Faq />);
+/** The FAQ section as shown on /custom, or with other questions on another route (/printers). */
+export const renderFaq = (route = "/custom", props: Parameters<typeof Faq>[0] = {}) => render(route, <Faq {...props} />);

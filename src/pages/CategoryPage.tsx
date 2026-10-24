@@ -2,6 +2,9 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { ProductCatalog } from '@/components/shop/ProductCatalog';
 import { INTEREST_FOR_CATEGORY, LeadCapture } from '@/components/LeadCapture';
+import { Faq } from '@/components/Faq';
+import { printerPriceFaq } from '@/seo/faq.js';
+import { PRINTER_CATEGORY } from '@/seo/site.js';
 
 interface CategoryPageProps {
     category: string;
@@ -21,7 +24,16 @@ const CategoryPage = ({ category, eyebrow, title, subtitle, subCategories }: Cat
     const interest = INTEREST_FOR_CATEGORY[category];
     return (
         <>
-            <ProductCatalog category={category} eyebrow={eyebrow} title={title} subtitle={subtitle} subCategories={subCategories} />
+            <ProductCatalog
+                category={category}
+                eyebrow={eyebrow}
+                title={title}
+                subtitle={subtitle}
+                subCategories={subCategories}
+                footer={category === PRINTER_CATEGORY
+                    ? (products) => <Faq items={printerPriceFaq(products)} heading="3D printer prices in India: common questions" />
+                    : undefined}
+            />
             {interest && (
                 <div className="container mx-auto max-w-4xl space-y-4 px-4 pb-16">
                     {TOOL_LINKS[category] && (

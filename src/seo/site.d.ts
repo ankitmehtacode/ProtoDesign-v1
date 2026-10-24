@@ -1,7 +1,7 @@
 // Types for site.js, which stays plain JS so the Node prerender script can import it.
 export type Crumb = { name: string; path: string };
 export type PageMeta = {
-    title: string; description: string; h1?: string; intro?: string;
+    title: string; description: string; h1?: string; heading?: string; intro?: string;
     noindex?: boolean; crumbs?: Crumb[]; service?: boolean; category?: string;
 };
 type ProductInput = {

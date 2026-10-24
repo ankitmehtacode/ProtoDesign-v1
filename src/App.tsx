@@ -18,6 +18,7 @@ import { TermsPage, PrivacyPage, RefundPage, ReturnPage, ShippingPage, ContactPa
 import { Footer } from "@/components/Footer"; 
 import ScrollToTop from "@/components/ScrollToTop";
 import { AnalyticsConsent } from "@/components/AnalyticsConsent";
+import { PAGES } from "@/seo/site.js";
 
 
 // Split out of the main bundle: the quote page pulls in three.js (~1 MB) and
@@ -68,8 +69,8 @@ const App = () => (
                                     <CategoryPage
                                         category="3d_printer"
                                         eyebrow="3D Printers"
-                                        title="Machines that make things."
-                                        subtitle="FDM, resin and metal printers, plus 3D pens. From a first print to production runs."
+                                        title={PAGES["/printers"].heading ?? "3D printers"}
+                                        subtitle={PAGES["/printers"].intro ?? ""}
                                         subCategories={['FDM', 'SLA', 'Metal 3D Printer', '3D Pen', '3D Scanner', 'Laser Engraver', 'Wash & Cure', 'Others']}
                                     />
                                 } />

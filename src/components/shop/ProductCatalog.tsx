@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -29,6 +29,8 @@ interface ProductCatalogProps {
     categories?: CategoryOption[];
     /** Sub-type chips for a fixed category. */
     subCategories?: string[];
+    /** Rendered under the grid from the loaded products, e.g. a price guide. */
+    footer?: (products: Product[]) => ReactNode;
 }
 
 type SortOption = 'newest' | 'price-low' | 'price-high';
@@ -139,7 +141,7 @@ function FilterTabs({ id, options, value, onChange, label, variant }: {
     );
 }
 
-export function ProductCatalog({ eyebrow, title, subtitle, category, categories, subCategories: fixedSubCategories = NO_SUBCATEGORIES }: ProductCatalogProps) {
+export function ProductCatalog({ eyebrow, title, subtitle, category, categories, subCategories: fixedSubCategories = NO_SUBCATEGORIES, footer }: ProductCatalogProps) {
     const navigate = useNavigate();
     const { addToCart } = useCart();
 
@@ -443,6 +445,7 @@ export function ProductCatalog({ eyebrow, title, subtitle, category, categories,
                         </AnimatePresence>
                     </motion.div>
                 )}
+                {!loading && footer?.(products)}
             </div>
         </div>
     );

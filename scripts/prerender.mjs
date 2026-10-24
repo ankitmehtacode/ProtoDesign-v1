@@ -13,7 +13,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createServer } from "vite";
-import { FAQ, faqLd } from "../src/seo/faq.js";
+import { FAQ, faqLd, printerPriceFaq } from "../src/seo/faq.js";
 import {
     CATEGORY_PAGES, DEFAULT_IMAGE, NOT_FOUND, ORG, PAGES, SITE_NAME, SITE_URL,
     PRINTER_CATEGORY, breadcrumbLd, comparableSpecs, festivalRegularPrice, itemListLd, organizationLd,
@@ -68,7 +68,7 @@ function pageBody(meta, products = [], extra = "") {
             .map((p) => `<li><a href="${new URL(productUrl(p)).pathname}">${esc(plainText(p.name, 200))}</a>: ${esc(priceText(p))}${p.stock > 0 ? "" : " (sold out)"}</li>`)
             .join("")}</ul>`
         : "";
-    return shell(`${nav()}<h1 class="mt-8 font-display text-3xl font-bold">${esc(meta.h1)}</h1><p class="mt-3 max-w-xl text-muted-foreground">${esc(meta.intro ?? meta.description)}</p>${list}${extra}`);
+    return shell(`${nav()}<h1 class="mt-8 font-display text-3xl font-bold">${esc(meta.heading ?? meta.h1)}</h1><p class="mt-3 max-w-xl text-muted-foreground">${esc(meta.intro ?? meta.description)}</p>${list}${extra}`);
 }
 
 /** "₹37,144 (Navratri Sale until 20 Oct; regular price ₹39,099)", or the plain price. */
@@ -79,15 +79,35 @@ function priceText(p) {
 
 const stockText = (p) => p.stock <= 0 ? "Sold out" : specMap(p.specifications).Fulfilment === "Made to order" ? "Made to order" : "In stock";
 
+// Keys the product page hides from its spec list (ProductDetail.tsx).
+const HIDDEN_SPECS = new Set(["allow_cod_override"]);
+
+/** Every specification, exactly as the product page's spec list shows it. */
+const allSpecs = (specs) => Object.entries(specMap(specs)).filter(([k, v]) => k && v && !HIDDEN_SPECS.has(k));
+
+/**
+ * The product page's "You may also like": up to 10 others from the category,
+ * in the API's order, as links.
+ */
+function relatedLinks(p) {
+    const related = products.filter((o) => o.category === p.category && o.id !== p.id).slice(0, 10);
+    return related.length
+        ? `<h2 class="mt-8 text-xl font-bold">You may also like</h2><ul class="mt-3 space-y-1 text-sm">${related
+            .map((o) => `<li><a href="${new URL(productUrl(o)).pathname}">${esc(plainText(o.name, 200))}</a>: ${esc(inr(o.price))}</li>`)
+            .join("")}</ul>`
+        : "";
+}
+
 function productBody(p, categoryName, categoryPath) {
     const desc = plainText(p.description || p.short_description || "", 1200);
     const printer = p.category === PRINTER_CATEGORY;
-    const specs = comparableSpecs(p.specifications);
+    const specs = allSpecs(p.specifications);
     return shell(`${nav()}<p class="mt-8 text-sm text-muted-foreground"><a href="${categoryPath}">${esc(categoryName)}</a></p>` +
         `<h1 class="mt-2 font-display text-3xl font-bold">${esc(plainText(p.name, 200))}</h1>` +
         `<p class="mt-3 text-lg">${esc(priceText(p))} · GST included · ${stockText(p)} · ${printer ? "Free shipping across India" : "Delivered across India"}</p>` +
         (specs.length ? `<ul class="mt-4 space-y-1 text-sm">${specs.map(([k, v]) => `<li>${esc(k)}: ${esc(v)}</li>`).join("")}</ul>` : "") +
-        (desc ? `<p class="mt-4 max-w-xl text-muted-foreground">${esc(desc)}</p>` : ""));
+        (desc ? `<p class="mt-4 max-w-xl text-muted-foreground">${esc(desc)}</p>` : "") +
+        relatedLinks(p));
 }
 
 function render(template, headHtml, bodyHtml) {
@@ -169,9 +189,14 @@ for (const [route, meta] of Object.entries(PAGES)) {
     const inCategory = meta.category ? products.filter((p) => p.category === meta.category)
         : route === "/shop" ? products : [];
     if (!meta.noindex && meta.category && inCategory.length) ld.push(itemListLd(inCategory));
+    // The printer price questions /printers shows under its grid (CategoryPage.tsx).
+    const priceFaq = meta.category === PRINTER_CATEGORY ? printerPriceFaq(inCategory) : [];
+    if (!meta.noindex && priceFaq.length) ld.push(faqLd(priceFaq, route));
+    const extra = route === "/custom" ? renderFaq()
+        : priceFaq.length ? renderFaq(route, { items: priceFaq, heading: "3D printer prices in India: common questions" }) : "";
     await write(route, render(template,
         head({ title: meta.title, description: meta.description, canonical: `${SITE_URL}${route}`, noindex: meta.noindex, ld }),
-        meta.noindex ? "" : renderedBody(route) ?? pageBody(meta, inCategory, route === "/custom" ? renderFaq() : "")));
+        meta.noindex ? "" : renderedBody(route) ?? pageBody(meta, inCategory, extra)));
     count++;
 }
 
