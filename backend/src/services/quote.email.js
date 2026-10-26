@@ -107,16 +107,22 @@ export function quoteAdminEmail({ quoteId, contact, fileName, fileSize, specs, n
 }
 
 /** The confirmation to the customer. */
-export function quoteCustomerEmail({ contact, fileName, specs }) {
+//
+// It goes to whatever address was typed, without an account for a guest, so
+// neither the subject nor the body carries text a caller chose (a file name
+// like "verify at evil.in.stl" would be linked by mail clients), and the price
+// is shown only as a number: the email cannot be turned into a message from us to anyone.
+export function quoteCustomerEmail({ contact, specs }) {
+    const price = Number(specs?.estimatedPrice);
     return {
-        subject: `Order Received: ${fileName}`,
+        subject: 'We received your 3D print quote request',
         html: `
             <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #2563eb;">🚀 We received your request!</h2>
                 <p>Hi ${escapeHtml(contact.name || 'there')},</p>
-                <p>Thank you for submitting your model <strong>${escapeHtml(fileName)}</strong>.</p>
+                <p>Thank you for submitting your model.</p>
                 <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <p><strong>Estimated Price:</strong> ₹${escapeHtml(specs?.estimatedPrice ?? 0)}</p>
+                    ${Number.isFinite(price) && price > 0 ? `<p><strong>Estimated Price:</strong> ₹${Math.round(price)}</p>` : ''}
                     <p><strong>Next Steps:</strong> Our engineers are reviewing the file for printability. We will contact you soon.</p>
                 </div>
                 <p>Best regards,<br><strong>The ProtoDesign Team</strong></p>

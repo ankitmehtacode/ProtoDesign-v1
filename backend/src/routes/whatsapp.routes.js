@@ -7,9 +7,8 @@ import {
     dispatch,
     enqueueMessage,
     getConfig,
-    makeRef,
     maskWaId,
-    shortId,
+    updatesUrl,
     verifySignature,
     verifyToken,
     waMeUrl,
@@ -151,9 +150,7 @@ router.get('/link', authMiddleware, async (req, res, next) => {
         // Same answer for "not yours" and "does not exist".
         if (!owned) return res.status(404).json({ error: `${kind === 'order' ? 'Order' : 'Quote'} not found` });
 
-        const text = `Hi ProtoDesign! Please send me WhatsApp updates for my ${kind} #${shortId(id)} `
-            + `(ref ${makeRef(kind, id, config.linkSecret)}).`;
-        res.json({ url: waMeUrl(config.businessNumber, text) });
+        res.json({ url: updatesUrl(config, kind, id) });
     } catch (error) {
         next(error);
     }

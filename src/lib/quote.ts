@@ -70,32 +70,38 @@ export function modelFileProblem(file: File): string | null {
     return null;
 }
 
-/*
- * Hand-off for a model picked outside the quote page (the home page drop zone),
- * or held while the visitor signs in to send a quote. In memory only: a File
- * cannot be persisted, and a reload starting fresh is the honest behaviour.
- */
-export type PendingQuote = {
-    file: File;
-    settings?: {
-        qualityId: string;
-        materialId: string;
-        color: string;
-        infill: number;
-        scale: number;
-        rotation: { x: number; y: number; z: number };
-    };
+/* --- Contact for a quote (components/QuoteContactCard.tsx) --- */
+
+export type ContactErrors = { email?: string; phone?: string };
+
+// Same rules as the server (backend/src/services/quote.email.js).
+const SINGLE_EMAIL = /^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/;
+
+export function contactErrors(contact: { email: string; phone: string }): ContactErrors {
+    const errors: ContactErrors = {};
+    if (!SINGLE_EMAIL.test(contact.email.trim())) {
+        errors.email = contact.email.trim() ? "Please check your email address." : "Enter your email to receive the quote.";
+    }
+    const digits = contact.phone.replace(/\D/g, "").length;
+    if (!/^\+?[0-9\s()-]+$/.test(contact.phone.trim()) || digits < 10 || digits > 15) {
+        errors.phone = contact.phone.trim() ? "Enter a 10-digit mobile number." : "Enter your WhatsApp number.";
+    }
+    return errors;
+}
+
+// Misspellings of the domains most customers use. A wrong domain means the
+// quote and payment link never arrive, and the customer thinks we ignored them.
+const DOMAIN_FIXES: Record<string, string> = {
+    "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gmal.com": "gmail.com", "gamil.com": "gmail.com",
+    "gmail.co": "gmail.com", "gmail.con": "gmail.com", "gmail.cm": "gmail.com", "gmail.in": "gmail.com",
+    "gnail.com": "gmail.com", "gmaill.com": "gmail.com",
+    "yaho.com": "yahoo.com", "yahooo.com": "yahoo.com", "yahoo.con": "yahoo.com", "yahoo.co": "yahoo.com",
+    "hotmial.com": "hotmail.com", "hotmail.con": "hotmail.com", "outlok.com": "outlook.com", "outlook.con": "outlook.com",
+    "rediffmail.con": "rediffmail.com", "redifmail.com": "rediffmail.com",
 };
 
-let pending: PendingQuote | null = null;
-
-export const holdQuote = (quote: PendingQuote) => {
-    pending = quote;
-};
-
-/** Returns the held quote once, then forgets it. */
-export const takeHeldQuote = (): PendingQuote | null => {
-    const quote = pending;
-    pending = null;
-    return quote;
-};
+export function emailSuggestion(email: string): string | null {
+    const [local, domain] = email.trim().toLowerCase().split("@");
+    const fixed = local && domain ? DOMAIN_FIXES[domain] : undefined;
+    return fixed ? `${local}@${fixed}` : null;
+}

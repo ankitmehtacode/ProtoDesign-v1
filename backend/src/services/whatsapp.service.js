@@ -184,6 +184,16 @@ export function waMeUrl(businessNumber, text) {
     return `https://wa.me/${businessNumber}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 }
 
+/**
+ * The wa.me link a customer sends to follow one of their orders or quotes:
+ * its pre-filled text carries a signed reference. Sending it is the opt-in.
+ */
+export function updatesUrl(config, kind, id) {
+    const text = `Hi ProtoDesign! Please send me WhatsApp updates for my ${kind} #${shortId(id)} `
+        + `(ref ${makeRef(kind, id, config.linkSecret)}).`;
+    return waMeUrl(config.businessNumber, text);
+}
+
 // ---------------------------------------------------------------------------
 // Graph API
 // ---------------------------------------------------------------------------
