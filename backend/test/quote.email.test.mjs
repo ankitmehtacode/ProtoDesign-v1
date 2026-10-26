@@ -79,9 +79,17 @@ describe('quoteAdminEmail', () => {
 });
 
 describe('quoteCustomerEmail', () => {
-    it('greets the customer by name and escapes the file name', () => {
-        const { html } = quoteCustomerEmail({ contact: { name: 'Asha Rao' }, fileName: '<x>.stl', specs: { estimatedPrice: 154 } });
+    it('greets the customer by name and shows the estimate', () => {
+        const { html } = quoteCustomerEmail({ contact: { name: 'Asha Rao' }, specs: { estimatedPrice: 154 } });
         assert.match(html, /Hi Asha Rao,/);
-        assert.match(html, /&lt;x&gt;\.stl/);
+        assert.match(html, /₹154/);
+    });
+
+    it('carries no text the caller chose, so it cannot be turned into a message to someone else', () => {
+        const { subject, html } = quoteCustomerEmail({
+            contact: { name: '' }, fileName: 'verify at evil-pay.in.stl', specs: { estimatedPrice: '0 - call 99999 99999' },
+        });
+        assert.equal(subject, 'We received your 3D print quote request');
+        assert.doesNotMatch(html, /evil-pay|99999/);
     });
 });

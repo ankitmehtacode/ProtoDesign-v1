@@ -9,6 +9,8 @@ import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status";
 interface Props {
     kind: "order" | "quote";
     id: string;
+    /** A link already signed by the server (a guest's quote); skips fetching one. */
+    href?: string;
     size?: ButtonProps["size"];
     className?: string;
 }
@@ -18,7 +20,7 @@ interface Props {
  * customer's chat. Sending that message is the customer's opt-in; nothing is
  * sent on their behalf. Renders nothing when WhatsApp is off.
  */
-export function WhatsAppUpdatesButton({ kind, id, size = "sm", className }: Props) {
+export function WhatsAppUpdatesButton({ kind, id, href, size = "sm", className }: Props) {
     const { data } = useWhatsAppStatus();
     const [opening, setOpening] = useState(false);
     if (!data?.enabled) return null;
@@ -29,7 +31,7 @@ export function WhatsAppUpdatesButton({ kind, id, size = "sm", className }: Prop
         const tab = window.open("about:blank", "_blank");
         setOpening(true);
         try {
-            const url = await apiService.getWhatsAppLink(kind, id);
+            const url = href ?? await apiService.getWhatsAppLink(kind, id);
             if (tab) {
                 tab.opener = null;
                 tab.location.href = url;

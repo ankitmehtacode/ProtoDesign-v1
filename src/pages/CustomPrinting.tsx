@@ -1,17 +1,16 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STLViewer } from "@/components/STLViewer";
 import { useDropzone } from "react-dropzone";
-import { Upload, Check, Loader2, FileBox, Ruler, Clock, RotateCw, Scale, Trash2, FileText, Info } from "lucide-react";
+import { Upload, Check, RotateCw, Scale, Trash2, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
-import { useNavigate } from "react-router-dom";
-import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, holdQuote, modelFileProblem, quotePrice, takeHeldQuote } from "@/lib/quote";
+import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, modelFileProblem, quotePrice, contactErrors, type ContactErrors } from "@/lib/quote";
+import { QuoteContactCard, type QuoteContact } from "@/components/QuoteContactCard";
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
 import { track } from "@/lib/analytics";
@@ -37,8 +36,15 @@ export default function CustomPrinting() {
     const [color, setColor] = useState(MATERIALS[0].colors[0]);
     const [infill, setInfill] = useState(DEFAULT_INFILL);
 
-    const [contact, setContact] = useState({ email: "", phone: "", notes: "" });
+    const [contact, setContact] = useState<QuoteContact>({ email: "", phone: "", notes: "", website: "" });
+    const [errors, setErrors] = useState<ContactErrors>({});
+    const contactRef = useRef<HTMLFormElement>(null);
+    // The mobile price bar shows while the contact card is off screen.
+    const [contactInView, setContactInView] = useState(false);
     const [quoteId, setQuoteId] = useState<string | null>(null);
+    // A guest cannot fetch a WhatsApp link later (it checks the account), so it
+    // comes with the quote.
+    const [whatsAppUrl, setWhatsAppUrl] = useState<string | undefined>();
     // Where the server sent the confirmation: the typed email or the account's.
     const [sentTo, setSentTo] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -46,26 +52,25 @@ export default function CustomPrinting() {
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [isSuccess, setIsSuccess] = useState(false)
 
-    const navigate = useNavigate();
-
-    // A model dropped on the home page, or held while the visitor signed in.
-    // In an effect so StrictMode's double render cannot take it and lose it.
+    // Signed-in customers start with their saved details filled in.
     useEffect(() => {
-        const held = takeHeldQuote();
-        if (!held) return;
-        setFile(held.file);
-        const s = held.settings;
-        if (!s) return;
-        const heldMaterial = MATERIALS.find(m => m.id === s.materialId);
-        setQuality(PRINTER_QUALITIES.find(q => q.id === s.qualityId) ?? PRINTER_QUALITIES[0]);
-        if (heldMaterial) {
-            setMaterial(heldMaterial);
-            setColor(heldMaterial.colors.includes(s.color) ? s.color : heldMaterial.colors[0]);
-        }
-        setInfill(s.infill);
-        setScale(s.scale);
-        setRotation(s.rotation);
+        if (!apiService.isAuthenticated()) return;
+        apiService.getUserProfile()
+            .then((profile) => setContact(c => ({
+                ...c,
+                email: c.email || profile?.email || "",
+                phone: c.phone || profile?.phone_number || "",
+            })))
+            .catch((err) => console.warn("Could not prefill quote contact", err));
     }, []);
+
+    useEffect(() => {
+        const el = contactRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(([entry]) => setContactInView(entry.isIntersecting), { threshold: 0.2 });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isSuccess]);
 
     // --- ACTIONS ---
 
@@ -77,40 +82,33 @@ export default function CustomPrinting() {
         toast.info("Model removed");
     };
 
+    const updateContact = (next: Partial<QuoteContact>) => {
+        setContact(c => ({ ...c, ...next }));
+        // An error clears as soon as the field it is about is edited.
+        setErrors(e => ({ ...e, ...("email" in next ? { email: undefined } : {}), ...("phone" in next ? { phone: undefined } : {}) }));
+    };
+
+    /** Brings the contact card into view with the first field that needs attention focused. */
+    const goToContact = (problems: ContactErrors = contactErrors(contact)) => {
+        contactRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const field = problems.email ? "quote-email" : problems.phone ? "quote-phone" : null;
+        if (field) document.getElementById(field)?.focus({ preventScroll: true });
+    };
+
     const handleSendQuote = async () => {
-        // --- ADD THIS BLOCK AT THE START ---
-        if (!apiService.isAuthenticated()) {
-            // Keep the model and settings through sign-in; Auth brings the visitor back here.
-            if (file) {
-                holdQuote({
-                    file,
-                    settings: { qualityId: quality.id, materialId: material.id, color, infill, scale, rotation },
-                });
-            }
-            localStorage.setItem('redirectAfterLogin', '/custom');
-            toast.info("Sign in to send your quote. Your model and settings are kept.");
-            navigate('/auth');
+        if (!file) {
+            toast.error("Please choose a model file first.");
             return;
         }
-        // Checked before the upload: the team needs a way to reach the customer,
-        // and the server rejects a quote without one only after the model is sent.
-        // Same rules as the server (backend/src/services/quote.email.js).
-        if (contact.email.trim() && !/^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/.test(contact.email.trim())) {
-            toast.error("Please check your email address.");
-            return;
-        }
-        const phoneDigits = contact.phone.replace(/\D/g, "").length;
-        if (!/^\+?[0-9\s()-]+$/.test(contact.phone.trim()) || phoneDigits < 10 || phoneDigits > 15) {
-            toast.error("Please enter a phone number so we can reach you about this quote.");
+        // Nothing is uploaded without a way to reach the customer: a quote the
+        // team cannot reply to is no use. The server enforces the same rule.
+        const problems = contactErrors(contact);
+        if (problems.email || problems.phone) {
+            setErrors(problems);
+            goToContact(problems);
             return;
         }
         setIsSending(true);
-
-        if (!file) {
-            toast.error("Please choose a model file first.");
-            setIsSending(false);
-            return;
-        }
 
         const specs = JSON.stringify({
             quality: quality.name,
@@ -131,7 +129,11 @@ export default function CustomPrinting() {
             // so model size is not bounded by the request limit.
             setUploadProgress(0);
             track("quote_start");
-            const fileKey = await apiService.uploadModel(file, setUploadProgress);
+            const { key: fileKey, guestToken } = await apiService.uploadModel(
+                file,
+                { email: contact.email, phone: contact.phone, website: contact.website },
+                setUploadProgress,
+            );
 
             const result = await apiService.sendQuoteRequest({
                 fileKey,
@@ -140,17 +142,19 @@ export default function CustomPrinting() {
                 phone: contact.phone,
                 notes: contact.notes,
                 specifications: specs,
+                guestToken,
             });
 
             setQuoteId(result?.quoteId ?? null);
+            setWhatsAppUrl(result?.whatsAppUrl);
             setSentTo(result?.email || contact.email.trim());
             toast.success("Quote sent successfully!");
             setIsSuccess(true);
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
             // Surface the real reason -- size and file-type rejections are
             // actionable, and a generic message just makes people retry.
-            toast.error(error?.message || "Failed to send quote. Please try again.");
+            toast.error(error instanceof Error && error.message ? error.message : "Failed to send quote. Please try again.");
         } finally {
             setIsSending(false);
             setUploadProgress(null);
@@ -232,7 +236,7 @@ export default function CustomPrinting() {
                         Our team will verify your file and send the payment link{sentTo && <> to <strong>{sentTo}</strong></>} shortly.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        {quoteId && <WhatsAppUpdatesButton kind="quote" id={quoteId} size="default" />}
+                        {quoteId && <WhatsAppUpdatesButton kind="quote" id={quoteId} href={whatsAppUrl} size="default" />}
                         <Button onClick={() => window.location.reload()}>Submit Another</Button>
                     </div>
                 </div>
@@ -241,7 +245,7 @@ export default function CustomPrinting() {
     }
 
     return (
-        <div className="min-h-screen pt-24 pb-12 bg-muted/30">
+        <div className={`min-h-screen pt-24 bg-muted/30 ${file ? "pb-28 lg:pb-12" : "pb-12"}`}>
             <div className="container mx-auto px-4">
 
                 <div className="mb-10 flex items-baseline gap-4 border-b border-border pb-6">
@@ -297,6 +301,7 @@ export default function CustomPrinting() {
                                             <Upload className="w-8 h-8" />
                                         </div>
                                         <p className="font-semibold text-lg">Click or Drop STL/OBJ here</p>
+                                        <p className="mt-1 text-sm text-white/70">See your price in seconds. Free, no sign-up.</p>
                                     </div>
                                 )}
                             </div>
@@ -526,46 +531,44 @@ export default function CustomPrinting() {
                             </CardContent>
                         </Card>
 
-                        <Card className="border-primary/20 shadow-md">
-                            <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent pb-4">
-                                <CardTitle className="text-xl flex justify-between items-center">
-                                    <span>Estimated Quote</span>
-                                    <span className="text-2xl font-bold text-primary">{formatINR(calculatePrice())}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 pt-6">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                                    <Clock className="w-4 h-4" /> Est. Print Time: {calculateTime()}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Input type="email" placeholder="Email (blank uses your account email)" value={contact.email} onChange={e => setContact(c => ({...c, email: e.target.value}))} />
-                                    <Input type="tel" inputMode="tel" placeholder="Phone Number *" value={contact.phone} onChange={e => setContact(c => ({...c, phone: e.target.value}))} />
-                                </div>
-                                <Textarea placeholder="Special instructions (optional)..." value={contact.notes} onChange={e => setContact(c => ({...c, notes: e.target.value}))} />
-
-                                <Button
-                                    className="w-full h-12 text-lg shadow-lg shadow-primary/20"
-                                    size="lg"
-                                    onClick={handleSendQuote}
-                                    disabled={isSending || !file}
-                                >
-                                    {isSending ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2" />}
-                                    {/* Large models take real time to upload; showing
-                                        progress keeps the wait from looking like a hang. */}
-                                    {uploadProgress !== null && uploadProgress < 1
-                                        ? `Uploading model... ${Math.round(uploadProgress * 100)}%`
-                                        : isSending
-                                            ? "Sending Quote Request..."
-                                            : "Send Quote Request"}
-                                </Button>
-                            </CardContent>
-                        </Card>
+                        <QuoteContactCard
+                            ref={contactRef}
+                            price={calculatePrice()}
+                            printTime={calculateTime()}
+                            summary={`${material.name} ${color} · ${infill}% infill · ${quality.name}`}
+                            contact={contact}
+                            onContactChange={updateContact}
+                            errors={errors}
+                            onSubmit={handleSendQuote}
+                            sending={isSending}
+                            uploadProgress={uploadProgress}
+                            hasFile={!!file}
+                        />
 
                     </div>
                 </div>
                 <Faq />
             </div>
+
+            {/* Mobile: the price and the way to the contact card stay in reach
+                while the visitor scrolls through the settings. */}
+            {file && (
+                <div
+                    aria-hidden={contactInView}
+                    className={`fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md transition-transform duration-300 lg:hidden ${contactInView ? 'translate-y-full' : 'translate-y-0'}`}
+                    style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs text-muted-foreground">Your estimate</p>
+                            <p className="font-display text-lg font-bold tabular-nums">{formatINR(calculatePrice())}</p>
+                        </div>
+                        <Button onClick={() => goToContact()} tabIndex={contactInView ? -1 : 0} className="h-11 shrink-0 rounded-full px-6 font-semibold active:scale-[0.98]">
+                            Get my exact quote
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

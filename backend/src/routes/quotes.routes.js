@@ -3,10 +3,12 @@ import nodemailer from 'nodemailer';
 import db from '../config/database.js';
 import { storageService } from '../services/storage.service.js';
 import authMiddleware from '../middleware/auth.js';
+import optionalAuthMiddleware from '../middleware/optionalAuth.js';
 import isAdmin from '../middleware/isAdmin.js';
-import { notifyQuote } from '../services/whatsapp.service.js';
+import { getConfig as whatsAppConfig, notifyQuote, updatesUrl } from '../services/whatsapp.service.js';
 import { alertNewQuote } from '../services/telegram.service.js';
 import { quoteAdminEmail, quoteContact, quoteCustomerEmail } from '../services/quote.email.js';
+import { GUEST_OWNER, guestQuoteRefusal, lockGuestQuotes, signGuestUpload, verifyGuestUpload } from '../services/guest-quote.js';
 
 const router = express.Router();
 
@@ -36,16 +38,36 @@ router.get('/my', authMiddleware, async (req, res) => {
  * Step 1 of the upload flow: mint a presigned PUT so the browser can send the
  * model directly to S3. Validation of type and size happens here, at signing
  * time, so an oversized or unsupported file is rejected before any bytes move.
+ *
+ * Signed-in customers upload under their own folder. A guest must give an email
+ * and phone first (services/guest-quote.js): nothing is uploaded for a visitor
+ * the team could not reply to.
  */
-router.post('/upload-url', authMiddleware, async (req, res, next) => {
+router.post('/upload-url', optionalAuthMiddleware, async (req, res, next) => {
     try {
         const { filename, contentType, contentLength } = req.body || {};
+        let contact = null;
+        if (!req.userId) {
+            // Honeypot: a field people never see. No upload URL for bots.
+            if (req.body?.website) {
+                console.warn(JSON.stringify({ event: 'quote_honeypot_hit' }));
+                return res.status(400).json({ error: 'Please try again.' });
+            }
+            contact = quoteContact(req.body, null);
+            if (contact.problem) return res.status(400).json({ error: contact.problem });
+            const refusal = await guestQuoteRefusal(db, contact.email);
+            if (refusal) return res.status(429).json({ error: refusal });
+        }
         const result = await storageService.createModelUploadUrl({
-            userId: req.userId,
+            userId: req.userId || GUEST_OWNER,
             filename,
             contentType,
             contentLength
         });
+        if (contact) {
+            result.guestToken = signGuestUpload({ key: result.key, email: contact.email, phone: contact.phone, fileName: filename });
+            console.log(JSON.stringify({ event: 'guest_upload_url', key: result.key }));
+        }
         res.json(result);
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });
@@ -55,26 +77,36 @@ router.post('/upload-url', authMiddleware, async (req, res, next) => {
 
 /**
  * Step 2: record the quote. The client sends the key it was given, never a URL
- * and never file bytes.
+ * and never file bytes. A guest also sends the token that came with the upload
+ * URL, which carries the contact they gave before uploading.
  */
-router.post('/request', authMiddleware, async (req, res, next) => {
+router.post('/request', optionalAuthMiddleware, async (req, res, next) => {
     try {
-        const { notes, specifications, fileKey, fileName } = req.body || {};
+        const { notes, specifications, fileKey, guestToken } = req.body || {};
+        let { fileName } = req.body || {};
 
         if (!fileKey || !fileName) {
             return res.status(400).json({ error: 'fileKey and fileName are required' });
         }
 
-        // The key is namespaced by user at signing time; re-check it here so a
-        // caller cannot attach someone else's model to their own quote.
-        if (!String(fileKey).startsWith(`quotes/models/${req.userId}/`)) {
-            return res.status(403).json({ error: 'That file does not belong to you' });
-        }
+        let contact;
+        if (req.userId) {
+            // The key is namespaced by user at signing time; re-check it here so a
+            // caller cannot attach someone else's model to their own quote.
+            if (!String(fileKey).startsWith(`quotes/models/${req.userId}/`)) {
+                return res.status(403).json({ error: 'That file does not belong to you' });
+            }
 
-        // A quote nobody can be contacted about is no use to the team.
-        const account = await db.oneOrNone('SELECT email, full_name, phone_number FROM users WHERE id = $1', [req.userId]);
-        const contact = quoteContact(req.body, account);
-        if (contact.problem) return res.status(400).json({ error: contact.problem });
+            // A quote nobody can be contacted about is no use to the team.
+            const account = await db.oneOrNone('SELECT email, full_name, phone_number FROM users WHERE id = $1', [req.userId]);
+            contact = quoteContact(req.body, account);
+            if (contact.problem) return res.status(400).json({ error: contact.problem });
+        } else {
+            contact = verifyGuestUpload(guestToken, fileKey);
+            if (!contact) return res.status(403).json({ error: 'This upload has expired. Please upload the file again.' });
+            // The name the upload was signed for: it goes into emails.
+            fileName = contact.fileName;
+        }
 
         // Confirm the object exists rather than trusting the client's word that
         // the upload succeeded -- otherwise a quote can reference nothing.
@@ -91,11 +123,31 @@ router.post('/request', authMiddleware, async (req, res, next) => {
             specs = {};
         }
 
-        const quote = await db.one(`
+        const insertQuote = (t) => t.one(`
             INSERT INTO quotes (user_id, email, phone, file_url, file_name, specifications, estimated_price, admin_notes, status)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
             RETURNING id
-        `, [req.userId, contact.email, contact.phone, fileKey, fileName, specs, specs.estimatedPrice || 0, notes]);
+        `, [req.userId || null, contact.email, contact.phone, fileKey, fileName, specs, Number(specs.estimatedPrice) || 0, notes]);
+
+        // A guest upload makes one quote, and the caps are checked again under a
+        // lock: the cap may have been reached while the model uploaded, and a
+        // replayed token must not slip parallel requests past the count.
+        let quote;
+        if (req.userId) {
+            quote = await insertQuote(db);
+        } else {
+            const outcome = await db.tx(async (t) => {
+                await lockGuestQuotes(t);
+                if (await t.oneOrNone('SELECT 1 FROM quotes WHERE file_url = $1', [fileKey])) {
+                    return { status: 409, error: 'This quote has already been sent.' };
+                }
+                const refusal = await guestQuoteRefusal(t, contact.email);
+                if (refusal) return { status: 429, error: refusal };
+                return { quote: await insertQuote(t) };
+            });
+            if (!outcome.quote) return res.status(outcome.status).json({ error: outcome.error });
+            quote = outcome.quote;
+        }
 
         // The model is not attached: the server never receives the bytes. The
         // email links to the admin dashboard, which downloads it on demand via
@@ -114,7 +166,7 @@ router.post('/request', authMiddleware, async (req, res, next) => {
         const customerMail = transporter.sendMail({
             from: `"ProtoDesign" <${process.env.EMAIL_USER}>`,
             to: contact.email,
-            ...quoteCustomerEmail({ contact, fileName, specs }),
+            ...quoteCustomerEmail({ contact, specs }),
         }).catch(err => console.error(JSON.stringify({
             event: 'email_failed', type: 'quote_customer', quoteId: quote.id, error: err.message
         })));
@@ -126,8 +178,14 @@ router.post('/request', authMiddleware, async (req, res, next) => {
         await Promise.allSettled([adminMail, customerMail,
             alertNewQuote({ quoteId: quote.id, fileName, price: specs.estimatedPrice, contact })]);
 
-        // quoteId lets the page offer "Get updates on WhatsApp" for this quote.
-        res.json({ success: true, message: "Quote requested successfully", quoteId: quote.id, email: contact.email });
+        // quoteId lets the page offer "Get updates on WhatsApp" for this quote. A
+        // guest cannot call GET /whatsapp/link (it checks ownership by account),
+        // so their link comes with this answer.
+        const wa = whatsAppConfig();
+        res.json({
+            success: true, message: "Quote requested successfully", quoteId: quote.id, email: contact.email,
+            ...(!req.userId && wa.enabled ? { whatsAppUrl: updatesUrl(wa, 'quote', quote.id) } : {}),
+        });
 
     } catch (error) {
         console.error('Quote Process Error:', error);

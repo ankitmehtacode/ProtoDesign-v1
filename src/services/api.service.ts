@@ -375,15 +375,22 @@ class ApiService {
 
     /**
      * Upload a 3D model straight to S3. Returns the object key to attach to a
-     * quote. `onProgress` receives 0..1.
+     * quote; a visitor who is not signed in also gets a `guestToken` to send
+     * with it. `contact` is required for them: the server refuses a guest upload
+     * without an email and phone. `onProgress` receives 0..1.
      */
-    async uploadModel(file: File, onProgress?: (fraction: number) => void): Promise<string> {
-        const { uploadUrl, key, contentType } = await this.request("/quotes/upload-url", {
+    async uploadModel(
+        file: File,
+        contact: { email: string; phone: string; website?: string },
+        onProgress?: (fraction: number) => void,
+    ): Promise<{ key: string; guestToken?: string }> {
+        const { uploadUrl, key, contentType, guestToken } = await this.request("/quotes/upload-url", {
             method: "POST",
             body: JSON.stringify({
                 filename: file.name,
                 contentType: file.type || "application/octet-stream",
                 contentLength: file.size,
+                ...contact,
             }),
         });
 
@@ -406,7 +413,7 @@ class ApiService {
             xhr.send(file);
         });
 
-        return key;
+        return { key, guestToken };
     }
 
     /**
@@ -454,7 +461,8 @@ class ApiService {
         phone: string;
         notes?: string;
         specifications: string;
-    }) {
+        guestToken?: string;
+    }): Promise<{ quoteId: string; email: string; whatsAppUrl?: string }> {
         return this.request("/quotes/request", {
             method: "POST",
             body: JSON.stringify(payload),
