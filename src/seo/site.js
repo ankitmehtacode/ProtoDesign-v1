@@ -411,9 +411,12 @@ const MODEL_KEYS = ["model", "model name", "model no."];
 // keys that mean it; the first one present wins.
 const COMPARABLE_SPECS = /** @type {const} */ ([
     ["Technology", ["technology", "print technology"]],
-    ["Build volume", ["build volume", "build size (mm)", "print size (l x w x h) (mm)", "build volume (w*d*h)", "print volume", "printing volume"]],
+    ["Build volume", ["build volume", "build size (mm)", "print size (l x w x h) (mm)", "build volume (w*d*h)", "build volume (mm3)", "print volume", "printing volume"]],
     ["Max print speed", ["max print speed", "printing speed (mm/s)", "print speed", "printing speed", "maximum printing speed", "max speed of toolhead"]],
-    ["Max nozzle temperature", ["max nozzle temperature", "nozzle max temperature (°c)", "max hotend temperature", "nozzle temperature (°c)"]],
+    ["Max nozzle temperature", ["max nozzle temperature", "nozzle max temperature (°c)", "max hotend temperature", "max hot end temperature", "nozzle temperature (°c)"]],
+    ["Materials", ["filament compatibility", "filament supported", "ideal filament"]],
+    // Resin printers' masking screen. Not "screen type": on most listings that is the touchscreen.
+    ["Screen", ["screen", "lcd screen"]],
     ["Multi-colour", ["multi-colour"]],
     ["Bed levelling", ["bed levelling"]],
     ["Motion system", ["motion system"]],

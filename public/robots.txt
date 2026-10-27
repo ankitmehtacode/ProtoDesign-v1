@@ -10,3 +10,4 @@ Disallow: /reset-password
 Disallow: /forgot-password
 
 Sitemap: https://www.protodesignstudio.com/sitemap.xml
+Sitemap: https://www.protodesignstudio.com/sitemap-guides.xml

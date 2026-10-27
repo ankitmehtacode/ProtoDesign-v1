@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { Faq } from "@/components/Faq";
 import { ContactPage, PrivacyPage, RefundPage, ReturnPage, ShippingPage, TermsPage } from "@/pages/Legal";
+import { CompareHubView, ComparisonView, UseCaseHubView, UseCaseView } from "@/components/GuideViews";
 
 const PAGES: Record<string, () => ReactElement> = {
     "/terms-and-conditions": () => <TermsPage />,
@@ -30,3 +31,9 @@ export function renderPage(route: string): string | null {
 
 /** The FAQ section as shown on /custom, or with other questions on another route (/printers). */
 export const renderFaq = (route = "/custom", props: Parameters<typeof Faq>[0] = {}) => render(route, <Faq {...props} />);
+
+/** Guide pages: the views the app renders at /compare and /3d-printing, given the catalogue. */
+export const renderComparison = (...[props]: Parameters<typeof ComparisonView>) => render(props.r.path, <ComparisonView {...props} />);
+export const renderCompareHub = (...[props]: Parameters<typeof CompareHubView>) => render("/compare", <CompareHubView {...props} />);
+export const renderUseCase = (...[props]: Parameters<typeof UseCaseView>) => render(`/3d-printing/${props.u.slug}`, <UseCaseView {...props} />);
+export const renderUseCaseHub = () => render("/3d-printing", <UseCaseHubView />);

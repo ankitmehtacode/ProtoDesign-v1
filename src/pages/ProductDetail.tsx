@@ -46,6 +46,8 @@ import { FreeGiftNote } from '@/components/shop/FreeGiftNote';
 import { INTEREST_FOR_CATEGORY, LeadCapture } from '@/components/LeadCapture';
 import { ProductAlert } from '@/components/ProductAlert';
 import { track } from '@/lib/analytics';
+import { resolveComparisons, type ResolvedComparison } from '@/seo/guides.js';
+import NotFound from "./NotFound";
 
 // --- INTERFACES ---
 interface ProductImage {
@@ -237,6 +239,8 @@ const ProductDetail = () => {
 
     const [product, setProduct] = useState<Product | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+    const [comparisons, setComparisons] = useState<ResolvedComparison<Product>[]>([]);
+    const [notFound, setNotFound] = useState(false);
     const [reviews, setReviews] = useState<Review[]>([]);
 
     const [loading, setLoading] = useState(true);
@@ -288,6 +292,8 @@ const ProductDetail = () => {
             try {
                 if (!productId) { navigate("/shop"); return; }
                 setLoading(true);
+                setNotFound(false);
+                setComparisons([]);
 
                 const admin = await checkAdmin();
 
@@ -316,6 +322,7 @@ const ProductDetail = () => {
                         // GET /products returns a bare array (as ProductCatalog reads it); .data alone left this always empty.
                         const list: Product[] = Array.isArray(categoryRes) ? categoryRes : (categoryRes.data || []);
                         setRelatedProducts(list.filter((p: Product) => p.id !== fetchedProduct.id).slice(0, 10));
+                        setComparisons(resolveComparisons(list).filter((r) => r.a.id === fetchedProduct.id || r.b.id === fetchedProduct.id));
                     } catch (e) { console.error("Failed to load related products", e); }
                 }
 
@@ -323,7 +330,10 @@ const ProductDetail = () => {
 
             } catch (error) {
                 console.error("Error loading product", error);
-                navigate("/shop");
+                // A product that does not exist gets a real 404 page (noindex), not a
+                // redirect that search engines read as a soft 404 of /shop.
+                if ((error as { status?: number }).status === 404) setNotFound(true);
+                else navigate("/shop");
             } finally {
                 setLoading(false);
             }
@@ -673,6 +683,7 @@ const ProductDetail = () => {
     });
 
     if (loading) return <div className="min-h-screen pt-32 flex justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
+    if (notFound) return <NotFound />;
     if (!product) return null;
 
     const inStock = isEditing ? (editState?.stock ?? 0) > 0 : product.stock > 0;
@@ -1175,6 +1186,17 @@ const ProductDetail = () => {
                         </article>
                     </div>
                 </div>
+
+                {comparisons.length > 0 && (
+                    <section className="mb-16 border-t border-border/60 pt-16">
+                        <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">Compare</h2>
+                        <ul className="mt-4 space-y-2">
+                            {comparisons.map((r) => (
+                                <li key={r.path}><Link to={r.path} className="hover:text-primary">{r.cmp.a.name} vs {r.cmp.b.name}</Link></li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
 
                 {relatedProducts.length > 0 && (
                     <div className="border-t border-border/60 pt-16">
