@@ -15,9 +15,12 @@ interface CategoryPageProps {
 }
 
 // A self-serve answer before the enquiry form.
-const TOOL_LINKS: Record<string, { to: string; title: string; body: string }> = {
-    '3d_printer': { to: '/printer-advisor', title: 'Which printer should you buy?', body: 'Answer three questions, get the best three in stock.' },
-    filament: { to: '/filament-calculator', title: 'How much filament do you use?', body: 'See your monthly use, spool life and cost.' },
+const TOOL_LINKS: Record<string, { to: string; title: string; body: string }[]> = {
+    '3d_printer': [
+        { to: '/printer-advisor', title: 'Which printer should you buy?', body: 'Answer three questions, get the best three in stock.' },
+        { to: '/compare', title: 'Compare printers side by side', body: 'Bambu Lab A1 vs P1S, P1S vs P2S and more: price, specs and which to buy.' },
+    ],
+    filament: [{ to: '/filament-calculator', title: 'How much filament do you use?', body: 'See your monthly use, spool life and cost.' }],
 };
 
 const CategoryPage = ({ category, eyebrow, title, subtitle, subCategories }: CategoryPageProps) => {
@@ -36,13 +39,13 @@ const CategoryPage = ({ category, eyebrow, title, subtitle, subCategories }: Cat
             />
             {interest && (
                 <div className="container mx-auto max-w-4xl space-y-4 px-4 pb-16">
-                    {TOOL_LINKS[category] && (
-                        <Link to={TOOL_LINKS[category].to} className="flex items-center justify-between gap-4 rounded-xl border bg-card p-5 hover:border-foreground/40">
-                            <span><span className="font-semibold">{TOOL_LINKS[category].title}</span>
-                                <span className="block text-sm text-muted-foreground">{TOOL_LINKS[category].body}</span></span>
+                    {TOOL_LINKS[category]?.map((tool) => (
+                        <Link key={tool.to} to={tool.to} className="flex items-center justify-between gap-4 rounded-xl border bg-card p-5 hover:border-foreground/40">
+                            <span><span className="font-semibold">{tool.title}</span>
+                                <span className="block text-sm text-muted-foreground">{tool.body}</span></span>
                             <ArrowRight className="h-5 w-5 shrink-0" />
                         </Link>
-                    )}
+                    ))}
                     <LeadCapture interest={interest} form="category_page" />
                 </div>
             )}

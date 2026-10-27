@@ -33,6 +33,8 @@ export const Footer = () => {
                             <li><Link to="/filament-calculator" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Filament calculator</Link></li>
                             <li><Link to="/resins" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Resins</Link></li>
                             <li><Link to="/custom" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Custom Printing</Link></li>
+                            <li><Link to="/3d-printing" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">What we print</Link></li>
+                            <li><Link to="/compare" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Compare printers</Link></li>
                         </ul>
                     </div>
 

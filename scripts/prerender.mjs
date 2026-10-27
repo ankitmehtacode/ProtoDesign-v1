@@ -20,6 +20,10 @@ import {
     plainText, productBrand, productDescription, productLd, productTitle, productUrl, quoteServiceLd,
     istDay, saleLastDay, specMap, websiteLd,
 } from "../src/seo/site.js";
+import {
+    COMPARE_HUB, USE_CASES, USE_CASE_HUB, compareDescription, compareHubLd, compareLd, compareTitle,
+    resolveComparisons, caseHubLd, casePageLd, casePath,
+} from "../src/seo/guides.js";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
 const API = (process.env.VITE_API_URL || "").replace(/\/$/, "");
@@ -107,6 +111,7 @@ function productBody(p, categoryName, categoryPath) {
         `<p class="mt-3 text-lg">${esc(priceText(p))} · GST included · ${stockText(p)} · ${printer ? "Free shipping across India" : "Delivered across India"}</p>` +
         (specs.length ? `<ul class="mt-4 space-y-1 text-sm">${specs.map(([k, v]) => `<li>${esc(k)}: ${esc(v)}</li>`).join("")}</ul>` : "") +
         (desc ? `<p class="mt-4 max-w-xl text-muted-foreground">${esc(desc)}</p>` : "") +
+        linkList("Compare", compareLinks(comparisons.filter((r) => r.a.id === p.id || r.b.id === p.id))) +
         relatedLinks(p));
 }
 
@@ -160,7 +165,7 @@ const template = await readFile(join(DIST, "index.html"), "utf8");
 // static page matches what visitors see. Vite compiles the TSX and resolves "@/".
 const ROOT = new URL("../", import.meta.url).pathname;
 const vite = await createServer({ root: ROOT, appType: "custom", logLevel: "error", server: { middlewareMode: true, hmr: false } });
-const { renderPage, renderFaq } = await vite.ssrLoadModule("/src/seo/ssr.tsx");
+const { renderPage, renderFaq, renderComparison, renderCompareHub, renderUseCase, renderUseCaseHub } = await vite.ssrLoadModule("/src/seo/ssr.tsx");
 
 let products = [];
 let festival = null;
@@ -178,6 +183,14 @@ try {
     console.error(`[prerender] products unavailable, skipping product pages: ${error.message}`);
 }
 
+const comparisons = resolveComparisons(products);
+const linkList = (heading, links) => links.length
+    ? `<h2 class="mt-8 text-xl font-bold">${esc(heading)}</h2><ul class="mt-3 space-y-1 text-sm">${links
+        .map(([href, label]) => `<li><a href="${href}">${esc(label)}</a></li>`).join("")}</ul>`
+    : "";
+const compareLinks = (list) => list.map((r) => [r.path, `${r.cmp.a.name} vs ${r.cmp.b.name}`]);
+const useCaseLinks = USE_CASES.map((u) => [casePath(u), u.h1]);
+
 let count = 0;
 for (const [route, meta] of Object.entries(PAGES)) {
     const ld = [];
@@ -192,8 +205,8 @@ for (const [route, meta] of Object.entries(PAGES)) {
     // The printer price questions /printers shows under its grid (CategoryPage.tsx).
     const priceFaq = meta.category === PRINTER_CATEGORY ? printerPriceFaq(inCategory) : [];
     if (!meta.noindex && priceFaq.length) ld.push(faqLd(priceFaq, route));
-    const extra = route === "/custom" ? renderFaq()
-        : priceFaq.length ? renderFaq(route, { items: priceFaq, heading: "3D printer prices in India: common questions" }) : "";
+    const extra = route === "/custom" ? renderFaq() + linkList("What people print with us", useCaseLinks)
+        : priceFaq.length ? renderFaq(route, { items: priceFaq, heading: "3D printer prices in India: common questions" }) + linkList("Compare 3D printers", compareLinks(comparisons)) : "";
     await write(route, render(template,
         head({ title: meta.title, description: meta.description, canonical: `${SITE_URL}${route}`, noindex: meta.noindex, ld }),
         meta.noindex ? "" : renderedBody(route) ?? pageBody(meta, inCategory, extra)));
@@ -216,6 +229,35 @@ for (const p of products) {
     count++;
 }
 
+// Guides: printer comparisons (only pairs whose two printers are on sale) and use cases.
+const guidePaths = [];
+const guide = async (route, headProps, bodyHtml) => {
+    await write(route, render(template, head({ ...headProps, canonical: `${SITE_URL}${route}` }),
+        `<div class="container mx-auto px-4 pt-28">${nav()}</div>${bodyHtml}`));
+    guidePaths.push(route);
+    count++;
+};
+for (const r of comparisons) {
+    await guide(r.path, { title: compareTitle(r.cmp), description: compareDescription(r), image: r.a.images[0] ?? DEFAULT_IMAGE, ld: compareLd(r) },
+        renderComparison({ r, others: comparisons.filter((x) => x !== r) }));
+}
+if (comparisons.length) {
+    await guide(COMPARE_HUB.path, { title: COMPARE_HUB.title, description: COMPARE_HUB.description, ld: compareHubLd() }, renderCompareHub({ items: comparisons }));
+}
+for (const u of USE_CASES) {
+    await guide(casePath(u), { title: u.title, description: u.description, ld: casePageLd(u) }, renderUseCase({ u }));
+}
+await guide(USE_CASE_HUB.path, { title: USE_CASE_HUB.title, description: USE_CASE_HUB.description, ld: caseHubLd() }, renderUseCaseHub());
+
+// The guides' own sitemap (listed in robots.txt): exactly the pages just written,
+// so a comparison dropped for a missing printer never points Google at a 404.
+// The main sitemap.xml is the backend's (catalogue pages).
+await writeFile(join(DIST, "sitemap-guides.xml"), `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${guidePaths.map((path) => `  <url><loc>${esc(`${SITE_URL}${path}`)}</loc></url>`).join("\n")}
+</urlset>
+`);
+
 // Fallback for products added since the last build: neutral tags, the app fills them in.
 await write("/_app", render(template, head({ title: SITE_NAME, description: PAGES["/"].description, canonical: "" }), ""));
 await write("/404", render(template, head({ ...NOT_FOUND, canonical: "" }), ""));
@@ -223,7 +265,7 @@ await write("/404", render(template, head({ ...NOT_FOUND, canonical: "" }), ""))
 await writeFile(join(DIST, "llms.txt"), llmsTxt(products, festival));
 await vite.close();
 
-console.log(`[prerender] wrote ${count} pages (${products.length} products) + _app.html, 404.html, llms.txt`);
+console.log(`[prerender] wrote ${count} pages (${products.length} products, ${guidePaths.length} guides) + _app.html, 404.html, llms.txt, sitemap-guides.xml`);
 
 /** A route's real component, rendered, under the site nav; null when it has none. */
 function renderedBody(route) {
@@ -274,6 +316,10 @@ function llmsTxt(list, festival) {
         "",
         "## Pages",
         ...indexable.map(([path, m]) => `- [${md(m.h1 ?? m.title)}](${SITE_URL}${path === "/" ? "/" : path}): ${md(m.description)}`),
+        "",
+        "## Guides",
+        ...comparisons.map((r) => `- [${md(`${r.cmp.a.name} vs ${r.cmp.b.name}`)}](${SITE_URL}${r.path}): ${md(compareDescription(r))}`),
+        ...USE_CASES.map((u) => `- [${md(u.h1)}](${SITE_URL}${casePath(u)}): ${md(u.description)}`),
         "",
         "## Buying a 3D printer from ProtoDesign",
         "- Listed prices include 18% GST. A GST invoice is issued by " + ORG.legalName + ` (GSTIN ${ORG.gstin}).`,

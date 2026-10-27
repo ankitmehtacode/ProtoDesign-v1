@@ -14,6 +14,7 @@ import Index from "./pages/Index";
 import Shop from "./pages/Shop";
 import CategoryPage from "./pages/CategoryPage";
 import NotFound from "./pages/NotFound";
+import { CompareHubPage, ComparePage, UseCaseHubPage, UseCasePage } from "./pages/Guides";
 import { TermsPage, PrivacyPage, RefundPage, ReturnPage, ShippingPage, ContactPage } from "@/pages/Legal.tsx";
 import { Footer } from "@/components/Footer"; 
 import ScrollToTop from "@/components/ScrollToTop";
@@ -133,6 +134,10 @@ const App = () => (
                                 {/* Details & Other Pages */}
                                 <Route path="/product/:productId" element={<ProductDetail />} />
                                 <Route path="/custom" element={<CustomPrinting />} />
+                                <Route path="/compare" element={<CompareHubPage />} />
+                                <Route path="/compare/:slug" element={<ComparePage />} />
+                                <Route path="/3d-printing" element={<UseCaseHubPage />} />
+                                <Route path="/3d-printing/:slug" element={<UseCasePage />} />
                                 <Route path="/printer-advisor" element={<PrinterAdvisor />} />
                                 <Route path="/filament-calculator" element={<FilamentCalculator />} />
                                 <Route path="/cart" element={<Cart />} />
