@@ -56,7 +56,8 @@ function PriceLine({ p }: { p: Product }) {
 export function ComparisonView({ r, others }: { r: Resolved; others: Resolved[] }) {
     const { cmp, a, b } = r;
     const specs = [comparableSpecs(a.specifications), comparableSpecs(b.specifications)].map((s) => new Map(s));
-    const rows = [...new Set([...specs[0].keys(), ...specs[1].keys()])];
+    // Only specs both listings record: "Not listed" beside a value reads as "has no Wi-Fi".
+    const rows = [...specs[0].keys()].filter((k) => specs[1].has(k));
     const gap = Math.abs(Number(a.price) - Number(b.price));
     const cheaper = Number(a.price) < Number(b.price) ? cmp.a.name : cmp.b.name;
     return (
@@ -89,8 +90,8 @@ export function ComparisonView({ r, others }: { r: Resolved; others: Resolved[] 
                                 {rows.map((row) => (
                                     <tr key={row}>
                                         <th className="p-3 font-medium" scope="row">{row}</th>
-                                        <td className="p-3 text-muted-foreground">{specs[0].get(row) ?? "Not listed"}</td>
-                                        <td className="p-3 text-muted-foreground">{specs[1].get(row) ?? "Not listed"}</td>
+                                        <td className="p-3 text-muted-foreground">{specs[0].get(row)}</td>
+                                        <td className="p-3 text-muted-foreground">{specs[1].get(row)}</td>
                                     </tr>
                                 ))}
                             </tbody>

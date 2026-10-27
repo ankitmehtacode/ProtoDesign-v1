@@ -11,13 +11,18 @@
  *    the products' own specifications show, or that hold for the model line
  *    (enclosure, frame type). A pair whose product is archived, unpriced or
  *    renamed (new slug) is left out of the site, so a page never shows a
- *    printer we do not sell.
+ *    printer we do not sell. Static pages refresh on the rebuild that admin
+ *    product changes and the catalogue sync trigger (backend site.rebuild.js).
+ *    Both printers must be in the 3d_printer category: the app loads only
+ *    that category for these pages.
+ *  - Verdicts never say which is cheaper: prices are live and a sale can flip
+ *    the order. The page computes that line from the prices.
  *  - Use-case facts (materials, file limits, prices) come from src/lib/quote.ts
  *    and src/seo/faq.js; the pages compute example prices with quotePrice.
  */
 
-import { FACTS, faqLd } from "./faq.js";
-import { SITE_NAME, SITE_URL, breadcrumbLd, plainText, productUrl } from "./site.js";
+import { FACTS } from "./faq.js";
+import { PRINTER_CATEGORY, SITE_NAME, SITE_URL, breadcrumbLd, plainText, productUrl } from "./site.js";
 
 /**
  * @typedef {{ slug: string, name: string }} Side
@@ -31,7 +36,7 @@ export const COMPARISONS = [
         a: { slug: "bambu-lab-a1-mini-3d-printer-db0w", name: "Bambu Lab A1 Mini" },
         b: { slug: "bambu-lab-a1-3d-printer--0c43", name: "Bambu Lab A1" },
         intro: "The same open-frame Bambu Lab printer in two sizes. Both print PLA, PETG and TPU, and both work with the AMS lite for multi-colour prints. The difference is how big a part you can print and how much desk it takes.",
-        chooseA: "Your prints fit in a 180 mm cube (figurines, gadgets, small parts), desk space is tight, or this is your first printer and you want the lowest price.",
+        chooseA: "Your prints fit in a 180 mm cube (figurines, gadgets, small parts), or desk space is tight.",
         chooseB: "You want to print larger parts in one piece: the A1 prints up to a 256 mm cube, over 2.8 times the volume of the A1 Mini.",
     },
     {
@@ -39,7 +44,7 @@ export const COMPARISONS = [
         a: { slug: "bambu-lab-a1-3d-printer--0c43", name: "Bambu Lab A1" },
         b: { slug: "bambu-lab-p1s-3d-printer--f109", name: "Bambu Lab P1S" },
         intro: "Same 256 mm build volume, two different machines. The A1 is open-frame with a moving bed; the P1S is a closed CoreXY printer. The enclosure is what decides which materials you can print well.",
-        chooseA: "You print PLA, PETG and TPU: toys, decor, household parts and most prototypes. It costs less and does those materials well.",
+        chooseA: "You print PLA, PETG and TPU: toys, decor, household parts and most prototypes. It does those materials well without an enclosure.",
         chooseB: "You want ABS or ASA for parts that face heat or sunlight (car parts, outdoor fittings, enclosures). Those materials warp in open air, and the P1S's closed chamber keeps them warm.",
     },
     {
@@ -47,16 +52,16 @@ export const COMPARISONS = [
         a: { slug: "bambu-lab-p1s-3d-printer--f109", name: "Bambu Lab P1S" },
         b: { slug: "bambu-lab-p2s-3d-printer-7173", name: "Bambu Lab P2S" },
         intro: "Two generations of Bambu Lab's enclosed printer. Both print a 256 mm cube and handle ABS and ASA. The P2S is the newer model.",
-        chooseA: "You want an enclosed printer for ABS and ASA at the lower price. It is a proven machine.",
+        chooseA: "You want an enclosed printer for ABS and ASA, and the older model's speed is enough for you.",
         chooseB: "You want the newer generation: a faster toolhead (600 mm/s against 500) and a hotter bed (110 °C).",
     },
     {
         slug: "bambu-lab-p1s-vs-elegoo-centauri-carbon",
         a: { slug: "bambu-lab-p1s-3d-printer--f109", name: "Bambu Lab P1S" },
         b: { slug: "elegoo-centauri-carbon-3d-printer-cccc", name: "ELEGOO Centauri Carbon" },
-        intro: "Two enclosed CoreXY printers with the same 256 mm cube build volume, from different makers. They differ in software and in what you can add later.",
-        chooseA: "You may want multi-colour later: the P1S works with Bambu Lab's AMS. You also get Bambu Studio and the Bambu Handy app for remote monitoring.",
-        chooseB: "You want an enclosed printer for less, and prefer to use your own slicer: it works with OrcaSlicer, Cura and PrusaSlicer.",
+        intro: "Two enclosed CoreXY printers with the same 256 mm cube build volume, from different makers.",
+        chooseA: "You may want multi-colour later: the P1S works with Bambu Lab's AMS.",
+        chooseB: "You use OrcaSlicer, Cura or PrusaSlicer and want a printer that lists support for all three.",
     },
     {
         slug: "bambu-lab-p1s-vs-creality-k1c",
@@ -88,7 +93,7 @@ export const COMPARISONS = [
         b: { slug: "anycubic-photon-mono-4-resin-3d-printer-f16v", name: "Anycubic Photon Mono 4" },
         intro: "Two 7-inch resin printers, the usual first step into resin printing.",
         chooseA: "You want Wi-Fi printing and speed: the Mars 5 Ultra sends jobs over Wi-Fi and prints up to 150 mm an hour.",
-        chooseB: "You want the lowest price into resin printing, and a 10K screen.",
+        chooseB: "You want a 10K screen against the Mars 5 Ultra's 9K.",
     },
 ];
 
@@ -101,12 +106,14 @@ export const comparePath = (/** @type {Comparison} */ c) => `/compare/${c.slug}`
 
 /**
  * The comparisons whose two printers are both on sale, with their products.
- * @template {{ slug?: string, is_archived?: boolean, price: number | string }} P
+ * @template {{ slug?: string, is_archived?: boolean, price: number | string, category?: string }} P
  * @param {P[]} products
  * @returns {ResolvedComparison<P>[]}
  */
 export function resolveComparisons(products) {
-    const bySlug = new Map(products.filter((p) => p.slug && !p.is_archived && Number(p.price) > 0).map((p) => [p.slug, p]));
+    const bySlug = new Map(products
+        .filter((p) => p.slug && !p.is_archived && Number(p.price) > 0 && p.category === PRINTER_CATEGORY)
+        .map((p) => [p.slug, p]));
     return COMPARISONS.flatMap((cmp) => {
         const a = bySlug.get(cmp.a.slug);
         const b = bySlug.get(cmp.b.slug);
@@ -149,7 +156,7 @@ export const compareLd = ({ cmp, a, b, path }) => [
 export const COMPARE_HUB = {
     path: "/compare",
     title: `Compare 3D Printers: Prices in India Side by Side | ${SITE_NAME}`,
-    description: "Bambu Lab, ELEGOO, Creality and Anycubic printers compared side by side: price in India, build volume, speed, materials and which one to buy.",
+    description: "3D printers people often choose between, compared side by side: price in India with GST, build volume, speed, materials and which one to buy.",
     h1: "Compare 3D printers",
     intro: "Printers people often choose between, side by side: price with GST, build volume, speed, materials, and when each one is the better buy.",
 };
@@ -314,10 +321,16 @@ export const USE_CASES = [
 
 export const casePath = (/** @type {UseCase} */ u) => `/3d-printing/${u.slug}`;
 
-/** @param {UseCase} u */
-export const caseCrumbs = (u) => [{ name: "Custom 3D printing", path: "/custom" }, { name: u.name, path: casePath(u) }];
+const CASE_HUB_CRUMBS = [{ name: "Custom 3D printing", path: "/custom" }, { name: "What we print", path: "/3d-printing" }];
 
 /** @param {UseCase} u */
+export const caseCrumbs = (u) => [...CASE_HUB_CRUMBS, { name: u.name, path: casePath(u) }];
+
+/**
+ * Breadcrumbs and Service. No FAQPage: the shown questions share answers with
+ * /custom's, and Google wants repeated FAQ markup on one page only.
+ * @param {UseCase} u
+ */
 export const caseLd = (u) => [
     breadcrumbLd(caseCrumbs(u)),
     {
@@ -340,7 +353,6 @@ export const USE_CASE_HUB = {
     intro: "Upload any STL or OBJ for an instant price. These guides cover the jobs we print most: which material to choose, how to prepare the file and what it costs.",
 };
 
-export const caseHubLd = () => [breadcrumbLd([{ name: "Custom 3D printing", path: "/custom" }, { name: "What we print", path: USE_CASE_HUB.path }])];
+export const caseHubLd = () => [breadcrumbLd(CASE_HUB_CRUMBS)];
 
-/** The use case's structured data with its questions. @param {UseCase} u */
-export const casePageLd = (u) => [...caseLd(u), faqLd(u.faq, casePath(u))];
+

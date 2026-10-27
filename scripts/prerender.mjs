@@ -22,7 +22,7 @@ import {
 } from "../src/seo/site.js";
 import {
     COMPARE_HUB, USE_CASES, USE_CASE_HUB, compareDescription, compareHubLd, compareLd, compareTitle,
-    resolveComparisons, caseHubLd, casePageLd, casePath,
+    resolveComparisons, caseHubLd, caseLd, casePath,
 } from "../src/seo/guides.js";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
@@ -238,14 +238,13 @@ const guide = async (route, headProps, bodyHtml) => {
     count++;
 };
 for (const r of comparisons) {
-    await guide(r.path, { title: compareTitle(r.cmp), description: compareDescription(r), image: r.a.images[0] ?? DEFAULT_IMAGE, ld: compareLd(r) },
+    await guide(r.path, { title: compareTitle(r.cmp), description: compareDescription(r), image: r.a.images[0] ?? r.a.image_url ?? DEFAULT_IMAGE, ld: compareLd(r) },
         renderComparison({ r, others: comparisons.filter((x) => x !== r) }));
 }
-if (comparisons.length) {
-    await guide(COMPARE_HUB.path, { title: COMPARE_HUB.title, description: COMPARE_HUB.description, ld: compareHubLd() }, renderCompareHub({ items: comparisons }));
-}
+// Written even without comparisons (catalogue unavailable): the footer links here from every page.
+await guide(COMPARE_HUB.path, { title: COMPARE_HUB.title, description: COMPARE_HUB.description, ld: compareHubLd() }, renderCompareHub({ items: comparisons }));
 for (const u of USE_CASES) {
-    await guide(casePath(u), { title: u.title, description: u.description, ld: casePageLd(u) }, renderUseCase({ u }));
+    await guide(casePath(u), { title: u.title, description: u.description, ld: caseLd(u) }, renderUseCase({ u }));
 }
 await guide(USE_CASE_HUB.path, { title: USE_CASE_HUB.title, description: USE_CASE_HUB.description, ld: caseHubLd() }, renderUseCaseHub());
 

@@ -13,7 +13,7 @@ import { CompareHubView, ComparisonView, UseCaseHubView, UseCaseView } from "@/c
 import { Seo } from "@/seo/Seo";
 import {
     COMPARE_HUB, USE_CASES, USE_CASE_HUB,
-    caseHubLd, casePageLd, compareDescription, compareHubLd, compareLd, compareTitle, resolveComparisons,
+    caseHubLd, caseLd, compareDescription, compareHubLd, compareLd, compareTitle, resolveComparisons,
 } from "@/seo/guides.js";
 import NotFound from "./NotFound";
 
@@ -72,7 +72,7 @@ export function UseCasePage() {
     if (!u) return <NotFound />;
     return (
         <>
-            <Seo title={u.title} description={u.description} jsonLd={casePageLd(u)} />
+            <Seo title={u.title} description={u.description} jsonLd={caseLd(u)} />
             <UseCaseView u={u} />
         </>
     );

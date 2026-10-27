@@ -1,7 +1,7 @@
 // Types for guides.js (plain JS so the Node prerender script can import it).
 export type Side = { slug: string; name: string };
 export type Comparison = { slug: string; a: Side; b: Side; intro: string; chooseA: string; chooseB: string };
-type Comparable = { slug?: string; id: string; name: string; is_archived?: boolean; price: number | string };
+type Comparable = { slug?: string; id: string; name: string; is_archived?: boolean; price: number | string; category?: string };
 export type ResolvedComparison<P extends Comparable> = { cmp: Comparison; a: P; b: P; path: string };
 export type UseCase = {
     slug: string; title: string; description: string; h1: string; name: string; intro: string;
@@ -28,4 +28,3 @@ export function caseCrumbs(u: UseCase): { name: string; path: string }[];
 export function caseLd(u: UseCase): object[];
 export const USE_CASE_HUB: Hub;
 export function caseHubLd(): object[];
-export function casePageLd(u: UseCase): object[];
