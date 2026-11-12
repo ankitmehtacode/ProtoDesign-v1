@@ -53,7 +53,7 @@ export type PrintQuality = (typeof PRINTER_QUALITIES)[number];
  * which makes small ABS and PETG parts much slower than PLA.
  */
 export const MATERIALS = [
-    { id: "abs", name: "ABS", density: 1.04, inrPerGram: 6.5, minLayerSec: 12, colors: ["Black", "White", "Grey", "Red", "Blue"] },
+    { id: "abs", name: "ABS", density: 1.04, inrPerGram: 6, minLayerSec: 12, colors: ["Black", "White", "Grey", "Red", "Blue"] },
     { id: "pla", name: "PLA", density: 1.24, inrPerGram: 5, minLayerSec: 4, colors: ["Black", "White", "Grey", "Yellow", "Green"] },
     { id: "petg", name: "PETG", density: 1.27, inrPerGram: 6.5, minLayerSec: 10, colors: ["Translucent", "Black"] },
 ];
