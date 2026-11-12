@@ -14,7 +14,7 @@ const PAGE = 20;
 
 type Specs = {
     material?: string; quality?: string; infill?: string; scale?: string; rotation?: string;
-    estimatedTime?: string; estimatedWeight?: string;
+    estimatedTime?: string; estimatedWeight?: string; estimateWarnings?: string[];
     printDimensions?: { x?: number; y?: number; z?: number };
     originalStats?: { volume?: number; triangles?: number; dimensions?: { x?: number; y?: number; z?: number } };
 };
@@ -27,7 +27,7 @@ const specsOf = (q: AdminQuote): Specs => {
 };
 
 const dims = (d?: { x?: number; y?: number; z?: number }) =>
-    d?.x ? `${Number(d.x).toFixed(1)} × ${Number(d.y).toFixed(1)} × ${Number(d.z).toFixed(1)} mm` : "—";
+    d?.x ? `${Number(d.x).toFixed(1)} × ${Number(d.y).toFixed(1)} × ${Number(d.z).toFixed(1)} cm` : "—";
 
 /** wa.me needs the country code; Indian numbers are often stored as 10 digits. */
 const waNumber = (phone: string) => {
@@ -212,7 +212,7 @@ function QuoteDetail({ quote }: { quote: AdminQuote }) {
     ];
     const settings: [string, string][] = [
         ["Material", s.material ?? "—"], ["Quality", s.quality ?? "—"], ["Infill", s.infill ?? "—"], ["Scale", s.scale ?? "100%"],
-        ["Print size", dims(s.printDimensions)], ["Original size", dims(s.originalStats?.dimensions)],
+        ["Print size", dims(s.printDimensions)], ["Size at 100%", dims(s.originalStats?.dimensions)],
         ["Rotation", s.rotation ?? "—"], ["Triangles", s.originalStats?.triangles?.toLocaleString("en-IN") ?? "—"],
     ];
     return (
@@ -222,6 +222,12 @@ function QuoteDetail({ quote }: { quote: AdminQuote }) {
                 <SheetDescription>{formatDate(quote.created_at)} · {quote.email ?? `${quote.phone} via WhatsApp`}</SheetDescription>
             </SheetHeader>
             <div className="mt-4"><StatusBadge label={st.label} tone={st.tone} /></div>
+            {Array.isArray(s.estimateWarnings) && s.estimateWarnings.length > 0 && (
+                <ul className="mt-6 space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+                    <li className="text-xs font-medium text-amber-300">Check before confirming the price</li>
+                    {s.estimateWarnings.map((w) => <li key={w}>{String(w)}</li>)}
+                </ul>
+            )}
             <div className="mt-6 grid grid-cols-2 gap-3">
                 {facts.map(([k, v]) => (
                     <div key={k} className="rounded-lg border p-3">
