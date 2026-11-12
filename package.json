@@ -9,6 +9,7 @@
     "build": "vite build && node scripts/prerender.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "test": "node --test src/lib/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -59,6 +59,8 @@ export function quoteAdminEmail({ quoteId, contact, fileName, fileSize, specs, n
     const polygons = Number(s.polygonCount);
     const sizeMb = (Number(fileSize) / 1024 / 1024).toFixed(2);
     const wa = whatsAppNumber(contact.phone);
+    // What the customer was told about the estimate (open mesh, too big, wrong units).
+    const warnings = Array.isArray(s.estimateWarnings) ? s.estimateWarnings.filter((w) => typeof w === 'string').slice(0, 5) : [];
 
     const subject = `New quote: ${fileName} - ₹${s.estimatedPrice ?? 0}${contact.name ? ` - ${contact.name}` : ''}`;
     const html = `
@@ -90,6 +92,11 @@ export function quoteAdminEmail({ quoteId, contact, fileName, fileSize, specs, n
                         ${row('Polygons', Number.isFinite(polygons) ? polygons.toLocaleString('en-IN') : 'N/A')}
                     </div>
                 </div>
+                ${warnings.length ? `
+                <div style="background: #422006; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+                    <h3 style="margin-top: 0; color: #fbbf24; font-size: 15px; margin-bottom: 8px;">⚠️ Check before confirming the price</h3>
+                    ${warnings.map((w) => `<p style="margin: 4px 0; color: #fde68a;">${escapeHtml(w)}</p>`).join('')}
+                </div>` : ''}
                 <div style="border: 1px dashed #475569; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
                     <h3 style="margin-top: 0; color: #94a3b8; font-size: 15px; margin-bottom: 5px;">📝 Customer notes</h3>
                     <p style="font-style: italic; color: #cbd5e1; margin: 0;">${escapeHtml(notes || 'None provided')}</p>

@@ -9,7 +9,8 @@ import { Upload, Check, RotateCw, Scale, Trash2, FileText, Info } from "lucide-r
 import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
-import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, modelFileProblem, quotePrice, contactErrors, type ContactErrors } from "@/lib/quote";
+import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, modelFileProblem, estimatePrint, estimateWarnings, formatDuration, contactErrors, type ContactErrors } from "@/lib/quote";
+import { EMPTY_STATS, type MeshStats } from "@/lib/mesh";
 import { QuoteContactCard, type QuoteContact } from "@/components/QuoteContactCard";
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
@@ -22,11 +23,7 @@ export default function CustomPrinting() {
     // Rotation State (X, Y, Z degrees)
     const [rotation, setRotation] = useState({ x: 0, y: 0, z: 0 });
 
-    const [modelStats, setModelStats] = useState({
-        volume: 0,
-        dimensions: { x: 0, y: 0, z: 0 },
-        triangles: 0 // Added triangle count
-    });
+    const [modelStats, setModelStats] = useState<MeshStats>(EMPTY_STATS);
 
     const [scale, setScale] = useState(1); // 1 = 100%
 
@@ -74,12 +71,22 @@ export default function CustomPrinting() {
 
     // --- ACTIONS ---
 
-    const handleRemoveFile = () => {
+    const clearModel = () => {
         setFile(null);
         setRotation({ x: 0, y: 0, z: 0 });
         setScale(1);
-        setModelStats({ volume: 0, dimensions: { x: 0, y: 0, z: 0 }, triangles: 0 });
+        setModelStats(EMPTY_STATS);
+    };
+
+    const handleRemoveFile = () => {
+        clearModel();
         toast.info("Model removed");
+    };
+
+    /** Degrees from an input: anything not a finite number is 0, and whole turns drop away. */
+    const setAngle = (axis: "x" | "y" | "z", value: string) => {
+        const deg = Number(value);
+        setRotation(p => ({ ...p, [axis]: Number.isFinite(deg) ? deg % 360 : 0 }));
     };
 
     const updateContact = (next: Partial<QuoteContact>) => {
@@ -114,14 +121,27 @@ export default function CustomPrinting() {
             quality: quality.name,
             material: `${material.name} - ${color}`,
             infill: `${infill}%`,
-            originalStats: modelStats,
+            // At 100% and in the chosen orientation; z is the print height.
+            originalStats: {
+                volume: +modelStats.volume.toFixed(2),
+                area: +modelStats.area.toFixed(1),
+                supportSpace: +modelStats.overhangSpace.toFixed(1),
+                dimensions: {
+                    x: +modelStats.dimensions.x.toFixed(2),
+                    y: +modelStats.dimensions.y.toFixed(2),
+                    z: +modelStats.dimensions.z.toFixed(2),
+                },
+                triangles: modelStats.triangles,
+                closed: modelStats.closed,
+            },
             polygonCount: modelStats.triangles,
-            estimatedWeight: calculateWeight(),
+            estimatedWeight: `${estimate.grams.toFixed(0)} g`,
             printDimensions: printDims,
             scale: `${(scale * 100).toFixed(0)}%`,
             rotation: `X:${rotation.x} Y:${rotation.y} Z:${rotation.z}`,
-            estimatedPrice: calculatePrice(),
-            estimatedTime: calculateTime()
+            estimatedPrice: estimate.price,
+            estimatedTime: formatDuration(estimate.seconds),
+            ...(warnings.length ? { estimateWarnings: warnings } : {})
         });
         try {
             // Two steps: the model goes straight to storage, then the quote is
@@ -179,27 +199,10 @@ export default function CustomPrinting() {
         }
     };
 
-    // --- LOGIC: PRICING & WEIGHT ---
-
-    // Weight = Volume (cm3) * Scale^3 * Density (g/cm3) * Infill Factor (approx)
-    const calculateWeight = () => {
-        if (!modelStats.volume) return "0 g";
-        const scaledVolume = modelStats.volume * Math.pow(scale, 3);
-        const infillFactor = 0.3 + (infill / 100 * 0.7); // Rough approximation: Shell is solid, infill varies
-        const weight = scaledVolume * material.density * infillFactor;
-        return `${weight.toFixed(1)} g`;
-    };
-
-    const calculatePrice = () => quotePrice(modelStats.volume * Math.pow(scale, 3), quality.multiplier, infill);
-
-    const calculateTime = () => {
-        if (!modelStats.volume) return "0h 0m";
-        const scaledVolume = modelStats.volume * Math.pow(scale, 3);
-        const hours = (scaledVolume / 10) * quality.multiplier * (1 + infill/100);
-        const h = Math.floor(hours);
-        const m = Math.floor((hours - h) * 60);
-        return `${h}h ${m}m`;
-    };
+    // --- LOGIC: ESTIMATE ---
+    // Filament, time and price from the measured shape; see src/lib/quote.ts.
+    const estimate = estimatePrint(modelStats, scale, quality, material, infill);
+    const warnings = estimateWarnings(modelStats, scale);
 
     const onDrop = useCallback((files: File[]) => {
         const [next] = files;
@@ -293,6 +296,7 @@ export default function CustomPrinting() {
                                     rotation={rotation} // Pass dynamic rotation object
                                     color={colorHex(color)} // Pass dynamic color
                                     onStatsCalculated={setModelStats}
+                                    onError={(message) => { toast.error(message); clearModel(); }}
                                 />
                                 {!file && (
                                     <div {...getRootProps()} className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition text-white">
@@ -321,7 +325,7 @@ export default function CustomPrinting() {
                                             type="number"
                                             className="h-8"
                                             value={rotation.x}
-                                            onChange={e => setRotation(p => ({...p, x: Number(e.target.value)}))}
+                                            onChange={e => setAngle("x", e.target.value)}
                                         />
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -330,7 +334,7 @@ export default function CustomPrinting() {
                                             type="number"
                                             className="h-8"
                                             value={rotation.y}
-                                            onChange={e => setRotation(p => ({...p, y: Number(e.target.value)}))}
+                                            onChange={e => setAngle("y", e.target.value)}
                                         />
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -339,7 +343,7 @@ export default function CustomPrinting() {
                                             type="number"
                                             className="h-8"
                                             value={rotation.z}
-                                            onChange={e => setRotation(p => ({...p, z: Number(e.target.value)}))}
+                                            onChange={e => setAngle("z", e.target.value)}
                                         />
                                     </div>
                                 </div>
@@ -359,19 +363,19 @@ export default function CustomPrinting() {
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4 p-3 bg-muted/30 rounded-lg text-sm mb-2">
                                     <div>
-                                        <span className="text-muted-foreground block text-xs mb-1">Original Size</span>
+                                        <span className="text-muted-foreground block text-xs mb-1">Size at 100%</span>
                                         <span className="font-mono font-medium">
-                                            {modelStats.dimensions.x} x {modelStats.dimensions.y} x {modelStats.dimensions.z} cm
+                                            {[modelStats.dimensions.x, modelStats.dimensions.y, modelStats.dimensions.z].map((d) => +d.toFixed(2)).join(" x ")} cm
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-muted-foreground block text-xs mb-1">Triangle Count</span>
+                                        <span className="text-muted-foreground block text-xs mb-1">Est. Print Time</span>
                                         <span className="font-mono font-medium">
-                                            {modelStats.triangles.toLocaleString()}
+                                            {formatDuration(estimate.seconds)}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-muted-foreground block text-xs mb-1">Material Volume</span>
+                                        <span className="text-muted-foreground block text-xs mb-1">Model Volume</span>
                                         <span className="font-mono font-medium">
                                             {(modelStats.volume * Math.pow(scale, 3)).toFixed(2)} cm³
                                         </span>
@@ -379,10 +383,16 @@ export default function CustomPrinting() {
                                     <div>
                                         <span className="text-muted-foreground block text-xs mb-1">Est. Weight</span>
                                         <span className="font-mono font-medium">
-                                            {calculateWeight()}
+                                            {estimate.grams.toFixed(0)} g
                                         </span>
                                     </div>
                                 </div>
+
+                                {warnings.length > 0 && (
+                                    <ul role="status" className="space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+                                        {warnings.map((w) => <li key={w}>{w}</li>)}
+                                    </ul>
+                                )}
 
                                 <div className="space-y-3">
                                     <Label>Printing Dimensions (cm)</Label>
@@ -533,8 +543,8 @@ export default function CustomPrinting() {
 
                         <QuoteContactCard
                             ref={contactRef}
-                            price={calculatePrice()}
-                            printTime={calculateTime()}
+                            price={estimate.price}
+                            printTime={formatDuration(estimate.seconds)}
                             summary={`${material.name} ${color} · ${infill}% infill · ${quality.name}`}
                             contact={contact}
                             onContactChange={updateContact}
@@ -561,7 +571,7 @@ export default function CustomPrinting() {
                     <div className="flex items-center gap-3">
                         <div className="min-w-0 flex-1">
                             <p className="text-xs text-muted-foreground">Your estimate</p>
-                            <p className="font-display text-lg font-bold tabular-nums">{formatINR(calculatePrice())}</p>
+                            <p className="font-display text-lg font-bold tabular-nums">{formatINR(estimate.price)}</p>
                         </div>
                         <Button onClick={() => goToContact()} tabIndex={contactInView ? -1 : 0} className="h-11 shrink-0 rounded-full px-6 font-semibold active:scale-[0.98]">
                             Get my exact quote

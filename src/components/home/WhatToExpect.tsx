@@ -54,7 +54,7 @@ const ROWS: { term: string; detail: ReactNode }[] = [
     },
     {
         term: "Price",
-        detail: <>Worked out from your model's volume, layer height and infill, plus <Fig>{formatINR(SETUP_FEE_INR)}</Fig> setup. You see it live while you choose.</>,
+        detail: <>Worked out from the filament and printer time your model needs, plus <Fig>{formatINR(SETUP_FEE_INR)}</Fig> setup. You see it live while you choose.</>,
     },
     {
         term: "Paying",

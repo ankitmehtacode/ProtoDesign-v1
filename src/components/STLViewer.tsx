@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
     OrbitControls,
@@ -9,12 +9,10 @@ import {
 import * as THREE from "three";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { analyzeMesh, edgesClosed, type MeshStats } from "@/lib/mesh";
 
-interface ModelStats {
-    volume: number; // cm3
-    dimensions: { x: number; y: number; z: number }; // cm
-    triangles: number;
-}
+/** How long rotation input must rest before a model is measured again. */
+const ROTATION_SETTLE_MS = 250;
 
 interface STLViewerProps {
     file: File | null;
@@ -22,7 +20,10 @@ interface STLViewerProps {
     rotation?: { x: number; y: number; z: number }; // Degrees
     color?: string; // NEW: Color prop
     showGrid?: boolean;
-    onStatsCalculated: (stats: ModelStats) => void;
+    /** Called when the model loads and again whenever the rotation changes. */
+    onStatsCalculated: (stats: MeshStats) => void;
+    /** Called when the file cannot be read as a model. */
+    onError?: (message: string) => void;
 }
 
 const ModelRender = ({
@@ -63,87 +64,70 @@ export const STLViewer = ({
                               rotation = { x: 0, y: 0, z: 0 },
                               color = "#10b981",
                               showGrid = true,
-                              onStatsCalculated
+                              onStatsCalculated,
+                              onError
                           }: STLViewerProps) => {
-    const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
+    // The geometry is kept with the file it came from, so a removed or replaced
+    // file can never be shown or measured from the previous model.
+    const [loaded, setLoaded] = useState<{ file: File; geometry: THREE.BufferGeometry; edgesClosed: boolean | null } | null>(null);
     const [loading, setLoading] = useState(false);
+    const current = loaded && loaded.file === file ? loaded : null;
+    const geometry = current?.geometry ?? null;
 
-    // Calculate Volume (Signed Triangle Volume)
-    const calculateVolume = (geo: THREE.BufferGeometry) => {
-        const position = geo.attributes.position;
-        const faces = position.count / 3;
-        let sum = 0;
-        const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
-        for (let i = 0; i < faces; i++) {
-            p1.fromBufferAttribute(position, i * 3 + 0);
-            p2.fromBufferAttribute(position, i * 3 + 1);
-            p3.fromBufferAttribute(position, i * 3 + 2);
-            sum += p1.dot(p2.cross(p3)) / 6.0;
-        }
-        return Math.abs(sum) / 1000; // mm3 to cm3
-    };
+    // Latest callbacks without re-running the effects that use them.
+    const callbacks = useRef({ onStatsCalculated, onError });
+    callbacks.current = { onStatsCalculated, onError };
 
     useEffect(() => {
         if (!file) {
-            setGeometry(null);
+            setLoaded(null);
+            setLoading(false);
             return;
         }
-
+        let cancelled = false;
         setLoading(true);
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-            try {
-                const arrayBuffer = event.target?.result as ArrayBuffer;
-                const name = file.name.toLowerCase();
-                let geo: THREE.BufferGeometry | null = null;
-
-                if (name.endsWith(".stl")) {
-                    const loader = new STLLoader();
-                    geo = loader.parse(arrayBuffer);
-                } else if (name.endsWith(".obj")) {
-                    const text = new TextDecoder().decode(arrayBuffer);
-                    const loader = new OBJLoader();
-                    const obj = loader.parse(text);
-                    obj.traverse((child) => {
-                        if ((child as THREE.Mesh).isMesh && !geo) {
-                            geo = (child as THREE.Mesh).geometry.clone();
-                        }
-                    });
-                }
-
-                if (geo) {
-                    geo.center();
-                    geo.computeVertexNormals();
-                    geo.computeBoundingBox();
-
-                    const size = new THREE.Vector3();
-                    geo.boundingBox!.getSize(size);
-
-                    // Robust Triangle Counting
-                    const triangleCount = geo.index
-                        ? geo.index.count / 3
-                        : geo.attributes.position.count / 3;
-
-                    onStatsCalculated({
-                        volume: parseFloat(calculateVolume(geo).toFixed(2)),
-                        dimensions: {
-                            x: parseFloat((size.x / 10).toFixed(2)),
-                            y: parseFloat((size.y / 10).toFixed(2)),
-                            z: parseFloat((size.z / 10).toFixed(2)),
-                        },
-                        triangles: Math.floor(triangleCount)
-                    });
-                    setGeometry(geo);
-                }
-            } catch (err) {
-                console.error("Error loading model:", err);
-            } finally {
-                setLoading(false);
-            }
+        file.arrayBuffer()
+            .then((buffer) => {
+                if (cancelled) return;
+                const geo = parseModel(file.name, buffer);
+                if (!geo) throw new Error("no triangles");
+                setLoaded({ file, geometry: geo, edgesClosed: edgesClosed(geo.attributes.position.array) });
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("Could not load model", file.name, err);
+                setLoaded(null);
+                callbacks.current.onError?.(`${file.name} could not be read as a 3D model. Check the file and try again.`);
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => {
+            cancelled = true;
+            setLoading(false);
         };
-        reader.readAsArrayBuffer(file);
     }, [file]);
+
+    // Measured with the same rotation the viewer shows, so overhangs and the
+    // print height follow the orientation the customer picks. A large model
+    // takes a noticeable moment to measure, so typing a rotation is measured
+    // once it settles; a new model is measured straight away.
+    // Numbers, not the object: a default rotation is a new object every render.
+    const { x: rx, y: ry, z: rz } = rotation;
+    const measured = useRef<THREE.BufferGeometry | null>(null);
+    useEffect(() => {
+        if (!current) return;
+        const { geometry: geo, edgesClosed: closedEdges } = current;
+        const measure = () => {
+            measured.current = geo;
+            const stats = analyzeMesh(geo.attributes.position.array, { x: rx, y: ry, z: rz });
+            callbacks.current.onStatsCalculated({ ...stats, closed: stats.closed && closedEdges !== false });
+        };
+        if (measured.current !== geo) {
+            measure();
+            return;
+        }
+        const timer = setTimeout(measure, ROTATION_SETTLE_MS);
+        return () => clearTimeout(timer);
+    }, [current, rx, ry, rz]);
 
     return (
         <div className="w-full h-full rounded-lg overflow-hidden bg-gradient-to-b from-muted to-secondary relative shadow-inner border border-border">
@@ -182,7 +166,8 @@ export const STLViewer = ({
                 )}
 
                 {geometry && (
-                    <Center top>
+                    // Center measures once per cacheKey: re-seat the model on the floor when it turns or resizes.
+                    <Center top cacheKey={`${rx},${ry},${rz},${scale}`}>
                         <ModelRender
                             geometry={geometry}
                             scale={scale}
@@ -195,3 +180,44 @@ export const STLViewer = ({
         </div>
     );
 };
+/**
+ * One non-indexed, Y-up triangle list for the whole file. Model files are Z-up
+ * (as slicers read them), so they are turned to stand on the viewer's floor the
+ * way they will stand on the print bed. Every mesh in an OBJ is kept.
+ */
+function parseModel(name: string, buffer: ArrayBuffer): THREE.BufferGeometry | null {
+    const parts: THREE.BufferGeometry[] = [];
+    if (name.toLowerCase().endsWith(".stl")) {
+        parts.push(new STLLoader().parse(buffer));
+    } else {
+        const obj = new OBJLoader().parse(new TextDecoder().decode(buffer));
+        obj.updateMatrixWorld(true);
+        obj.traverse((child) => {
+            const mesh = child as THREE.Mesh;
+            if (mesh.isMesh) parts.push(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld));
+        });
+    }
+    const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
+    const length = flat.reduce((n, g) => n + g.attributes.position.count * 3, 0);
+    if (length < 9) return null;
+
+    let geo: THREE.BufferGeometry;
+    if (flat.length === 1) {
+        // The usual case: transform the loader's geometry in place. Copying it
+        // would hold a second copy of a model that can be 200 MB.
+        geo = flat[0];
+    } else {
+        const positions = new Float32Array(length);
+        let offset = 0;
+        for (const g of flat) {
+            positions.set(g.attributes.position.array as ArrayLike<number>, offset);
+            offset += g.attributes.position.count * 3;
+        }
+        geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    }
+    geo.rotateX(-Math.PI / 2);
+    geo.center();
+    geo.computeVertexNormals();
+    return geo;
+}

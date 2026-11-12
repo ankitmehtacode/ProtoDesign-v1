@@ -66,6 +66,14 @@ describe('quoteAdminEmail', () => {
         }
     });
 
+    it('flags estimates the customer was told we would confirm', () => {
+        assert.doesNotMatch(quoteAdminEmail(base).html, /Check before confirming/);
+        const { html } = quoteAdminEmail({ ...base, specs: { ...base.specs, estimateWarnings: ['Model has <holes>', 42] } });
+        assert.match(html, /Check before confirming the price/);
+        assert.match(html, /Model has &lt;holes&gt;/);
+        assert.doesNotMatch(html, />42</);
+    });
+
     it('escapes everything the customer controls', () => {
         const { html } = quoteAdminEmail({
             ...base,

@@ -38,7 +38,7 @@ export const FAQ = [
     },
     {
         q: "How is the price of a custom 3D print worked out?",
-        a: "The quote page calculates it live from your model's volume, the material, the layer height and the infill, plus a ₹150 setup fee. After you send the request, our team checks the file and emails you a payment link.",
+        a: "The quote page works out how much filament your model needs (its walls, infill and any supports) and how long it holds a printer, then prices that by material plus a ₹150 setup fee. It updates live as you change the size, orientation, material, layer height and infill. After you send the request, our team checks the file and emails you a payment link.",
     },
     {
         q: "How long does delivery take?",
