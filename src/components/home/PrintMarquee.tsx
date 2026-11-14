@@ -19,7 +19,7 @@ import { SECTION_TITLE } from "./cta";
  * The row is doubled so the loop is seamless (translateX -50%); screen readers
  * get the list once as text. Reduced motion: no loop, swipe instead.
  */
-// volume: a typical size in cm³, priced with the quote page's own formula.
+// volume: a typical size in cm³, priced as a compact part with the quote page's own estimate.
 const IDEAS: { label: string; src: string; volume?: number }[] = [
     { label: "Keycap set", src: keycaps, volume: 80 },
     { label: "Planter", src: planter, volume: 150 },
