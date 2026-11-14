@@ -23,3 +23,23 @@ declare module "three/addons/loaders/OBJLoader.js" {
         parse(data: string): THREE.Group;
     }
 }
+
+declare module "three/addons/loaders/3MFLoader.js" {
+    import * as THREE from "three";
+    export class ThreeMFLoader {
+        parse(data: ArrayBuffer): THREE.Group;
+    }
+}
+
+declare module "occt-import-js" {
+    type OcctMesh = { attributes: { position: { array: number[] } }; index: { array: number[] } };
+    type Occt = {
+        ReadStepFile(content: Uint8Array, params: { linearUnit?: string } | null): { success: boolean; meshes: OcctMesh[] };
+    };
+    export default function occtImport(options?: { locateFile?: (file: string) => string }): Promise<Occt>;
+}
+
+declare module "*.wasm?url" {
+    const url: string;
+    export default url;
+}

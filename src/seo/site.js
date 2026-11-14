@@ -33,7 +33,7 @@ export const ORG = {
     logo: `${SITE_URL}/apple-touch-icon.png`,
     // Certificate of Incorporation, 7 July 2025.
     foundingDate: "2025-07-07",
-    description: "ProtoDesign is a 3D printing service and 3D printer store in Indore, India, operated by Zon Robotics and AI Pvt. Ltd. It prints customers' STL and OBJ files in PLA, PETG and ABS, sells made-to-order 3D printed products, 3D printers, filament and resin, and ships across India.",
+    description: "ProtoDesign is a 3D printing service and 3D printer store in Indore, India, operated by Zon Robotics and AI Pvt. Ltd. It prints customers' STL, OBJ, 3MF and STEP files in PLA, PETG and ABS, sells made-to-order 3D printed products, 3D printers, filament and resin, and ships across India.",
     // Official profiles, as linked in the site footer. Lets search engines and
     // AI assistants tie these accounts to this business.
     sameAs: [
@@ -67,16 +67,16 @@ export const PAGES = {
     "/": {
         title: "3D Printing Service & 3D Printers in India | ProtoDesign",
         description:
-            "Instant 3D printing quotes: upload an STL or OBJ file, printed in PLA, PETG or ABS and delivered across India. Shop 3D printers and filament too.",
+            "Instant 3D printing quotes: upload an STL, OBJ, 3MF or STEP file, printed in PLA, PETG or ABS and delivered across India. Shop 3D printers and filament too.",
         h1: "Make it real: 3D printing service and 3D printers in India",
         intro: "Upload a model for an instant quote, or shop the printers, filament and resin we print with. Based in Indore, shipping across India: metro cities in 3–5 working days, the rest of India in 5–7.",
     },
     "/custom": {
         title: "Online 3D Printing Service in India: Instant Quote | ProtoDesign",
         description:
-            "Get an instant price for custom 3D printing. Upload an STL or OBJ file up to 200 MB, choose PLA, PETG or ABS, and we print and ship anywhere in India.",
+            "Get an instant price for custom 3D printing. Upload an STL, OBJ, 3MF or STEP file up to 200 MB, choose PLA, PETG or ABS, and we print and ship anywhere in India.",
         h1: "Custom 3D printing with an instant quote",
-        intro: "Upload an STL or OBJ file up to 200 MB. Choose PLA, PETG or ABS and a colour, see the estimated weight, print time and price, then send the job. We check the file, email you a payment link, print it and ship it anywhere in India.",
+        intro: "Upload an STL, OBJ, 3MF or STEP file up to 200 MB. Choose PLA, PETG or ABS and a colour, see the estimated weight, print time and price, then send the job. We check the file, email you a payment link, print it and ship it anywhere in India.",
         crumbs: [{ name: "Custom 3D printing", path: "/custom" }],
         service: true,
     },

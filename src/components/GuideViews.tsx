@@ -177,7 +177,7 @@ export function UseCaseView({ u }: { u: UseCase }) {
             <Faq items={u.faq} heading={`${u.name}: common questions`} />
 
             <div className="mt-12 space-y-4">
-                <LinkCard to="/custom" title="Upload your file" body="STL or OBJ up to 200 MB. See the price before you send the job." />
+                <LinkCard to="/custom" title="Upload your file" body="STL, OBJ, 3MF or STEP up to 200 MB. See the price before you send the job." />
                 <section>
                     <h2 className="font-display text-xl font-bold">Other things we print</h2>
                     <ul className="mt-3 space-y-1 text-sm">
@@ -194,7 +194,7 @@ export function UseCaseHubView() {
         <Shell eyebrow="Custom 3D printing" title={USE_CASE_HUB.h1} intro={USE_CASE_HUB.intro}>
             <div className="mt-10 space-y-4">
                 {USE_CASES.map((u) => <LinkCard key={u.slug} to={casePath(u)} title={u.h1} body={u.description} />)}
-                <LinkCard to="/custom" title="Get an instant quote" body="Upload an STL or OBJ and see the price." />
+                <LinkCard to="/custom" title="Get an instant quote" body="Upload an STL, OBJ, 3MF or STEP and see the price." />
             </div>
         </Shell>
     );
@@ -231,7 +231,7 @@ export function IndoreView() {
             <Faq items={INDORE.faq} heading="3D printing in Indore: common questions" />
 
             <div className="mt-12 space-y-4">
-                <LinkCard to="/custom" title="Upload your file" body="STL or OBJ up to 200 MB. See the price before you send the job." />
+                <LinkCard to="/custom" title="Upload your file" body="STL, OBJ, 3MF or STEP up to 200 MB. See the price before you send the job." />
                 <LinkCard to="/printers" title="Buying a 3D printer in Indore?" body="Every printer we sell, with prices in rupees, GST included." />
                 <section>
                     <h2 className="font-display text-xl font-bold">What people print with us</h2>

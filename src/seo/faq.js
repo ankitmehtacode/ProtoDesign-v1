@@ -5,7 +5,7 @@
  * the FAQPage structured data and /llms.txt, so they can never disagree.
  *
  * Every answer must be true today. Where each fact comes from:
- *  - files, materials, colours: src/pages/CustomPrinting.tsx (dropzone, MATERIALS)
+ *  - files: MODEL_EXTENSIONS in src/lib/quote.ts; materials, colours: src/pages/CustomPrinting.tsx
  *  - 200 MB: MAX_STL_BYTES in backend/src/services/storage.service.js
  *  - shipping, COD, GST: backend/src/services/order.service.js
  *  - delivery times: ShippingPage; returns: ReturnPage (src/pages/Legal.tsx)
@@ -30,7 +30,7 @@ export const FACTS = {
 export const FAQ = [
     {
         q: "What files can I upload for a 3D printing quote?",
-        a: "An STL or OBJ file, up to 200 MB, one model per request. The quote page shows the model in 3D with its size, estimated weight, print time and price as you change the settings.",
+        a: "An STL, OBJ, 3MF or STEP file, up to 200 MB, one model per request. The quote page shows the model in 3D with its size, estimated weight, print time and price as you change the settings.",
     },
     {
         q: "Which materials and colours can I choose?",

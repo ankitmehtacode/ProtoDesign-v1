@@ -87,9 +87,9 @@ export const STLViewer = ({
         let cancelled = false;
         setLoading(true);
         file.arrayBuffer()
-            .then((buffer) => {
+            .then((buffer) => parseModel(file.name, buffer))
+            .then((geo) => {
                 if (cancelled) return;
-                const geo = parseModel(file.name, buffer);
                 if (!geo) throw new Error("no triangles");
                 setLoaded({ file, geometry: geo, edgesClosed: edgesClosed(geo.attributes.position.array) });
             })
@@ -180,22 +180,55 @@ export const STLViewer = ({
         </div>
     );
 };
+/** Every mesh under a loaded object, moved to where the file places it. */
+function meshesOf(root: THREE.Object3D): THREE.BufferGeometry[] {
+    const parts: THREE.BufferGeometry[] = [];
+    root.updateMatrixWorld(true);
+    root.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.isMesh) parts.push(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld));
+    });
+    return parts;
+}
+
+/**
+ * STEP holds exact surfaces, not triangles, so it is meshed here with
+ * OpenCascade (occt-import-js, about 7.6 MB of WebAssembly). Loaded only when
+ * someone drops a STEP file, and served from our own origin.
+ */
+async function stepMeshes(buffer: ArrayBuffer): Promise<THREE.BufferGeometry[]> {
+    const [{ default: occtImport }, { default: wasmUrl }] = await Promise.all([
+        import("occt-import-js"),
+        import("occt-import-js/dist/occt-import-js.wasm?url"),
+    ]);
+    const occt = await occtImport({ locateFile: () => wasmUrl });
+    const result = occt.ReadStepFile(new Uint8Array(buffer), { linearUnit: "millimeter" });
+    if (!result.success) throw new Error("OpenCascade could not read the STEP file");
+    return result.meshes.map((mesh) => {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(mesh.attributes.position.array, 3));
+        geo.setIndex(Array.from(mesh.index.array));
+        return geo;
+    });
+}
+
 /**
  * One non-indexed, Y-up triangle list for the whole file. Model files are Z-up
  * (as slicers read them), so they are turned to stand on the viewer's floor the
- * way they will stand on the print bed. Every mesh in an OBJ is kept.
+ * way they will stand on the print bed. Every mesh in the file is kept.
  */
-function parseModel(name: string, buffer: ArrayBuffer): THREE.BufferGeometry | null {
-    const parts: THREE.BufferGeometry[] = [];
-    if (name.toLowerCase().endsWith(".stl")) {
-        parts.push(new STLLoader().parse(buffer));
+async function parseModel(name: string, buffer: ArrayBuffer): Promise<THREE.BufferGeometry | null> {
+    const lower = name.toLowerCase();
+    let parts: THREE.BufferGeometry[];
+    if (lower.endsWith(".stl")) {
+        parts = [new STLLoader().parse(buffer)];
+    } else if (lower.endsWith(".3mf")) {
+        const { ThreeMFLoader } = await import("three/addons/loaders/3MFLoader.js");
+        parts = meshesOf(new ThreeMFLoader().parse(buffer));
+    } else if (lower.endsWith(".step") || lower.endsWith(".stp")) {
+        parts = await stepMeshes(buffer);
     } else {
-        const obj = new OBJLoader().parse(new TextDecoder().decode(buffer));
-        obj.updateMatrixWorld(true);
-        obj.traverse((child) => {
-            const mesh = child as THREE.Mesh;
-            if (mesh.isMesh) parts.push(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld));
-        });
+        parts = meshesOf(new OBJLoader().parse(new TextDecoder().decode(buffer)));
     }
     const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
     const length = flat.reduce((n, g) => n + g.attributes.position.count * 3, 0);

@@ -185,7 +185,7 @@ const ordering = {
 };
 const files = {
     q: "Which files can I send?",
-    a: "An STL or OBJ file up to 200 MB, one model per request. Most CAD programs export STL; export in millimetres and check the size the quote page shows.",
+    a: "An STL, OBJ, 3MF or STEP file up to 200 MB, one model per request. Most CAD programs export STL; export in millimetres and check the size the quote page shows.",
 };
 const timing = {
     q: "How long does it take?",
@@ -200,7 +200,7 @@ export const USE_CASES = [
         title: `3D Printing for Prototypes in India: Instant Quote | ${SITE_NAME}`,
         description: "3D print a product prototype from your STL in PLA, PETG or ABS. Instant price online, printed in Indore and delivered across India.",
         h1: "3D printed prototypes",
-        intro: "Hold your design before you pay for tooling. Upload an STL or OBJ, see the price straight away, and get a printed part to check fit, size and feel.",
+        intro: "Hold your design before you pay for tooling. Upload an STL, OBJ, 3MF or STEP, see the price straight away, and get a printed part to check fit, size and feel.",
         sections: [
             {
                 heading: "What a printed prototype is for",
@@ -354,7 +354,7 @@ export const USE_CASE_HUB = {
     title: `What We 3D Print: Prototypes, Parts & Models | ${SITE_NAME}`,
     description: "Custom 3D printing for prototypes, replacement parts, architectural models and student projects. Instant price online, delivered across India.",
     h1: "What people 3D print with us",
-    intro: "Upload any STL or OBJ for an instant price. These guides cover the jobs we print most: which material to choose, how to prepare the file and what it costs.",
+    intro: "Upload any STL, OBJ, 3MF or STEP for an instant price. These guides cover the jobs we print most: which material to choose, how to prepare the file and what it costs.",
 };
 
 export const caseHubLd = () => [breadcrumbLd(CASE_HUB_CRUMBS)];
@@ -372,7 +372,7 @@ export const INDORE = {
     path: "/3d-printing-indore",
     name: "3D printing in Indore",
     title: `3D Printing Service in Indore: Instant Quote, Free Pickup | ${SITE_NAME}`,
-    description: "3D printing in Indore: upload an STL or OBJ for an instant price, printed at our Jawahar Tekri workshop. Free pickup, or delivered in Indore the day it is finished.",
+    description: "3D printing in Indore: upload an STL, OBJ, 3MF or STEP for an instant price, printed at our Jawahar Tekri workshop. Free pickup, or delivered in Indore the day it is finished.",
     h1: "3D printing service in Indore",
     intro: "We print at our own workshop in Indore. Upload a model and see the price straight away, then collect the finished print from us for free, or have it delivered within Indore on the day it comes off the printer.",
     workshop: WORKSHOP,
@@ -380,7 +380,7 @@ export const INDORE = {
     tel: ORG.telephone.replace(/[^+\d]/g, ""),
     hours: OPEN_HOURS,
     steps: [
-        "Upload an STL or OBJ file on the quote page and choose PLA, PETG or ABS. The price shows straight away; you do not need an account.",
+        "Upload an STL, OBJ, 3MF or STEP file on the quote page and choose PLA, PETG or ABS. The price shows straight away; you do not need an account.",
         "We check the file and email you a payment link with the production time.",
         "Tell us you are in Indore, by phone or WhatsApp on the number below.",
         "When the print is finished, collect it from the workshop for free, or we deliver it within Indore that same day.",
