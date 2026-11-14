@@ -15,7 +15,7 @@ import { QuoteContactCard, type QuoteContact } from "@/components/QuoteContactCa
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
 import { Link } from "react-router-dom";
-import { USE_CASES, casePath } from "@/seo/guides.js";
+import { INDORE, USE_CASES, casePath } from "@/seo/guides.js";
 import { track } from "@/lib/analytics";
 
 export default function CustomPrinting() {
@@ -564,6 +564,7 @@ export default function CustomPrinting() {
                     <h2 id="use-cases-heading" className="text-xl font-bold">What people print with us</h2>
                     <ul className="mt-3 space-y-1 text-sm">
                         {USE_CASES.map((u) => <li key={u.slug}><Link className="hover:text-primary" to={casePath(u)}>{u.h1}</Link></li>)}
+                        <li><Link className="hover:text-primary" to={INDORE.path}>{INDORE.h1}</Link></li>
                     </ul>
                 </section>
             </div>

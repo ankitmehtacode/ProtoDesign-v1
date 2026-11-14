@@ -14,6 +14,7 @@ export const SITE_URL: string;
 export const SITE_NAME: string;
 export const DEFAULT_IMAGE: string;
 export const ORG: Record<string, unknown>;
+export const OPEN_HOURS: string;
 export const PAGES: Record<string, PageMeta>;
 export const NOT_FOUND: PageMeta;
 export const CATEGORY_PAGES: Record<string, [string, string]>;

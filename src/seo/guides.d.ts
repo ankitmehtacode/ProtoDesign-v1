@@ -28,3 +28,9 @@ export function caseCrumbs(u: UseCase): { name: string; path: string }[];
 export function caseLd(u: UseCase): object[];
 export const USE_CASE_HUB: Hub;
 export function caseHubLd(): object[];
+
+export const INDORE: Hub & {
+    name: string; workshop: string; phone: string; tel: string; hours: string;
+    steps: string[]; faq: { q: string; a: string }[];
+};
+export function indoreLd(): object[];

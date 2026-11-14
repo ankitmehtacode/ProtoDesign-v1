@@ -44,6 +44,9 @@ export const ORG = {
     grievanceOfficer: "Ankit Kumar Mehta",
 };
 
+/** When the phone is answered and the workshop is open (contact and Indore pages). */
+export const OPEN_HOURS = "Mon–Sat, 10 AM – 7 PM";
+
 /**
  * @typedef {{ name: string, path: string }} Crumb
  * @typedef {{

@@ -17,12 +17,16 @@
  *    that category for these pages.
  *  - Verdicts never say which is cheaper: prices are live and a sale can flip
  *    the order. The page computes that line from the prices.
+ *  - The Indore page's local promises (free pickup from the workshop, delivery
+ *    within Indore on the day a print is finished) were confirmed by the owner
+ *    on 15 Nov 2026. They are arranged by phone or WhatsApp, not by checkout:
+ *    change the copy here if the shop stops offering either.
  *  - Use-case facts (materials, file limits, prices) come from src/lib/quote.ts
  *    and src/seo/faq.js; the pages compute example prices with quotePrice.
  */
 
-import { FACTS } from "./faq.js";
-import { PRINTER_CATEGORY, SITE_NAME, SITE_URL, breadcrumbLd, plainText, productUrl } from "./site.js";
+import { FACTS, faqLd } from "./faq.js";
+import { OPEN_HOURS, ORG, PRINTER_CATEGORY, SITE_NAME, SITE_URL, breadcrumbLd, plainText, productUrl } from "./site.js";
 
 /**
  * @typedef {{ slug: string, name: string }} Side
@@ -356,3 +360,69 @@ export const USE_CASE_HUB = {
 export const caseHubLd = () => [breadcrumbLd(CASE_HUB_CRUMBS)];
 
 
+
+// --- Indore ------------------------------------------------------------------
+
+const a = ORG.address;
+const WORKSHOP = `${a.streetAddress}, ${a.addressLocality}, ${a.addressRegion} ${a.postalCode}`;
+const PHONE = ORG.telephone.replace("+91-", "+91 ");
+
+/** The local page: what only a customer in Indore gets (pickup, same-day delivery). */
+export const INDORE = {
+    path: "/3d-printing-indore",
+    name: "3D printing in Indore",
+    title: `3D Printing Service in Indore: Instant Quote, Free Pickup | ${SITE_NAME}`,
+    description: "3D printing in Indore: upload an STL or OBJ for an instant price, printed at our Jawahar Tekri workshop. Free pickup, or delivered in Indore the day it is finished.",
+    h1: "3D printing service in Indore",
+    intro: "We print at our own workshop in Indore. Upload a model and see the price straight away, then collect the finished print from us for free, or have it delivered within Indore on the day it comes off the printer.",
+    workshop: WORKSHOP,
+    phone: PHONE,
+    tel: ORG.telephone.replace(/[^+\d]/g, ""),
+    hours: OPEN_HOURS,
+    steps: [
+        "Upload an STL or OBJ file on the quote page and choose PLA, PETG or ABS. The price shows straight away; you do not need an account.",
+        "We check the file and email you a payment link with the production time.",
+        "Tell us you are in Indore, by phone or WhatsApp on the number below.",
+        "When the print is finished, collect it from the workshop for free, or we deliver it within Indore that same day.",
+    ],
+    faq: [
+        {
+            q: "Where is ProtoDesign in Indore?",
+            a: `Our workshop is at ${WORKSHOP}. It is open ${OPEN_HOURS}.`,
+        },
+        {
+            q: "Can I collect my 3D print myself in Indore?",
+            a: `Yes, and pickup is free. We tell you when the print is finished; collect it from the workshop ${OPEN_HOURS}.`,
+        },
+        {
+            q: "How fast is delivery within Indore?",
+            a: "We deliver within Indore on the day the print is finished. How long the print itself takes depends on its size, and we confirm that with your payment link.",
+        },
+        {
+            q: "How much does 3D printing cost in Indore?",
+            a: "The same as on the quote page: the filament your model needs and the time it holds a printer, plus a ₹150 setup fee. Upload the file to see the exact price before you send the job.",
+        },
+        {
+            q: "Do you deliver outside Indore?",
+            a: `Yes, across India by courier: ${FACTS.deliveryMetroDays} working days to metro cities and ${FACTS.deliveryRestDays} to the rest of India after dispatch.`,
+        },
+    ],
+};
+
+const INDORE_CRUMBS = [{ name: "Custom 3D printing", path: "/custom" }, { name: INDORE.name, path: INDORE.path }];
+
+/** Breadcrumbs, a Service scoped to the city, and the page's own questions. */
+export const indoreLd = () => [
+    breadcrumbLd(INDORE_CRUMBS),
+    {
+        "@context": "https://schema.org",
+        "@type": "Service",
+        serviceType: "3D printing service",
+        name: INDORE.h1,
+        description: INDORE.description,
+        provider: { "@id": `${SITE_URL}/#organization` },
+        areaServed: { "@type": "City", name: "Indore" },
+        url: `${SITE_URL}${INDORE.path}`,
+    },
+    faqLd(INDORE.faq, INDORE.path),
+];

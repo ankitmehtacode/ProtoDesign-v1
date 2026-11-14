@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { Faq } from "@/components/Faq";
 import { ContactPage, PrivacyPage, RefundPage, ReturnPage, ShippingPage, TermsPage } from "@/pages/Legal";
-import { CompareHubView, ComparisonView, UseCaseHubView, UseCaseView } from "@/components/GuideViews";
+import { CompareHubView, ComparisonView, IndoreView, UseCaseHubView, UseCaseView } from "@/components/GuideViews";
 
 const PAGES: Record<string, () => ReactElement> = {
     "/terms-and-conditions": () => <TermsPage />,
@@ -37,3 +37,4 @@ export const renderComparison = (...[props]: Parameters<typeof ComparisonView>) 
 export const renderCompareHub = (...[props]: Parameters<typeof CompareHubView>) => render("/compare", <CompareHubView {...props} />);
 export const renderUseCase = (...[props]: Parameters<typeof UseCaseView>) => render(`/3d-printing/${props.u.slug}`, <UseCaseView {...props} />);
 export const renderUseCaseHub = () => render("/3d-printing", <UseCaseHubView />);
+export const renderIndore = (route: string) => render(route, <IndoreView />);

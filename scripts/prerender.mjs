@@ -21,8 +21,8 @@ import {
     istDay, saleLastDay, specMap, websiteLd,
 } from "../src/seo/site.js";
 import {
-    COMPARE_HUB, USE_CASES, USE_CASE_HUB, compareDescription, compareHubLd, compareLd, compareTitle,
-    resolveComparisons, caseHubLd, caseLd, casePath,
+    COMPARE_HUB, INDORE, USE_CASES, USE_CASE_HUB, compareDescription, compareHubLd, compareLd, compareTitle,
+    resolveComparisons, caseHubLd, caseLd, casePath, indoreLd,
 } from "../src/seo/guides.js";
 
 const DIST = new URL("../dist/", import.meta.url).pathname;
@@ -165,7 +165,7 @@ const template = await readFile(join(DIST, "index.html"), "utf8");
 // static page matches what visitors see. Vite compiles the TSX and resolves "@/".
 const ROOT = new URL("../", import.meta.url).pathname;
 const vite = await createServer({ root: ROOT, appType: "custom", logLevel: "error", server: { middlewareMode: true, hmr: false } });
-const { renderPage, renderFaq, renderComparison, renderCompareHub, renderUseCase, renderUseCaseHub } = await vite.ssrLoadModule("/src/seo/ssr.tsx");
+const { renderPage, renderFaq, renderComparison, renderCompareHub, renderUseCase, renderUseCaseHub, renderIndore } = await vite.ssrLoadModule("/src/seo/ssr.tsx");
 
 let products = [];
 let festival = null;
@@ -189,7 +189,7 @@ const linkList = (heading, links) => links.length
         .map(([href, label]) => `<li><a href="${href}">${esc(label)}</a></li>`).join("")}</ul>`
     : "";
 const compareLinks = (list) => list.map((r) => [r.path, `${r.cmp.a.name} vs ${r.cmp.b.name}`]);
-const useCaseLinks = USE_CASES.map((u) => [casePath(u), u.h1]);
+const useCaseLinks = [...USE_CASES.map((u) => [casePath(u), u.h1]), [INDORE.path, INDORE.h1]];
 
 let count = 0;
 for (const [route, meta] of Object.entries(PAGES)) {
@@ -247,6 +247,7 @@ for (const u of USE_CASES) {
     await guide(casePath(u), { title: u.title, description: u.description, ld: caseLd(u) }, renderUseCase({ u }));
 }
 await guide(USE_CASE_HUB.path, { title: USE_CASE_HUB.title, description: USE_CASE_HUB.description, ld: caseHubLd() }, renderUseCaseHub());
+await guide(INDORE.path, { title: INDORE.title, description: INDORE.description, ld: indoreLd() }, renderIndore(INDORE.path));
 
 // The guides' own sitemap (listed in robots.txt): exactly the pages just written,
 // so a comparison dropped for a missing printer never points Google at a 404.
@@ -319,6 +320,7 @@ function llmsTxt(list, festival) {
         "## Guides",
         ...comparisons.map((r) => `- [${md(`${r.cmp.a.name} vs ${r.cmp.b.name}`)}](${SITE_URL}${r.path}): ${md(compareDescription(r))}`),
         ...USE_CASES.map((u) => `- [${md(u.h1)}](${SITE_URL}${casePath(u)}): ${md(u.description)}`),
+        `- [${md(INDORE.h1)}](${SITE_URL}${INDORE.path}): ${md(INDORE.description)}`,
         "",
         "## Buying a 3D printer from ProtoDesign",
         "- Listed prices include 18% GST. A GST invoice is issued by " + ORG.legalName + ` (GSTIN ${ORG.gstin}).`,

@@ -14,7 +14,7 @@ import { SETUP_FEE_INR, quotePrice } from "@/lib/quote";
 import { productImageUrls, sizedImage, type Product } from "@/components/shop/product";
 import { FACTS } from "@/seo/faq.js";
 import { comparableSpecs, festivalRegularPrice, saleLastDay } from "@/seo/site.js";
-import { COMPARE_HUB, USE_CASES, USE_CASE_HUB, casePath, type ResolvedComparison, type UseCase } from "@/seo/guides.js";
+import { COMPARE_HUB, INDORE, USE_CASES, USE_CASE_HUB, casePath, type ResolvedComparison, type UseCase } from "@/seo/guides.js";
 
 export type Resolved = ResolvedComparison<Product>;
 
@@ -200,3 +200,46 @@ export function UseCaseHubView() {
     );
 }
 
+
+// --- Indore ------------------------------------------------------------------
+
+export function IndoreView() {
+    return (
+        <Shell eyebrow="Custom 3D printing" title={INDORE.h1} intro={INDORE.intro}>
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Button asChild size="lg"><Link to="/custom">Get an instant quote</Link></Button>
+                <Button asChild size="lg" variant="outline"><a href={`tel:${INDORE.tel}`}>Call {INDORE.phone}</a></Button>
+            </div>
+
+            <section className="mt-12">
+                <h2 className="font-display text-2xl font-bold">How it works in Indore</h2>
+                <ol className="mt-4 list-decimal space-y-2 pl-5 text-muted-foreground">
+                    {INDORE.steps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+            </section>
+
+            <section className="mt-12">
+                <h2 className="font-display text-2xl font-bold">Where to find us</h2>
+                <address className="mt-4 rounded-xl border bg-card p-5 not-italic">
+                    <p className="font-semibold">ProtoDesign workshop</p>
+                    <p className="mt-1 text-muted-foreground">{INDORE.workshop}</p>
+                    <p className="mt-1 text-muted-foreground">{INDORE.hours}</p>
+                    <p className="mt-1"><a className="hover:text-primary" href={`tel:${INDORE.tel}`}>{INDORE.phone}</a></p>
+                </address>
+            </section>
+
+            <Faq items={INDORE.faq} heading="3D printing in Indore: common questions" />
+
+            <div className="mt-12 space-y-4">
+                <LinkCard to="/custom" title="Upload your file" body="STL or OBJ up to 200 MB. See the price before you send the job." />
+                <LinkCard to="/printers" title="Buying a 3D printer in Indore?" body="Every printer we sell, with prices in rupees, GST included." />
+                <section>
+                    <h2 className="font-display text-xl font-bold">What people print with us</h2>
+                    <ul className="mt-3 space-y-1 text-sm">
+                        {USE_CASES.map((u) => <li key={u.slug}><Link className="hover:text-primary" to={casePath(u)}>{u.h1}</Link></li>)}
+                    </ul>
+                </section>
+            </div>
+        </Shell>
+    );
+}

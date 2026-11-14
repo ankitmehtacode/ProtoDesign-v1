@@ -9,11 +9,11 @@ import { useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { apiService } from "@/services/api.service";
 import { productImageUrls, type Product } from "@/components/shop/product";
-import { CompareHubView, ComparisonView, UseCaseHubView, UseCaseView } from "@/components/GuideViews";
+import { CompareHubView, ComparisonView, IndoreView, UseCaseHubView, UseCaseView } from "@/components/GuideViews";
 import { Seo } from "@/seo/Seo";
 import {
-    COMPARE_HUB, USE_CASES, USE_CASE_HUB,
-    caseHubLd, caseLd, compareDescription, compareHubLd, compareLd, compareTitle, resolveComparisons,
+    COMPARE_HUB, INDORE, USE_CASES, USE_CASE_HUB,
+    caseHubLd, caseLd, indoreLd, compareDescription, compareHubLd, compareLd, compareTitle, resolveComparisons,
 } from "@/seo/guides.js";
 import NotFound from "./NotFound";
 
@@ -83,6 +83,15 @@ export function UseCaseHubPage() {
         <>
             <Seo title={USE_CASE_HUB.title} description={USE_CASE_HUB.description} jsonLd={caseHubLd()} />
             <UseCaseHubView />
+        </>
+    );
+}
+
+export function IndorePage() {
+    return (
+        <>
+            <Seo title={INDORE.title} description={INDORE.description} jsonLd={indoreLd()} />
+            <IndoreView />
         </>
     );
 }

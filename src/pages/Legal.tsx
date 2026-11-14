@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Mail, Phone, MapPin } from "lucide-react";
+import { OPEN_HOURS } from "@/seo/site.js";
 
 // Shared Layout for all Legal Pages to ensure UI consistency
 const LegalPageLayout = ({ title, lastUpdated, children }: { title: string, lastUpdated: string, children: React.ReactNode }) => {
@@ -293,7 +294,7 @@ export const ContactPage = () => (
             <div className="p-6 border rounded-lg bg-muted/20">
                 <h4 className="font-semibold text-lg mb-2 flex items-center gap-2"><Phone className="w-5 h-5 text-primary"/> Phone</h4>
                 <p>+91 8249581682</p>
-                <p className="text-sm text-muted-foreground">Mon-Sat, 10 AM - 7 PM</p>
+                <p className="text-sm text-muted-foreground">{OPEN_HOURS}</p>
             </div>
 
             <div className="p-6 border rounded-lg bg-muted/20">
