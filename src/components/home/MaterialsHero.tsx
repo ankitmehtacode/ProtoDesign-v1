@@ -1,6 +1,6 @@
 import { Component, Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { gsap, refreshInPageOrder } from "@/lib/gsap";
 import { Nozzle } from "./Nozzle";
@@ -35,8 +35,11 @@ class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean
 }
 
 /*
- * The margin story in one screen: engineering materials that let a printed
- * part do a machined part's job. Behind the promise runs the studio hero
+ * The headline is the materials promise (the owner's line: keep it). Under it
+ * the first action is the print service, for someone who has a file: we print
+ * it in Indore and the price is on the quote page. Buying filament (the film
+ * behind the words, then the heat ladder) is the second action.
+ * Behind the promise runs the studio hero
  * (HeroSequence, a film rendered in Blender): a masked hero pumping a swing, then
  * flying spool to spool on strands of filament, climbing the heat ladder from PLA
  * to PEEK. Its first frame is the poster, so the hero is whole from first paint;
@@ -54,6 +57,7 @@ export const MaterialsHero = () => {
     const ref = useRef<HTMLElement>(null);
     // The metal button is WebGL and always animating: plain button for reduced motion.
     const [still] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const navigate = useNavigate();
     const toLadder = () => document.getElementById("heat-ladder")?.scrollIntoView({ behavior: still ? "auto" : "smooth" });
     // Written by the scroll timeline, read by the film each frame (no React renders).
     const progress = useRef({ p: 0 });
@@ -154,41 +158,45 @@ export const MaterialsHero = () => {
                                 <Nozzle className="absolute bottom-0 left-0 w-[0.26em] -translate-x-1/2 drop-shadow-[0_0_12px_hsl(var(--ember)/0.7)]" />
                             </span>
                         </span>
-                        <span className="sr-only"> Engineering 3D printing filament, delivered across India</span>
+                        <span className="sr-only"> 3D printing service in Indore and engineering filament, delivered across India</span>
                     </h1>
                     <p className="mt-8 max-w-md text-pretty text-base font-light leading-[1.7] tracking-[-0.005em] text-foreground/70">
-                        Engineering filament, from everyday PLA to PEEK: the heat, strength and chemical resistance to do real work. Delivered anywhere in India.
+                        Send us your 3D file and see the price straight away: we print it at our workshop in Indore. Or buy the filament, from everyday PLA to PEEK, and print it yourself.
                     </p>
                     <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
                         {still ? (
-                            <a href="#heat-ladder" className={PRIMARY_CTA}>
-                                Find your material
-                                <ArrowDown className="h-4 w-4" />
-                            </a>
+                            <Link to="/custom" className={PRIMARY_CTA}>
+                                Get an instant quote
+                                <ArrowRight className="h-4 w-4" />
+                            </Link>
                         ) : (
-                            <SpecularButton size="lg" tint="#2bd18a" tintOpacity={0.18} onClick={toLadder}>
+                            <SpecularButton size="lg" tint="#2bd18a" tintOpacity={0.18} onClick={() => navigate("/custom")}>
                                 <span className="inline-flex items-center gap-2 font-semibold">
-                                    Find your material <ArrowDown className="h-4 w-4" />
+                                    Get an instant quote <ArrowRight className="h-4 w-4" />
                                 </span>
                             </SpecularButton>
                         )}
-                        <Link to="/filaments" className="group/link -my-2.5 inline-flex items-center gap-1 py-2.5 font-semibold underline-offset-4 hover:underline">
-                            Shop all filament
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover/link:translate-x-0.5" />
-                        </Link>
+                        <a
+                            href="#heat-ladder"
+                            onClick={(e) => { e.preventDefault(); toLadder(); }}
+                            className="group/link -my-2.5 inline-flex items-center gap-1 py-2.5 font-semibold underline-offset-4 hover:underline"
+                        >
+                            Buying filament? Find your material
+                            <ArrowDown className="h-4 w-4 transition-transform group-hover/link:translate-y-0.5" />
+                        </a>
                     </div>
-                    <dl className="mt-14 grid max-w-md grid-cols-3 divide-x divide-foreground/10 border-t border-foreground/10 pt-5 [&>div]:px-3 sm:[&>div]:px-5 [&>div:first-child]:pl-0">
+                    <dl className="mt-14 grid w-fit max-w-full grid-cols-[auto_auto_auto] divide-x divide-foreground/10 border-t border-foreground/10 pt-5 [&>div]:px-3 sm:[&>div]:px-5 [&>div:first-child]:pl-0">
                         <div>
-                            <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Heat, typical</dt>
-                            <dd className="mt-2 whitespace-nowrap text-base font-extralight sm:text-lg tracking-[-0.02em] tabular-nums">to 250&thinsp;°C</dd>
+                            <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Price</dt>
+                            <dd className="mt-2 whitespace-nowrap text-sm font-extralight sm:text-lg tracking-[-0.02em]">In seconds</dd>
                         </div>
                         <div>
                             <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Materials</dt>
-                            <dd className="mt-2 whitespace-nowrap text-base font-extralight sm:text-lg tracking-[-0.02em]">PLA → PEEK</dd>
+                            <dd className="mt-2 whitespace-nowrap text-sm font-extralight sm:text-lg tracking-[-0.02em]">PLA · PETG · ABS</dd>
                         </div>
                         <div>
-                            <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Composites</dt>
-                            <dd className="mt-2 whitespace-nowrap text-base font-extralight sm:text-lg tracking-[-0.02em]">CF &amp; GF</dd>
+                            <dt className="text-[10px] font-normal uppercase tracking-[0.18em] text-foreground/55">Indore</dt>
+                            <dd className="mt-2 whitespace-nowrap text-sm font-extralight sm:text-lg tracking-[-0.02em]">Free pickup</dd>
                         </div>
                     </dl>
                 </div>
