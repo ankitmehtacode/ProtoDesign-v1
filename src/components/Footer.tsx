@@ -19,7 +19,7 @@ export const Footer = () => {
                             <img src={logoLockup} alt="ProtoDesign Technologies, additive manufacturing" width={767} height={640} loading="lazy" className="h-32 w-auto" />
                         </Link>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            Empowering creators with premium 3D printing solutions. From high-end printers to custom prototyping services.
+                            We print your 3D models in Indore and sell the printers, filament and resin we print with. Delivered across India.
                         </p>
                     </div>
 
