@@ -1,3 +1,15 @@
+
+/**
+ * What a browser may call a model file, as backend storage.service.js allows.
+ * The type comes from the visitor's operating system, and CAD programs register
+ * their own for .step and .3mf; anything else is sent as plain bytes so the
+ * upload is not refused after the price was shown. The extension is checked on
+ * both sides.
+ */
+const MODEL_CONTENT_TYPES = new Set([
+    "model/stl", "application/sla", "application/vnd.ms-pki.stl", "model/obj", "model/3mf",
+    "application/vnd.ms-package.3dmanufacturing-3dmodel+xml", "model/step", "application/step",
+]);
 // src/services/api.service.ts
 
 // @ts-ignore
@@ -388,7 +400,7 @@ class ApiService {
             method: "POST",
             body: JSON.stringify({
                 filename: file.name,
-                contentType: file.type || "application/octet-stream",
+                contentType: MODEL_CONTENT_TYPES.has(file.type) ? file.type : "application/octet-stream",
                 contentLength: file.size,
                 ...contact,
             }),

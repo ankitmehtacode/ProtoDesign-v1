@@ -1025,7 +1025,7 @@ export const PrintStory = () => {
                     <div data-cta className="pointer-events-auto flex max-w-xl flex-col items-center text-center">
                         <p className="text-balance font-display text-4xl leading-[1.05] md:text-6xl">Your file is&nbsp;next.</p>
                         <p className="mt-4 max-w-[26rem] text-pretty text-muted-foreground md:text-lg">
-                            STL or OBJ, up to {MAX_MODEL_MB}&nbsp;MB. You see the price before you send&nbsp;anything.
+                            STL, OBJ, 3MF or STEP, up to {MAX_MODEL_MB}&nbsp;MB. You see the price before you send&nbsp;anything.
                         </p>
                         <Link to="/custom" className={`mt-6 ${PRIMARY_CTA}`}>
                             Get my price <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-1" />

@@ -9,11 +9,13 @@ import { Upload, Check, RotateCw, Scale, Trash2, FileText, Info } from "lucide-r
 import { toast } from "sonner";
 import { apiService } from "@/services/api.service";
 import { formatINR } from "@/lib/currency";
-import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, PRINTER_QUALITIES, colorHex, modelFileProblem, estimatePrint, estimateWarnings, formatDuration, contactErrors, type ContactErrors } from "@/lib/quote";
+import { DEFAULT_INFILL, INFILLS, MATERIALS, MAX_MODEL_MB, MODEL_FORMATS, PRINTER_QUALITIES, colorHex, modelFileProblem, estimatePrint, estimateWarnings, formatDuration, contactErrors, type ContactErrors } from "@/lib/quote";
 import { EMPTY_STATS, type MeshStats } from "@/lib/mesh";
 import { QuoteContactCard, type QuoteContact } from "@/components/QuoteContactCard";
 import { WhatsAppUpdatesButton } from "@/components/WhatsAppUpdatesButton";
 import { Faq } from "@/components/Faq";
+import { Link } from "react-router-dom";
+import { INDORE, USE_CASES, casePath } from "@/seo/guides.js";
 import { track } from "@/lib/analytics";
 
 export default function CustomPrinting() {
@@ -219,9 +221,9 @@ export default function CustomPrinting() {
     const { getRootProps, getInputProps } = useDropzone({
         onDrop,
         onDropRejected: ([rejection]) => {
-            if (rejection) toast.error(modelFileProblem(rejection.file) ?? "Choose one STL or OBJ file.");
+            if (rejection) toast.error(modelFileProblem(rejection.file) ?? `Choose one ${MODEL_FORMATS} file.`);
         },
-        accept: {'model/stl':['.stl'], 'model/obj':['.obj']},
+        accept: {'model/stl':['.stl'], 'model/obj':['.obj'], 'model/3mf':['.3mf'], 'model/step':['.step', '.stp']},
         maxFiles: 1,
         maxSize: MAX_MODEL_MB * 1024 * 1024,
         disabled: !!file
@@ -304,7 +306,7 @@ export default function CustomPrinting() {
                                         <div className="bg-white/10 p-4 rounded-full backdrop-blur-sm mb-4">
                                             <Upload className="w-8 h-8" />
                                         </div>
-                                        <p className="font-semibold text-lg">Click or Drop STL/OBJ here</p>
+                                        <p className="font-semibold text-lg">Click or drop an {MODEL_FORMATS} file here</p>
                                         <p className="mt-1 text-sm text-white/70">See your price in seconds. Free, no sign-up.</p>
                                     </div>
                                 )}
@@ -553,11 +555,19 @@ export default function CustomPrinting() {
                             sending={isSending}
                             uploadProgress={uploadProgress}
                             hasFile={!!file}
+                            measured={modelStats.triangles > 0}
                         />
 
                     </div>
                 </div>
                 <Faq />
+                <section aria-labelledby="use-cases-heading" className="mx-auto mt-12 max-w-3xl">
+                    <h2 id="use-cases-heading" className="text-xl font-bold">What people print with us</h2>
+                    <ul className="mt-3 space-y-1 text-sm">
+                        {USE_CASES.map((u) => <li key={u.slug}><Link className="hover:text-primary" to={casePath(u)}>{u.h1}</Link></li>)}
+                        <li><Link className="hover:text-primary" to={INDORE.path}>{INDORE.h1}</Link></li>
+                    </ul>
+                </section>
             </div>
 
             {/* Mobile: the price and the way to the contact card stay in reach

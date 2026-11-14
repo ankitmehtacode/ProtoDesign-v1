@@ -268,7 +268,7 @@ async function handleInbound(config, { message, contact: profile }) {
     // messages in the same window get no automatic reply.
     if (!windowWasOpen) {
         await reply(contact, 'Thanks for messaging ProtoDesign! Our team will reply here shortly. '
-            + 'Send STATUS for updates on orders you have linked, or send your STL/OBJ file as a document for a printing quote.');
+            + 'Send STATUS for updates on orders you have linked, or send your STL, OBJ, 3MF or STEP file as a document for a printing quote.');
         await alertAdmin(`New WhatsApp conversation: ${contact.profile_name || '+' + contact.wa_id}`,
             `From: ${contact.profile_name || 'Unknown'} (+${contact.wa_id})\n\n${text.slice(0, 500) || `[${message.type}]`}\n\nReply from the Admin Dashboard (WhatsApp panel) within 24 hours.`);
     }

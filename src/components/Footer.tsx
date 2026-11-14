@@ -19,7 +19,7 @@ export const Footer = () => {
                             <img src={logoLockup} alt="ProtoDesign Technologies, additive manufacturing" width={767} height={640} loading="lazy" className="h-32 w-auto" />
                         </Link>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            Empowering creators with premium 3D printing solutions. From high-end printers to custom prototyping services.
+                            We print your 3D models in Indore and sell the printers, filament and resin we print with. Delivered across India.
                         </p>
                     </div>
 
@@ -33,6 +33,9 @@ export const Footer = () => {
                             <li><Link to="/filament-calculator" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Filament calculator</Link></li>
                             <li><Link to="/resins" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Resins</Link></li>
                             <li><Link to="/custom" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Custom Printing</Link></li>
+                            <li><Link to="/3d-printing-indore" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">3D printing in Indore</Link></li>
+                            <li><Link to="/3d-printing" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">What we print</Link></li>
+                            <li><Link to="/compare" className="inline-block py-2.5 transition-colors hover:text-primary md:py-0">Compare printers</Link></li>
                         </ul>
                     </div>
 

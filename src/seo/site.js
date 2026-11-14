@@ -33,7 +33,7 @@ export const ORG = {
     logo: `${SITE_URL}/apple-touch-icon.png`,
     // Certificate of Incorporation, 7 July 2025.
     foundingDate: "2025-07-07",
-    description: "ProtoDesign is a 3D printing service and 3D printer store in Indore, India, operated by Zon Robotics and AI Pvt. Ltd. It prints customers' STL and OBJ files in PLA, PETG and ABS, sells made-to-order 3D printed products, 3D printers, filament and resin, and ships across India.",
+    description: "ProtoDesign is a 3D printing service and 3D printer store in Indore, India, operated by Zon Robotics and AI Pvt. Ltd. It prints customers' STL, OBJ, 3MF and STEP files in PLA, PETG and ABS, sells made-to-order 3D printed products, 3D printers, filament and resin, and ships across India.",
     // Official profiles, as linked in the site footer. Lets search engines and
     // AI assistants tie these accounts to this business.
     sameAs: [
@@ -43,6 +43,9 @@ export const ORG = {
     ],
     grievanceOfficer: "Ankit Kumar Mehta",
 };
+
+/** When the phone is answered and the workshop is open (contact and Indore pages). */
+export const OPEN_HOURS = "Mon–Sat, 10 AM – 7 PM";
 
 /**
  * @typedef {{ name: string, path: string }} Crumb
@@ -64,16 +67,16 @@ export const PAGES = {
     "/": {
         title: "3D Printing Service & 3D Printers in India | ProtoDesign",
         description:
-            "Instant 3D printing quotes: upload an STL or OBJ file, printed in PLA, PETG or ABS and delivered across India. Shop 3D printers and filament too.",
+            "Instant 3D printing quotes: upload an STL, OBJ, 3MF or STEP file, printed in PLA, PETG or ABS and delivered across India. Shop 3D printers and filament too.",
         h1: "Make it real: 3D printing service and 3D printers in India",
         intro: "Upload a model for an instant quote, or shop the printers, filament and resin we print with. Based in Indore, shipping across India: metro cities in 3–5 working days, the rest of India in 5–7.",
     },
     "/custom": {
         title: "Online 3D Printing Service in India: Instant Quote | ProtoDesign",
         description:
-            "Get an instant price for custom 3D printing. Upload an STL or OBJ file up to 200 MB, choose PLA, PETG or ABS, and we print and ship anywhere in India.",
+            "Get an instant price for custom 3D printing. Upload an STL, OBJ, 3MF or STEP file up to 200 MB, choose PLA, PETG or ABS, and we print and ship anywhere in India.",
         h1: "Custom 3D printing with an instant quote",
-        intro: "Upload an STL or OBJ file up to 200 MB. Choose PLA, PETG or ABS and a colour, see the estimated weight, print time and price, then send the job. We check the file, email you a payment link, print it and ship it anywhere in India.",
+        intro: "Upload an STL, OBJ, 3MF or STEP file up to 200 MB. Choose PLA, PETG or ABS and a colour, see the estimated weight, print time and price, then send the job. We check the file, email you a payment link, print it and ship it anywhere in India.",
         crumbs: [{ name: "Custom 3D printing", path: "/custom" }],
         service: true,
     },
@@ -117,9 +120,9 @@ export const PAGES = {
     },
     "/printables": {
         title: "3D Printed Products & Decor to Buy in India | ProtoDesign",
-        description: "Ready-made 3D printed pieces, designed and printed by ProtoDesign and shipped across India.",
+        description: "3D printed pieces, made to order at our workshop in Indore and shipped across India.",
         h1: "3D printables",
-        intro: "Finished 3D printed pieces, designed and printed by us.",
+        intro: "3D printed pieces, made to order at our workshop in Indore.",
         crumbs: [{ name: "Shop", path: "/shop" }, { name: "3D printables", path: "/printables" }],
         category: "3dprintables",
     },
@@ -288,7 +291,7 @@ export const productLd = (p, categoryName, categoryPath) => {
                 license: specs.License || undefined,
             } : undefined,
             // No aggregateRating: rating markup is only allowed for genuine reviews,
-            // and review_count can include seeded placeholder reviews.
+            // and review_count includes seeded placeholders until migration 021 is applied.
             offers: {
                 "@type": "Offer",
                 url,
@@ -411,9 +414,12 @@ const MODEL_KEYS = ["model", "model name", "model no."];
 // keys that mean it; the first one present wins.
 const COMPARABLE_SPECS = /** @type {const} */ ([
     ["Technology", ["technology", "print technology"]],
-    ["Build volume", ["build volume", "build size (mm)", "print size (l x w x h) (mm)", "build volume (w*d*h)", "print volume", "printing volume"]],
+    ["Build volume", ["build volume", "build size (mm)", "print size (l x w x h) (mm)", "build volume (w*d*h)", "build volume (mm3)", "print volume", "printing volume"]],
     ["Max print speed", ["max print speed", "printing speed (mm/s)", "print speed", "printing speed", "maximum printing speed", "max speed of toolhead"]],
-    ["Max nozzle temperature", ["max nozzle temperature", "nozzle max temperature (°c)", "max hotend temperature", "nozzle temperature (°c)"]],
+    ["Max nozzle temperature", ["max nozzle temperature", "nozzle max temperature (°c)", "max hotend temperature", "max hot end temperature", "nozzle temperature (°c)"]],
+    ["Materials", ["filament compatibility", "filament supported", "ideal filament"]],
+    // Resin printers' masking screen. Not "screen type": on most listings that is the touchscreen.
+    ["Screen", ["screen", "lcd screen"]],
     ["Multi-colour", ["multi-colour"]],
     ["Bed levelling", ["bed levelling"]],
     ["Motion system", ["motion system"]],

@@ -135,7 +135,7 @@ const Cart = () => {
                                 </div>
                                 <Button className="w-full h-12 text-lg shadow-md" onClick={() => navigate('/checkout')}>Proceed to Checkout</Button>
                                 {hasPrinter && (
-                                    <p className="text-[10px] text-center text-green-300 font-medium">✨ You've unlocked FREE Shipping by purchasing a 3D Printer!</p>
+                                    <p className="text-[10px] text-center text-green-300 font-medium">Free shipping: your order includes a 3D printer.</p>
                                 )}
                                 <Button variant="outline" className="w-full" onClick={() => navigate('/shop')}>Continue Shopping</Button>
                             </CardContent>

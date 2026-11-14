@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { analyzeMesh, edgesClosed } from "./mesh.ts";
-import { MATERIALS, PRINTER_QUALITIES, estimatePrint, estimateWarnings, quotePrice } from "./quote.ts";
+import { MATERIALS, PRINTER_QUALITIES, estimatePrint, estimateWarnings, modelFileProblem, quotePrice } from "./quote.ts";
 
 type V3 = [number, number, number];
 const quality = (id: string) => PRINTER_QUALITIES.find((q) => q.id === id)!;
@@ -135,4 +135,14 @@ test("warns about models it cannot price with confidence", () => {
     assert.equal(estimateWarnings(s, 3).length, 1, "300 mm is past the plate");
     assert.equal(estimateWarnings(analyzeMesh(toViewer(cube20.slice(1))), 1).length, 1);
     assert.equal(estimateWarnings(analyzeMesh(toViewer(box(0, 0, 0, 2, 2, 2))), 1).length, 1, "2 mm: probably inches");
+});
+
+test("the quote page takes STL, OBJ, 3MF and STEP files and nothing else", () => {
+    const file = (name: string) => ({ name, size: 1024 }) as File;
+    for (const name of ["part.stl", "PART.OBJ", "plate.3mf", "bracket.step", "bracket.STP"]) {
+        assert.equal(modelFileProblem(file(name)), null, name);
+    }
+    for (const name of ["part.iges", "photo.png", "step", "model.stl.exe"]) {
+        assert.match(modelFileProblem(file(name)) ?? "", /is not an STL, OBJ, 3MF or STEP file/, name);
+    }
 });

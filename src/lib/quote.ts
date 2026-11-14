@@ -27,7 +27,9 @@ const START_SECONDS = 376;
 const MIN_COOLING_SPEED_MM_S = 20;
 
 export const MAX_MODEL_MB = 200;
-export const MODEL_EXTENSIONS = [".stl", ".obj"] as const;
+export const MODEL_EXTENSIONS = [".stl", ".obj", ".3mf", ".step", ".stp"] as const;
+/** The same list as customers read it. */
+export const MODEL_FORMATS = "STL, OBJ, 3MF or STEP";
 
 /*
  * shellCm: walls plus top and bottom skins, as a thickness over the surface.
@@ -162,7 +164,7 @@ export function estimateWarnings(stats: MeshStats, scale: number): string[] {
 export function modelFileProblem(file: File): string | null {
     const name = file.name.toLowerCase();
     if (!MODEL_EXTENSIONS.some((ext) => name.endsWith(ext))) {
-        return `${file.name} is not an STL or OBJ file. Export your model as .stl or .obj and try again.`;
+        return `${file.name} is not an ${MODEL_FORMATS} file. Export your model in one of those formats and try again.`;
     }
     if (file.size > MAX_MODEL_MB * 1024 * 1024) {
         return `${file.name} is larger than ${MAX_MODEL_MB} MB. Reduce the mesh resolution and try again.`;
