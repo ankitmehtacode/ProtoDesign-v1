@@ -192,16 +192,39 @@ function meshesOf(root: THREE.Object3D): THREE.BufferGeometry[] {
 }
 
 /**
+ * 3MF is a zip of XML parts; src/lib/threemf.ts reads the meshes out of them.
+ * Only the model and relationship parts are unzipped: a slicer project also
+ * carries thumbnails and settings.
+ */
+async function threeMfMeshes(buffer: ArrayBuffer): Promise<THREE.BufferGeometry[]> {
+    const [{ unzipSync, strFromU8 }, { threeMfTriangles }] = await Promise.all([
+        import("three/addons/libs/fflate.module.js"),
+        import("@/lib/threemf"),
+    ]);
+    const files: Record<string, string> = {};
+    for (const [path, bytes] of Object.entries(unzipSync(new Uint8Array(buffer), { filter: (f) => /\.(model|rels)$/i.test(f.name) }))) {
+        if (/\.(model|rels)$/i.test(path)) files[path] = strFromU8(bytes);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(threeMfTriangles(files), 3));
+    return [geo];
+}
+
+/**
  * STEP holds exact surfaces, not triangles, so it is meshed here with
  * OpenCascade (occt-import-js, about 7.6 MB of WebAssembly). Loaded only when
  * someone drops a STEP file, and served from our own origin.
  */
+let occtLoading: ReturnType<typeof import("occt-import-js").default> | null = null;
+const loadOcct = () => (occtLoading ??= Promise.all([
+    import("occt-import-js"),
+    import("occt-import-js/dist/occt-import-js.wasm?url"),
+]).then(([{ default: occtImport }, { default: wasmUrl }]) => occtImport({ locateFile: () => wasmUrl }))
+    // A failed download must not be remembered: the next STEP file tries again.
+    .catch((err) => { occtLoading = null; throw err; }));
+
 async function stepMeshes(buffer: ArrayBuffer): Promise<THREE.BufferGeometry[]> {
-    const [{ default: occtImport }, { default: wasmUrl }] = await Promise.all([
-        import("occt-import-js"),
-        import("occt-import-js/dist/occt-import-js.wasm?url"),
-    ]);
-    const occt = await occtImport({ locateFile: () => wasmUrl });
+    const occt = await loadOcct();
     const result = occt.ReadStepFile(new Uint8Array(buffer), { linearUnit: "millimeter" });
     if (!result.success) throw new Error("OpenCascade could not read the STEP file");
     return result.meshes.map((mesh) => {
@@ -223,8 +246,7 @@ async function parseModel(name: string, buffer: ArrayBuffer): Promise<THREE.Buff
     if (lower.endsWith(".stl")) {
         parts = [new STLLoader().parse(buffer)];
     } else if (lower.endsWith(".3mf")) {
-        const { ThreeMFLoader } = await import("three/addons/loaders/3MFLoader.js");
-        parts = meshesOf(new ThreeMFLoader().parse(buffer));
+        parts = await threeMfMeshes(buffer);
     } else if (lower.endsWith(".step") || lower.endsWith(".stp")) {
         parts = await stepMeshes(buffer);
     } else {

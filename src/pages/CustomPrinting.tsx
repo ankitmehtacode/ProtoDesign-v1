@@ -555,6 +555,7 @@ export default function CustomPrinting() {
                             sending={isSending}
                             uploadProgress={uploadProgress}
                             hasFile={!!file}
+                            measured={modelStats.triangles > 0}
                         />
 
                     </div>

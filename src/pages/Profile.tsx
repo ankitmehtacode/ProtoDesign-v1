@@ -462,7 +462,7 @@ export default function Profile() {
                                                             toast.error(err?.message || "Could not open that file.");
                                                         }
                                                     }}>
-                                                        <Download className="w-4 h-4 mr-2" /> Download STL
+                                                        <Download className="w-4 h-4 mr-2" /> Download model
                                                     </button>
                                                 </Button>
                                             </div>

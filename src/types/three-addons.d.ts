@@ -24,13 +24,6 @@ declare module "three/addons/loaders/OBJLoader.js" {
     }
 }
 
-declare module "three/addons/loaders/3MFLoader.js" {
-    import * as THREE from "three";
-    export class ThreeMFLoader {
-        parse(data: ArrayBuffer): THREE.Group;
-    }
-}
-
 declare module "occt-import-js" {
     type OcctMesh = { attributes: { position: { array: number[] } }; index: { array: number[] } };
     type Occt = {
@@ -42,4 +35,9 @@ declare module "occt-import-js" {
 declare module "*.wasm?url" {
     const url: string;
     export default url;
+}
+
+declare module "three/addons/libs/fflate.module.js" {
+    export function unzipSync(data: Uint8Array, opts?: { filter?: (file: { name: string }) => boolean }): Record<string, Uint8Array>;
+    export function strFromU8(data: Uint8Array): string;
 }

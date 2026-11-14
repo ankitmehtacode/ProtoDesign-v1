@@ -307,7 +307,7 @@ export const USE_CASES = [
             {
                 heading: "Keeping the cost down",
                 body: [
-                    "The price follows the model's volume, so hollow out or slim down parts that do not carry load.",
+                    "The price follows the filament a part needs and the time it holds a printer, so print it no bigger than it has to be and avoid overhangs that need support.",
                     "Keep the quote page's default 20% infill unless a part takes real force.",
                     "For M3 screws, draw holes about 3.3 mm wide so the screw goes in without drilling.",
                 ],
@@ -382,7 +382,7 @@ export const INDORE = {
     steps: [
         "Upload an STL, OBJ, 3MF or STEP file on the quote page and choose PLA, PETG or ABS. The price shows straight away; you do not need an account.",
         "We check the file and email you a payment link with the production time.",
-        "Tell us you are in Indore, by phone or WhatsApp on the number below.",
+        "Tell us you are in Indore: call the number below.",
         "When the print is finished, collect it from the workshop for free, or we deliver it within Indore that same day.",
     ],
     faq: [

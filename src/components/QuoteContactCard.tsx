@@ -31,10 +31,12 @@ interface Props {
     sending: boolean;
     uploadProgress: number | null;
     hasFile: boolean;
+    /** False while the dropped model is still being read, so a quote is never sent with no price. */
+    measured: boolean;
 }
 
 export const QuoteContactCard = forwardRef<HTMLFormElement, Props>(function QuoteContactCard(
-    { price, printTime, summary, contact, onContactChange, errors, onSubmit, sending, uploadProgress, hasFile },
+    { price, printTime, summary, contact, onContactChange, errors, onSubmit, sending, uploadProgress, hasFile, measured },
     ref,
 ) {
     const [showNotes, setShowNotes] = useState(Boolean(contact.notes));
@@ -151,7 +153,7 @@ export const QuoteContactCard = forwardRef<HTMLFormElement, Props>(function Quot
                     tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
 
                 <Button
-                    type="submit" size="lg" disabled={sending || !hasFile}
+                    type="submit" size="lg" disabled={sending || !hasFile || !measured}
                     className="group h-14 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/25 transition-transform active:scale-[0.98]"
                 >
                     {sending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
