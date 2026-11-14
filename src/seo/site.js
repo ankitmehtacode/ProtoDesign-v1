@@ -291,7 +291,7 @@ export const productLd = (p, categoryName, categoryPath) => {
                 license: specs.License || undefined,
             } : undefined,
             // No aggregateRating: rating markup is only allowed for genuine reviews,
-            // and review_count includes seeded placeholders until migration 021 is applied.
+            // and review_count includes seeded placeholder reviews (kept at the owner's request, 15 Nov 2026).
             offers: {
                 "@type": "Offer",
                 url,
