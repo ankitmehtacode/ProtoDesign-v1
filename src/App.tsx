@@ -81,8 +81,8 @@ const App = () => (
                                     <CategoryPage
                                         category="3dprintables"
                                         eyebrow="3D Printables"
-                                        title="Ready to take home."
-                                        subtitle="Finished pieces, designed and printed by us."
+                                        title="Printed when you order."
+                                        subtitle="Pick a piece and we print it for you at our workshop in Indore."
                                         subCategories={[]}
                                     />
                                 } />

@@ -19,7 +19,7 @@ type Path = { title: string; body: string; to: string; category: string; fallbac
 const PATHS: Path[] = [
     { title: "3D printers", body: "The machines we print on, ready to ship to your desk.", to: "/printers", category: "3d_printer", fallback: workshop },
     { title: "Filament", body: "PLA, PETG, ABS, nylon and carbon fibre by the spool.", to: "/filaments", category: "filament", fallback: terrain },
-    { title: "Ready-made prints", body: "Pieces we designed and printed. Order it, it arrives.", to: "/printables", category: "3dprintables", fallback: vase },
+    { title: "Printed to order", body: "Pick a piece. We print it in Indore and ship it.", to: "/printables", category: "3dprintables", fallback: vase },
 ];
 
 /** One photo per path from the live catalogue; a path without one gets its fallback. */

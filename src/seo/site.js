@@ -120,9 +120,9 @@ export const PAGES = {
     },
     "/printables": {
         title: "3D Printed Products & Decor to Buy in India | ProtoDesign",
-        description: "Ready-made 3D printed pieces, designed and printed by ProtoDesign and shipped across India.",
+        description: "3D printed pieces, made to order at our workshop in Indore and shipped across India.",
         h1: "3D printables",
-        intro: "Finished 3D printed pieces, designed and printed by us.",
+        intro: "3D printed pieces, made to order at our workshop in Indore.",
         crumbs: [{ name: "Shop", path: "/shop" }, { name: "3D printables", path: "/printables" }],
         category: "3dprintables",
     },
